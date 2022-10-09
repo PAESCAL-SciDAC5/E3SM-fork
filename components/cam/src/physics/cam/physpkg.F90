@@ -1411,6 +1411,7 @@ subroutine tphysac (ztodt,   cam_in,               &
     !---------------------------Local workspace-----------------------------
     !
     type(physics_ptend)     :: ptend               ! indivdual parameterization tendencies
+    type(physics_state)     :: state_IC4drydep     ! state snapshot used as IC for aerosol dry deposition
 
     integer  :: nstep                              ! current timestep number
     real(r8) :: zero(pcols)                        ! array of zeros
@@ -1620,10 +1621,10 @@ if (l_vdiff) then
        if (cflx_cpl_opt.eq.1) then 
           call cflx_tend(state, cam_in, ptend) 
           call physics_update(state, ptend, ztodt, tend)
+          call cnd_diag_checkpoint( diag, 'CFLXAPP', state, pbuf, cam_in, cam_out )
        end if
 
        call cnd_diag_checkpoint( diag, 'CFLX1', state, pbuf, cam_in, cam_out )
-       call cnd_diag_checkpoint( diag, 'CFLXAPP', state, pbuf, cam_in, cam_out )
     else
 
        call t_startf('vertical_diffusion_tend')
@@ -1670,14 +1671,54 @@ end if ! l_rayleigh
 
 if (l_tracer_aero) then
 
+    !============================================
     !  aerosol dry deposition processes
+    !============================================
     call t_startf('aero_drydep')
-    call aero_model_drydep( state, pbuf, obklen, surfric, cam_in, ztodt, cam_out, ptend )
+
+    !-------------------------------------------------------------------------
+    ! Prepare IC for the drydep process
+    !-------------------------------------------------------------------------
+    ! If cflx_cpl_opt==1, then the "state" variable already includes ztodt's worth 
+    ! of the cflx-induced increments; otherwise, it does not yet include the 
+    ! cflx-induced increments.
+
+    if (cflx_cpl_opt==5) then
+
+       ! Diagnose the clfx-induced tracer tendencies, then add 0.5dt's worth of the 
+       ! increments to to the tmp variable "state_IC4drydep" so that the IC-induced 
+       ! coupling error and isolation induced coupling can cancel each other at the 
+       ! leading order.
+
+       call cflx_tend(state, cam_in, ptend)
+       call physics_state_copy(state,state_IC4drydep)
+       call physics_update(state_IC4drydep, ptend, 0.5_wp*ztodt)
+
+    else
+       ! Use the current "state" as the IC for drydep. It might or might not have
+       ! include the cflx-induced increments:
+       !  cflx_cpl_opt == 1:    yes
+       !  cflx_cpl_opt == 2, 3: no
+
+       call physics_state_copy(state,state_IC4drydep)
+
+    end if
+
+    !-------------------------------------------------------------------------
+    ! Calculate drydep-induced tendencies; update the model state.
+    ! Note that this physics_update only adds the drydep-induced increments
+    ! to the state. If cflx_cpl_opt==5, the cflx-induced tendencies
+    ! are added in the next call of tphysbc.
+    !-------------------------------------------------------------------------
+    call aero_model_drydep( state_IC4drydep, pbuf, obklen, surfric, cam_in, ztodt, cam_out, ptend )
     call physics_update(state, ptend, ztodt, tend)
+
     call t_stopf('aero_drydep')
     call cnd_diag_checkpoint( diag, 'AERDRYRM', state, pbuf, cam_in, cam_out )
 
+   !============================================
    ! CARMA microphysics
+   !============================================
    !
    ! NOTE: This does both the timestep_tend for CARMA aerosols as well as doing the dry
    ! deposition for CARMA aerosols. It needs to follow vertical_diffusion_tend, so that
@@ -2111,6 +2152,7 @@ subroutine tphysbc (ztodt,                          &
 
     !-- start: for alternative coupling between macmic subcycles and rest of model 
     type(physics_ptend)   :: ptend_dribble                    ! local array to save tendencies to be dribbled into macmic subcyles
+    type(physics_ptend)   :: ptend_cflx                       ! local array to save tendencies to be dribbled into macmic subcyles
     integer               :: cld_cpl_opt                      ! scheme for coupling macmic subcycles with the rest of EAM
     integer               :: dribble_start_step               ! namelist variable, specifying which step the dribbling start  
     logical               :: l_dribble                        ! local variabel to determine if tendency dribbling is applied in macmic loop
@@ -2519,6 +2561,19 @@ if (l_rad .and. (radheat_cpl_opt > 0) .and. (nstep > dyn_time_lvls-1) ) then
 end if
     call cnd_diag_checkpoint( diag, 'BFMACMIC_RAD', state, pbuf, cam_in, cam_out )
 
+    !===============================================================================
+    ! cflx options 2 and 5: add ztodt's worth of cflx-induced increments to tracers
+    !===============================================================================
+    if (cflx_cpl_opt==2 .or. cflx_cpl_opt==5) then
+       call cflx_tend(state, cam_in, ptend)
+       call physics_update(state, ptend, ztodt)
+       call cnd_diag_checkpoint( diag, 'CFLXAPP', state, pbuf, cam_in, cam_out )
+    end if
+    call cnd_diag_checkpoint( diag, 'CFLX2', state, pbuf, cam_in, cam_out )
+
+    !======================================================================
+    ! Stratiform clouds
+    !======================================================================
     if( microp_scheme == 'RK' ) then
 
      if (l_st_mac) then
@@ -2542,7 +2597,10 @@ end if
      end if !l_st_mac
 
     elseif( microp_scheme == 'MG' ) then
+
+       !=======================================================
        ! Start co-substepping of macrophysics and microphysics
+       !=======================================================
        cld_macmic_ztodt = ztodt/cld_macmic_num_steps
 
        ! Clear precip fields that should accumulate.
@@ -2552,6 +2610,10 @@ end if
        snow_pcw_macmic = 0._r8
 
        !-----------------------------------------------------------------------------------
+       ! Diagnose tendencies to be dribbled into the mac-mic sub-cycles.
+       !-----------------------------------------------------------------------------------
+       ! For clouds, humidy, and temperature
+
        l_dribble = ( cld_cpl_opt > 0 ) .and. ( nstep >= dribble_start_step )
        if ( l_dribble ) then
           call set_state_and_tendencies( state, pbuf, cld_cpl_opt, ztodt, p0_clubb, rair, cpair, latvap, tend, &
@@ -2564,33 +2626,33 @@ end if
        end if
        call cnd_diag_checkpoint( diag, 'BF_MACMIC', state, pbuf, cam_in, cam_out )
 
-       !-----------------------------------------------------------------------------------
-       ! cflx option 2: isolated sequential splitting with revised sequence 
+       ! For tracer species
 
-       if (cflx_cpl_opt.eq.2) then
-          call cflx_tend(state, cam_in, ptend)
-          call physics_update(state, ptend, ztodt)
+       if (cflx_cpl_opt.eq.3) then
+           call cflx_tend(state, cam_in, ptend_cflx)
        end if
-       call cnd_diag_checkpoint( diag, 'CFLX2', state, pbuf, cam_in, cam_out )
-       !--------------
+       !-----------------------------------------------------------------------------------
 
 
        do macmic_it = 1, cld_macmic_num_steps
 
           write(char_macmic_it,'(i2.2)') macmic_it
 
-          if (l_dribble) then
+          !==============================================================================
+          ! "Dribbling": At the beginning of each sub-cycle, cld_macmic_ztodt's worth of 
+          ! increments caused by processes outside the mac-mic sub-cycles.
+          !==============================================================================
+          ! For clouds, humidity, and temperature
 
+          if (l_dribble) then
             call physics_ptend_copy(ptend_dribble, ptend)
             call physics_update(state, ptend, cld_macmic_ztodt)
-
           end if
 
-          !--------------------------
-          ! cflx option 3: dribbling
+          ! For constituents #2 - #pcnst
 
           if (cflx_cpl_opt.eq.3) then
-             call cflx_tend(state, cam_in, ptend)
+             call physics_ptend_copy(ptend_cflx, ptend)
              call physics_update(state, ptend, cld_macmic_ztodt)
           end if
           call cnd_diag_checkpoint( diag, 'CFLX3_'//char_macmic_it, state, pbuf, cam_in, cam_out )

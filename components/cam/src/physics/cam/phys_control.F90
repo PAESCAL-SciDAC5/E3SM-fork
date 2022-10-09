@@ -367,6 +367,17 @@ subroutine phys_ctl_readnl(nlfile)
       end if
    end if
 
+   ! Handling of cflx during time integration
+
+   write(iulog,*) 'cflx_cpl_opt = ',cflx_cpl_opt
+
+   select case (cflx_cpl_opt)
+   case( 1,2,3,5 )
+     continue
+   case default
+     call endrun('Unsupported value for cflx_cpl_opt')
+   end select
+
    ! prog_modal_aero determines whether prognostic modal aerosols are present in the run.
    prog_modal_aero = (     cam_chempkg_is('trop_mam3') &
                       .or. cam_chempkg_is('trop_mam4') &
