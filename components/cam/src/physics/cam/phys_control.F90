@@ -372,7 +372,7 @@ subroutine phys_ctl_readnl(nlfile)
    write(iulog,*) 'cflx_cpl_opt = ',cflx_cpl_opt
 
    select case (cflx_cpl_opt)
-   case( 1,2,3,5 )
+   case( 1,2,3,51 )
      continue
    case default
      call endrun('Unsupported value for cflx_cpl_opt')

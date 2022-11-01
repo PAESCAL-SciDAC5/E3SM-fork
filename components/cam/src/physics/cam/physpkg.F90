@@ -1683,7 +1683,7 @@ if (l_tracer_aero) then
     ! of the cflx-induced increments; otherwise, it does not yet include the 
     ! cflx-induced increments.
 
-    if (cflx_cpl_opt==5) then
+    if (cflx_cpl_opt==51) then
 
        ! Diagnose the clfx-induced tracer tendencies, then add 0.5dt's worth of the 
        ! increments to to the tmp variable "state_IC4drydep" so that the IC-induced 
@@ -1697,7 +1697,7 @@ if (l_tracer_aero) then
     else
        ! Use the current "state" as the IC for drydep. It might or might not have
        ! include the cflx-induced increments:
-       !  cflx_cpl_opt == 1:    yes
+       !  cflx_cpl_opt == 1: yes
        !  cflx_cpl_opt == 2, 3: no
 
        call physics_state_copy(state,state_IC4drydep)
@@ -1707,7 +1707,7 @@ if (l_tracer_aero) then
     !-------------------------------------------------------------------------
     ! Calculate drydep-induced tendencies; update the model state.
     ! Note that this physics_update only adds the drydep-induced increments
-    ! to the state. If cflx_cpl_opt==5, the cflx-induced tendencies
+    ! to the state. If cflx_cpl_opt==51, the cflx-induced increments
     ! are added in the next call of tphysbc.
     !-------------------------------------------------------------------------
     call aero_model_drydep( state_IC4drydep, pbuf, obklen, surfric, cam_in, ztodt, cam_out, ptend )
@@ -2564,7 +2564,7 @@ end if
     !===============================================================================
     ! cflx options 2 and 5: add ztodt's worth of cflx-induced increments to tracers
     !===============================================================================
-    if (cflx_cpl_opt==2 .or. cflx_cpl_opt==5) then
+    if (cflx_cpl_opt==2 .or. cflx_cpl_opt==51) then
        call cflx_tend(state, cam_in, ptend)
        call physics_update(state, ptend, ztodt)
        call cnd_diag_checkpoint( diag, 'CFLXAPP', state, pbuf, cam_in, cam_out )
