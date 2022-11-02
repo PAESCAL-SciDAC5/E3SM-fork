@@ -1683,7 +1683,8 @@ if (l_tracer_aero) then
     ! of the cflx-induced increments; otherwise, it does not yet include the 
     ! cflx-induced increments.
 
-    if (cflx_cpl_opt==51) then
+    select case( cflx_cpl_opt )
+    case (51,52)
 
        ! Diagnose the clfx-induced tracer tendencies, then add 0.5dt's worth of the 
        ! increments to to the tmp variable "state_IC4drydep" so that the IC-induced 
@@ -1694,7 +1695,7 @@ if (l_tracer_aero) then
        call physics_state_copy(state,state_IC4drydep)
        call physics_update(state_IC4drydep, ptend, 0.5_wp*ztodt)
 
-    else
+    case default
        ! Use the current "state" as the IC for drydep. It might or might not have
        ! include the cflx-induced increments:
        !  cflx_cpl_opt == 1: yes
@@ -1702,7 +1703,7 @@ if (l_tracer_aero) then
 
        call physics_state_copy(state,state_IC4drydep)
 
-    end if
+    end select
 
     !-------------------------------------------------------------------------
     ! Calculate drydep-induced tendencies; update the model state.
@@ -2562,14 +2563,38 @@ end if
     call cnd_diag_checkpoint( diag, 'BFMACMIC_RAD', state, pbuf, cam_in, cam_out )
 
     !===============================================================================
-    ! cflx options 2 and 5: add ztodt's worth of cflx-induced increments to tracers
+    ! Apply surface emissions
     !===============================================================================
-    if (cflx_cpl_opt==2 .or. cflx_cpl_opt==51) then
+    select case (cflx_cpl_opt)
+    case(2,51)
+
+       ! The "state" variable at this point does not yet include any contribution from cflx.
+       ! Diagnose the clfx-induced tracer tendencies, add dt's worth of the increment 
+       ! to state, and we are done with cflx.
+
        call cflx_tend(state, cam_in, ptend)
        call physics_update(state, ptend, ztodt)
        call cnd_diag_checkpoint( diag, 'CFLXAPP', state, pbuf, cam_in, cam_out )
-    end if
+
+    case(52)
+
+       ! The "state" variable at this point does not yet include any contribution from cflx.
+       ! Diagnose the clfx-induced tracer tendencies, then add 0.5dt's worth of the 
+       ! increments to "state" so that the IC-induced coupling error and isolation 
+       ! induced coupling can cancel each other at the leading order for turbulent
+       ! transport that is calculated below in the macmic subcycles.
+       ! A tmp variable ptend_clfx is used here to save the tendencies, so that
+       ! after the macmic subcycles, we can add another 0.5dt's worth without
+       ! having to re-diagnose ptend_cflx.
+
+       call cflx_tend(state, cam_in, ptend_cflx)
+       call physics_ptend_copy(ptend_cflx, ptend)
+       call physics_update(state, ptend, 0.5_wp*ztodt)
+       call cnd_diag_checkpoint( diag, 'CFLXAPPa', state, pbuf, cam_in, cam_out )
+
+    end select
     call cnd_diag_checkpoint( diag, 'CFLX2', state, pbuf, cam_in, cam_out )
+
 
     !======================================================================
     ! Stratiform clouds
@@ -2859,6 +2884,23 @@ end if
 
      call cnd_diag_checkpoint( diag, 'STCLD', state, pbuf, cam_in, cam_out )
      !---------------------------------------------------------------------
+
+     !===================================================
+     ! Surface emissions again
+     !===================================================
+     if (cflx_cpl_opt==52) then
+
+        ! 0.5dt worth of clfx-induced increments was added before the macmic subcycles. 
+        ! Here we add another 0.5dt worth, then we are done with cflx.
+
+        call physics_ptend_copy(ptend_cflx, ptend)
+        call physics_update(state, ptend, 0.5_wp*ztodt)
+        call cnd_diag_checkpoint( diag, 'CFLXAPPb', state, pbuf, cam_in, cam_out )
+     end if
+     call cnd_diag_checkpoint( diag, 'CFLX4', state, pbuf, cam_in, cam_out )
+     !---------------------------------------------------------------------
+
+
 
 if (l_tracer_aero) then
 
