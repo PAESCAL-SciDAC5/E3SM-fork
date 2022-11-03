@@ -1348,7 +1348,7 @@ subroutine tphysac (ztodt,   cam_in,               &
     use rayleigh_friction,  only: rayleigh_friction_tend
     use constituents,       only: cnst_get_ind
     use physics_types,      only: physics_state, physics_tend, physics_ptend,    &
-         physics_dme_adjust, set_dry_to_wet, physics_state_check
+         physics_dme_adjust, set_dry_to_wet, physics_state_check, physics_state_copy
     use majorsp_diffusion,  only: mspd_intr  ! WACCM-X major diffusion
     use ionosphere,         only: ionos_intr ! WACCM-X ionosphere
     use tracers,            only: tracers_timestep_tend
@@ -1693,7 +1693,7 @@ if (l_tracer_aero) then
 
        call cflx_tend(state, cam_in, ptend)
        call physics_state_copy(state,state_IC4drydep)
-       call physics_update(state_IC4drydep, ptend, 0.5_wp*ztodt)
+       call physics_update(state_IC4drydep, ptend, 0.5_r8*ztodt)
 
     case default
        ! Use the current "state" as the IC for drydep. It might or might not have
@@ -2589,7 +2589,7 @@ end if
 
        call cflx_tend(state, cam_in, ptend_cflx)
        call physics_ptend_copy(ptend_cflx, ptend)
-       call physics_update(state, ptend, 0.5_wp*ztodt)
+       call physics_update(state, ptend, 0.5_r8*ztodt)
        call cnd_diag_checkpoint( diag, 'CFLXAPPa', state, pbuf, cam_in, cam_out )
 
     end select
@@ -2894,7 +2894,7 @@ end if
         ! Here we add another 0.5dt worth, then we are done with cflx.
 
         call physics_ptend_copy(ptend_cflx, ptend)
-        call physics_update(state, ptend, 0.5_wp*ztodt)
+        call physics_update(state, ptend, 0.5_r8*ztodt)
         call cnd_diag_checkpoint( diag, 'CFLXAPPb', state, pbuf, cam_in, cam_out )
      end if
      call cnd_diag_checkpoint( diag, 'CFLX4', state, pbuf, cam_in, cam_out )
