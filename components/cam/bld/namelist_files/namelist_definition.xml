@@ -2602,6 +2602,12 @@ Scheme for coupling surface tracer flux with rest of model.
 Default: 1 
 </entry>
 
+<entry id="dryrm_cpl_opt" type="integer" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Scheme for coupling aerosol dry removal with rest of model.
+Default: 1 
+</entry>
+
 <entry id="clubb_intr_efix_opt" type="integer" category="physc_test"
        group="phys_ctl_nl" valid_values="" >
 Energy fixer in module clubb_intr.
