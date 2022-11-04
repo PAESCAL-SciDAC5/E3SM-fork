@@ -1353,7 +1353,7 @@ subroutine tphysac (ztodt,   cam_in,               &
     use vertical_diffusion, only: vertical_diffusion_tend
     use rayleigh_friction,  only: rayleigh_friction_tend
     use constituents,       only: cnst_get_ind
-    use physics_types,      only: physics_state, physics_tend, physics_ptend,    &
+    use physics_types,      only: physics_state, physics_tend, physics_ptend, physics_ptend_init,   &
          physics_dme_adjust, set_dry_to_wet, physics_state_check, physics_state_copy
     use majorsp_diffusion,  only: mspd_intr  ! WACCM-X major diffusion
     use ionosphere,         only: ionos_intr ! WACCM-X ionosphere
@@ -1419,6 +1419,7 @@ subroutine tphysac (ztodt,   cam_in,               &
     !---------------------------Local workspace-----------------------------
     !
     type(physics_ptend)     :: ptend               ! indivdual parameterization tendencies
+    type(physics_ptend)     :: ptend_turb          ! local array containing turbulence-induced tendencies from the previous timestep
     type(physics_state)     :: state_IC4drydep     ! state snapshot used as IC for aerosol dry deposition
 
     integer  :: nstep                              ! current timestep number
@@ -1474,6 +1475,7 @@ subroutine tphysac (ztodt,   cam_in,               &
     real(r8):: net_flx(pcols)
 
     integer :: cflx_cpl_opt
+    logical :: lq(pcnst)
     !
     !-----------------------------------------------------------------------
     !

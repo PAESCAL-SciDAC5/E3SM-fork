@@ -3,12 +3,17 @@ module atm_cpl_utils
 ! Utitily subroutines used by various process coupling schemes 
 !---------------------------------------------------------------------------------
 
+  use shr_kind_mod,   only: r8 => shr_kind_r8
   use cam_abortutils, only : endrun
+
+  implicit none
+
+contains
 
 subroutine copy_dqdt_from_ptend_to_pbuf( ptend, pbuf, pbuf_fldname, ims, ime, pcols, pver )
 
   use physics_types,  only: physics_ptend
-  use physics_buffer, only: physics_buffer_desc, pbuf_get_field
+  use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 
   type(physics_ptend) :: ptend                   ! indivdual parameterization tendencies
   type(physics_buffer_desc), pointer :: pbuf(:)  ! physics puffer
@@ -22,7 +27,7 @@ subroutine copy_dqdt_from_ptend_to_pbuf( ptend, pbuf, pbuf_fldname, ims, ime, pc
   integer :: fldidx ! pbuf field index
   integer :: im     ! tracer loop index
 
-  if (.not.ptend%lq) call endrun("copy_dqdt_from_ptend_to_pbuf: ptend%lq is .false.")
+  if (.not.any(ptend%lq(ims:ime))) return 
 
   fldidx = pbuf_get_index( pbuf_fldname )
 
@@ -37,7 +42,7 @@ end subroutine copy_dqdt_from_ptend_to_pbuf
 subroutine copy_dqdt_from_pbuf_to_ptend( pbuf, ptend, pbuf_fldname, ims, ime, pcols, pver )
 
   use physics_types,  only: physics_ptend
-  use physics_buffer, only: physics_buffer_desc, pbuf_get_field
+  use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 
   type(physics_buffer_desc), pointer :: pbuf(:)  ! physics puffer
   type(physics_ptend) :: ptend                   ! indivdual parameterization tendencies
@@ -51,7 +56,6 @@ subroutine copy_dqdt_from_pbuf_to_ptend( pbuf, ptend, pbuf_fldname, ims, ime, pc
   integer :: fldidx ! pbuf field index
   integer :: im     ! tracer loop index
 
-  if (.not.ptend%lq) call endrun("copy_dqdt_from_pbuf_to_ptend: ptend%lq is .false.")
 
   fldidx = pbuf_get_index( pbuf_fldname )
 
