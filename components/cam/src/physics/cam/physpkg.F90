@@ -253,6 +253,12 @@ subroutine phys_register
     !     even if there are no prognostic aerosols ... so do it here for now 
        call pbuf_add_field('FRACIS','physpkg',dtype_r8,(/pcols,pver,pcnst/),m)
 
+       ! Add fields to pbuf to save some tracer tendencies for process coupling
+
+       call pbuf_add_field('DQDT_DRYRM','physpkg',dtype_r8,(/pcols,pver,pcnst/),idxtmp)
+       call pbuf_add_field('DQDT_TURB', 'physpkg',dtype_r8,(/pcols,pver,pcnst/),idxtmp)
+       !---
+
        call conv_water_register()
        
        ! Determine whether its a 'modal' aerosol simulation  or not
@@ -1380,6 +1386,8 @@ subroutine tphysac (ztodt,   cam_in,               &
     use phys_control,       only: use_qqflx_fixer
     use radiation,          only: get_saved_qrl_qrs
     use radheat,            only: radheat_tend_add_subtract
+    use atm_cpl_utils,      only: copy_dqdt_from_ptend_to_pbuf, copy_dqdt_from_pbuf_to_ptend
+
 
     implicit none
 
@@ -1705,6 +1713,14 @@ if (l_tracer_aero) then
 
     end select
 
+   ! Retrieve turbulence-induced tracer tendencies from the previous time step 
+
+    lq(:) = .TRUE.
+    call physics_ptend_init(ptend, state%psetcols, 'dqdt_turb', lq=lq)
+    call copy_dqdt_from_pbuf_to_ptend( pbuf, ptend_turb, 'DQDT_TURB', 1,pcnst, pcols,pver )
+    
+   ! note: in tphysbc, ptend_turb should be values averaged across macmic subcycles
+
     !-------------------------------------------------------------------------
     ! Calculate drydep-induced tendencies; update the model state.
     ! Note that this physics_update only adds the drydep-induced increments
@@ -1712,6 +1728,8 @@ if (l_tracer_aero) then
     ! are added in the next call of tphysbc.
     !-------------------------------------------------------------------------
     call aero_model_drydep( state_IC4drydep, pbuf, obklen, surfric, cam_in, ztodt, cam_out, ptend )
+
+    call copy_dqdt_from_ptend_to_pbuf( ptend, pbuf, 'DQDT_DRYRM', 1,pcnst, pcols,pver )
     call physics_update(state, ptend, ztodt, tend)
 
     call t_stopf('aero_drydep')
@@ -2153,7 +2171,8 @@ subroutine tphysbc (ztodt,                          &
 
     !-- start: for alternative coupling between macmic subcycles and rest of model 
     type(physics_ptend)   :: ptend_dribble                    ! local array to save tendencies to be dribbled into macmic subcyles
-    type(physics_ptend)   :: ptend_cflx                       ! local array to save tendencies to be dribbled into macmic subcyles
+    type(physics_ptend)   :: ptend_cflx                       ! local array to save tracer tendencies caused by surface flux
+    type(physics_ptend)   :: ptend_turb                       ! local array containing turbulence-induced tendencies from the previous timestep
     integer               :: cld_cpl_opt                      ! scheme for coupling macmic subcycles with the rest of EAM
     integer               :: dribble_start_step               ! namelist variable, specifying which step the dribbling start  
     logical               :: l_dribble                        ! local variabel to determine if tendency dribbling is applied in macmic loop
