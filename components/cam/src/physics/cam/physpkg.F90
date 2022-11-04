@@ -1716,7 +1716,7 @@ if (l_tracer_aero) then
    ! Retrieve turbulence-induced tracer tendencies from the previous time step 
 
     lq(:) = .TRUE.
-    call physics_ptend_init(ptend, state%psetcols, 'dqdt_turb', lq=lq)
+    call physics_ptend_init(ptend_turb, state%psetcols, 'dqdt_turb', lq=lq)
     call copy_dqdt_from_pbuf_to_ptend( pbuf, ptend_turb, 'DQDT_TURB', 1,pcnst, pcols,pver )
     
    ! note: in tphysbc, ptend_turb should be values averaged across macmic subcycles
