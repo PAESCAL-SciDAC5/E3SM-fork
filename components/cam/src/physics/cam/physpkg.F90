@@ -45,8 +45,6 @@ module physpkg
   use modal_aero_calcsize,    only: modal_aero_calcsize_init, modal_aero_calcsize_diag, modal_aero_calcsize_reg
   use modal_aero_wateruptake, only: modal_aero_wateruptake_init, modal_aero_wateruptake_dr, modal_aero_wateruptake_reg
 
-  use aero_model, only: imozart
-
   implicit none
   private
 
@@ -1479,7 +1477,6 @@ subroutine tphysac (ztodt,   cam_in,               &
 
     integer :: cflx_cpl_opt
     integer :: dryrm_cpl_opt
-    logical :: lq(pcnst)
     !
     !-----------------------------------------------------------------------
     !
@@ -1722,10 +1719,7 @@ if (l_tracer_aero) then
     case (3)
 
       ! Retrieve turbulence-induced tracer tendencies from the previous time step
-
-      lq(imozart:pcnst) = .TRUE.
-      call physics_ptend_init(ptend_turb, state%psetcols, 'dqdt_turb', lq=lq)
-      call copy_dqdt_from_pbuf_to_ptend( pbuf, ptend_turb, 'DQDT_TURB', imozart,pcnst, pcols,pver )
+      call copy_dqdt_from_pbuf_to_ptend( pbuf, 'DQDT_TURB', state%psetcols, pcols, pver, ptend_turb )
 
       ! Add 0.5dt worth of the increments to the IC for dry deposition to avoid 
       ! the situation of IC-induced error overcompensating the isolation-induced splitting error.
@@ -1755,8 +1749,7 @@ if (l_tracer_aero) then
     !-------------------------------------------------------------------------
     select case( dryrm_cpl_opt )
     case (2,3)
-      call calculate_dqdt_and_save_to_pbuf( state_IC4drydep, state, ztodt, pbuf, 'DQDT_DRYRM', &
-                                            imozart,pcnst, pcols,pver )
+      call calculate_dqdt_and_save_to_pbuf( state_IC4drydep, state, ztodt, pbuf, 'DQDT_DRYRM', pcols,pver )
     end select
 
    !============================================
@@ -2044,7 +2037,6 @@ subroutine tphysbc (ztodt,                          &
     real(r8), intent(in) :: sgh30(pcols)                     ! Std. deviation of 30 s orography for tms
 
     type(physics_state), intent(inout) :: state
-    type(physics_state), intent(inout) :: state_before_macmic
     type(physics_tend ), intent(inout) :: tend
     type(physics_buffer_desc), pointer :: pbuf(:)
     type(cnd_diag_t),    intent(inout) :: diag
@@ -2063,6 +2055,8 @@ subroutine tphysbc (ztodt,                          &
     type(physics_ptend)   :: ptend_aero       ! ptend for microp_aero
     type(physics_ptend)   :: ptend_aero_sc    ! ptend for microp_aero on sub-columns
     type(physics_tend)    :: tend_sc          ! tend for sub-columns
+
+    type(physics_state) :: state_before_macmic
 
     integer :: nstep                          ! current timestep number
 
@@ -2199,7 +2193,8 @@ subroutine tphysbc (ztodt,                          &
     !-- start: for alternative coupling between macmic subcycles and rest of model 
     type(physics_ptend)   :: ptend_dribble                    ! local array to save tendencies to be dribbled into macmic subcyles
     type(physics_ptend)   :: ptend_cflx                       ! local array to save tracer tendencies caused by surface flux
-    type(physics_ptend)   :: ptend_turb                       ! local array containing turbulence-induced tendencies from the previous timestep
+    type(physics_ptend)   :: ptend_turb                       ! local array containing tracer tendencies caused by turbulence 
+    type(physics_ptend)   :: ptend_dryrm                      ! local array containing tracer tendencies caused by aerosol dry removal 
     integer               :: cld_cpl_opt                      ! scheme for coupling macmic subcycles with the rest of EAM
     integer               :: dribble_start_step               ! namelist variable, specifying which step the dribbling start  
     logical               :: l_dribble                        ! local variabel to determine if tendency dribbling is applied in macmic loop
@@ -2650,9 +2645,7 @@ end if
 
       ! Retrieve tracer tendencies caused by aerosol dry removal
 
-      lq(imozart:pcnst) = .TRUE.
-      call physics_ptend_init(ptend_dryrm, state%psetcols, 'dqdt_dryrm', lq=lq)
-      call copy_dqdt_from_pbuf_to_ptend( pbuf, ptend_dryrm, 'DQDT_DRYRM', imozart,pcnst, pcols,pver )
+      call copy_dqdt_from_pbuf_to_ptend( pbuf, 'DQDT_DRYRM', state%psetcols, pcols, pver, ptend_dryrm )
 
       ! In tphysac, the physics_update call after "call aero_model_drydep" has added
       ! 1.0dt's worth of the dry-removal-induced increments state variable.
@@ -2997,8 +2990,7 @@ end if
      !===================================================
      select case( dryrm_cpl_opt )
      case (3)
-      call calculate_dqdt_and_save_to_pbuf( state_before_macmic, state, ztodt, pbuf, 'DQDT_TURB', &
-                                            imozart,pcnst, pcols,pver )
+      call calculate_dqdt_and_save_to_pbuf( state_before_macmic, state, ztodt, pbuf, 'DQDT_TURB', pcols,pver )
      end select
      !---------------------------------------------------------------------
 

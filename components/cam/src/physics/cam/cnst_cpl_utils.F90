@@ -11,31 +11,48 @@ module cnst_cpl_utils
 contains
 
 !------------------------------------------------------------------------------------------
-subroutine copy_dqdt_from_pbuf_to_ptend( pbuf, ptend, pbuf_fldname, ims, ime, pcols, pver )
+subroutine copy_dqdt_from_pbuf_to_ptend( pbuf, fldname, psetcols, pcols, pver, ptend )
 
-  use physics_types,  only: physics_ptend
+  use constituents,   only: cnst_get_ind, pcnst
+  use physics_types,  only: physics_ptend, physics_ptend_init
   use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 
   ! Arguments
 
   type(physics_buffer_desc), pointer :: pbuf(:)  ! physics puffer
-  type(physics_ptend) :: ptend                   ! indivdual parameterization tendencies
-  character(len=*),intent(in) :: pbuf_fldname    ! name of the pbuf field to copy values to 
-  integer, intent(in) :: ims, ime                ! start and end indices of tracers for which 
-                                                 ! the tendencies should be copied to pbuf
+  character(len=*),intent(in) :: fldname         ! name of the pbuf field to copy values to 
+  integer, intent(in) :: psetcols                ! # of grid columns used by physics_ptend_init
   integer, intent(in) :: pcols, pver             ! # of grid columns and vertical layers
                                                  ! for which the tendencies should be copied 
+
+  type(physics_ptend) :: ptend                   ! indivdual parameterization tendencies
 
   ! Local variables
 
   real(r8),pointer :: ptr2d(:,:)  ! (pcols,pver) pointer pointing to a slide of data in pbuf
+  logical :: lq(pcnst)
   integer :: fldidx ! pbuf field index
   integer :: im     ! tracer loop index
+  integer :: ims    ! tracer loop index
 
   !---------------------------------------
-  fldidx = pbuf_get_index( pbuf_fldname )
+  ! Exclude water species from the tracer list
 
-  do im = ims,ime
+  call cnst_get_ind('NUMSNO', ims); ims = ims+1 
+  
+  !---------------------------------------
+  ! Initialize ptend
+
+  lq(ims:pcnst) = .TRUE.
+  call physics_ptend_init(ptend, psetcols, fldname, lq=lq)
+
+  !---------------------------------------
+  ! Retrieve dqdt from pbuf
+
+  fldidx = pbuf_get_index( fldname )
+
+  do im = ims,pcnst
+
      call pbuf_get_field( pbuf, fldidx, ptr2d,   &! in, in, out
                           start=(/1,1,im/),      &! in
                           kount=(/pcols,pver,1/) )! in
@@ -47,9 +64,9 @@ end subroutine copy_dqdt_from_pbuf_to_ptend
 
 
 !-------------------------------------------------------------------------------------------------
-subroutine calculate_dqdt_and_save_to_pbuf( state_old, state_new, dtime, pbuf, pbuf_fldname, &
-                                            ims,ime, pcols,pver )
+subroutine calculate_dqdt_and_save_to_pbuf( state_old, state_new, dtime, pbuf, fldname, pcols,pver )
 
+  use constituents,   only: cnst_get_ind, pcnst
   use physics_types,  only: physics_state
   use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 
@@ -58,9 +75,7 @@ subroutine calculate_dqdt_and_save_to_pbuf( state_old, state_new, dtime, pbuf, p
   type(physics_state),intent(in) :: state_old, state_new
   real(r8),           intent(in) :: dtime
   type(physics_buffer_desc), pointer :: pbuf(:)  ! physics puffer
-  character(len=*),intent(in)    :: pbuf_fldname ! name of the pbuf field to copy values to 
-  integer, intent(in) :: ims, ime                ! start and end indices of tracers for which 
-                                                 ! the tendencies should be copied to pbuf
+  character(len=*),intent(in)    :: fldname      ! name of the pbuf field to copy values to 
   integer, intent(in) :: pcols, pver             ! # of grid columns and vertical layers
                                                  ! for which the tendencies should be copied 
   ! Local variables
@@ -68,11 +83,17 @@ subroutine calculate_dqdt_and_save_to_pbuf( state_old, state_new, dtime, pbuf, p
   real(r8),pointer :: ptr2d(:,:)  ! (pcols,pver) pointer pointing to a slide of data in pbuf
   integer :: fldidx ! pbuf field index
   integer :: im     ! tracer loop index
-
-  fldidx = pbuf_get_index( pbuf_fldname )
+  integer :: ims    ! tracer loop index, start value
 
   !---------------------------------------
-  do im = ims,ime
+  ! Exclude water species from the tracer list
+
+  call cnst_get_ind('NUMSNO', ims); ims = ims+1 
+
+  !---------------------------------------
+  fldidx = pbuf_get_index( fldname )
+
+  do im = ims,pcnst
      call pbuf_get_field( pbuf, fldidx, ptr2d,   &! in, in, out
                           start=(/1,1,im/),      &! in
                           kount=(/pcols,pver,1/) )! in
