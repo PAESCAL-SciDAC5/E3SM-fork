@@ -1387,7 +1387,7 @@ subroutine tphysac (ztodt,   cam_in,               &
     use radiation,          only: get_saved_qrl_qrs
     use radheat,            only: radheat_tend_add_subtract
     use cnst_cpl_utils,     only: calculate_dqdt_and_save_to_pbuf 
-    use cnst_cpl_utils,     only: copy_dqdt_from_pbuf_to_ptend
+    use cnst_cpl_utils,     only: get_saved_dqdt
 
 
     implicit none
@@ -1719,7 +1719,7 @@ if (l_tracer_aero) then
     case (3)
 
       ! Retrieve turbulence-induced tracer tendencies from the previous time step
-      call copy_dqdt_from_pbuf_to_ptend( pbuf, 'DQDT_TURB', state%psetcols, pcols, pver, ptend_turb )
+      call get_saved_dqdt( pbuf, 'DQDT_TURB', state, pcols, pver, ptend_turb )
 
       ! Add 0.5dt worth of the increments to the IC for dry deposition to avoid 
       ! the situation of IC-induced error overcompensating the isolation-induced splitting error.
@@ -1731,8 +1731,6 @@ if (l_tracer_aero) then
 
     end select
     
-   ! todo: should save and retrieve dq/dt *dp to ensure mass conservation
-
     !-------------------------------------------------------------------------
     ! Calculate drydep-induced tendencies; update the model state.
     ! Note that this physics_update only adds the drydep-induced increments
@@ -1745,7 +1743,8 @@ if (l_tracer_aero) then
     call cnd_diag_checkpoint( diag, 'AERDRYRM', state, pbuf, cam_in, cam_out )
 
     !-------------------------------------------------------------------------
-    ! Save dqdt from drydep to pbuf for later use
+    ! Save dqdt from drydep to pbuf for later use. (The actual saved quantity
+    ! is pdel*dqdt instead of dqdt as we need to ensure mass conservation.)
     !-------------------------------------------------------------------------
     select case( dryrm_cpl_opt )
     case (2,3)
@@ -2019,7 +2018,7 @@ subroutine tphysbc (ztodt,                          &
     use cld_cpl_utils,   only: set_state_and_tendencies, save_state_snapshot_to_pbuf
     use sfc_cpl_opt,     only: cflx_tend
     use cnst_cpl_utils,  only: calculate_dqdt_and_save_to_pbuf 
-    use cnst_cpl_utils,  only: copy_dqdt_from_pbuf_to_ptend
+    use cnst_cpl_utils,  only: get_saved_dqdt
 
     implicit none
 
@@ -2645,7 +2644,7 @@ end if
 
       ! Retrieve tracer tendencies caused by aerosol dry removal
 
-      call copy_dqdt_from_pbuf_to_ptend( pbuf, 'DQDT_DRYRM', state%psetcols, pcols, pver, ptend_dryrm )
+      call get_saved_dqdt( pbuf, 'DQDT_DRYRM', state, pcols, pver, ptend_dryrm )
 
       ! In tphysac, the physics_update call after "call aero_model_drydep" has added
       ! 1.0dt's worth of the dry-removal-induced increments state variable.

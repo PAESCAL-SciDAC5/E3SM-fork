@@ -1,7 +1,7 @@
 module cnst_cpl_utils
-!---------------------------------------------------------------------------------
-! Utitily subroutines used by various process coupling schemes 
-!---------------------------------------------------------------------------------
+!------------------------------------------------------------------------------------------
+! Utitily subroutines used by various process coupling schemes for gas and aerosol tracers
+!------------------------------------------------------------------------------------------
 
   use shr_kind_mod,   only: r8 => shr_kind_r8
   use cam_abortutils, only: endrun
@@ -10,45 +10,52 @@ module cnst_cpl_utils
 
 contains
 
+subroutine get_saved_dqdt( pbuf, fldname, state, pcols, pver, ptend )
 !------------------------------------------------------------------------------------------
-subroutine copy_dqdt_from_pbuf_to_ptend( pbuf, fldname, psetcols, pcols, pver, ptend )
+! This subroutine retrieves the tracer mass tendencies (pdel*dqdt) saved as fldname in pbuf,
+! convert them to mixing ratio tendencies, and save the results to ptend.  
+!
+! History
+!  - Hui Wan, 2022-11, initial version
+!------------------------------------------------------------------------------------------
 
-  use constituents,   only: cnst_get_ind, pcnst
+  use constituents,   only: pcnst, cnst_get_ind, cnst_get_type_byind
   use physics_types,  only: physics_ptend, physics_ptend_init
   use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 
   ! Arguments
 
   type(physics_buffer_desc), pointer :: pbuf(:)  ! physics puffer
-  character(len=*),intent(in) :: fldname         ! name of the pbuf field to copy values to 
-  integer, intent(in) :: psetcols                ! # of grid columns used by physics_ptend_init
-  integer, intent(in) :: pcols, pver             ! # of grid columns and vertical layers
-                                                 ! for which the tendencies should be copied 
+  character(len=*),intent(in) :: fldname         ! name of the pbuf field to retrieve info from 
+  type(physics_state), intent(in) :: state       ! state variable containing rpdel(dry) and dimensin size info
+  integer, intent(in) :: psetcols                ! # of grid columns to initialize ptend for
+  integer, intent(in) :: pcols, pver             ! # of grid columns and vertical layers in this chunk
 
-  type(physics_ptend) :: ptend                   ! indivdual parameterization tendencies
+  type(physics_ptend),intent(out) :: ptend       ! contains dqdt to be passed to the calling routine
 
   ! Local variables
 
-  real(r8),pointer :: ptr2d(:,:)  ! (pcols,pver) pointer pointing to a slide of data in pbuf
+  real(r8),pointer :: ptr2d(:,:)  ! pointer a slice of data in pbuf with the shape (pcols,pver)
+  integer :: fldidx               ! pbuf field index
+  integer :: im, ims              ! tracer loop index and its start value
   logical :: lq(pcnst)
-  integer :: fldidx ! pbuf field index
-  integer :: im     ! tracer loop index
-  integer :: ims    ! tracer loop index
+  integer :: ncol
 
-  !---------------------------------------
-  ! Exclude water species from the tracer list
+  !-----------
+  ! Inquiries
+  !-----------
+  ncol = state%ncol
+  call cnst_get_ind('NUMSNO', ims); ims = ims+1   ! Exclude water species from the list of tracers to be processed
 
-  call cnst_get_ind('NUMSNO', ims); ims = ims+1 
-  
-  !---------------------------------------
+  !------------------
   ! Initialize ptend
-
+  !------------------
   lq(ims:pcnst) = .TRUE.
-  call physics_ptend_init(ptend, psetcols, fldname, lq=lq)
+  call physics_ptend_init(ptend, state%psetcols, fldname, lq=lq)
 
-  !---------------------------------------
-  ! Retrieve dqdt from pbuf
-
+  !-------------------------------------------------
+  ! Retrieve pdel*dqdt from pbuf; convert to dqdt
+  !-------------------------------------------------
   fldidx = pbuf_get_index( fldname )
 
   do im = ims,pcnst
@@ -57,16 +64,27 @@ subroutine copy_dqdt_from_pbuf_to_ptend( pbuf, fldname, psetcols, pcols, pver, p
                           start=(/1,1,im/),      &! in
                           kount=(/pcols,pver,1/) )! in
 
-     ptend%q(:,:,im) = ptr2d(:,:)
+     if (cnst_get_type_byind(im).eq.'dry') then
+        ptend%q(:ncol,:,im) = ptr2d(:ncol,:)*state%rpdeldry(:ncol,:)
+     else
+        ptend%q(:ncol,:,im) = ptr2d(:ncol,:)*state%rpdel(:ncol,:)
+     end if
+
   end do
 
-end subroutine copy_dqdt_from_pbuf_to_ptend
+end subroutine get_saved_dqdt 
 
 
-!-------------------------------------------------------------------------------------------------
 subroutine calculate_dqdt_and_save_to_pbuf( state_old, state_new, dtime, pbuf, fldname, pcols,pver )
+!-------------------------------------------------------------------------------------------------
+! This subroutine diagnoses tracer mixing ratio tendencies from two state snapshots and then
+! convert them to mass tendencies and save to pbuf.
+!
+! History
+!  - Hui Wan, 2022-11, initial version
+!-------------------------------------------------------------------------------------------------
 
-  use constituents,   only: cnst_get_ind, pcnst
+  use constituents,   only: pcnst, cnst_get_ind, cnst_get_type_byind
   use physics_types,  only: physics_state
   use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 
@@ -75,22 +93,25 @@ subroutine calculate_dqdt_and_save_to_pbuf( state_old, state_new, dtime, pbuf, f
   type(physics_state),intent(in) :: state_old, state_new
   real(r8),           intent(in) :: dtime
   type(physics_buffer_desc), pointer :: pbuf(:)  ! physics puffer
-  character(len=*),intent(in)    :: fldname      ! name of the pbuf field to copy values to 
-  integer, intent(in) :: pcols, pver             ! # of grid columns and vertical layers
-                                                 ! for which the tendencies should be copied 
+  character(len=*),intent(in)        :: fldname  ! name of the pbuf field to copy values to 
+  integer, intent(in) :: pcols, pver             ! # of grid columns and vertical layers in this chunk
+
   ! Local variables
 
-  real(r8),pointer :: ptr2d(:,:)  ! (pcols,pver) pointer pointing to a slide of data in pbuf
-  integer :: fldidx ! pbuf field index
-  integer :: im     ! tracer loop index
-  integer :: ims    ! tracer loop index, start value
+  real(r8),pointer :: ptr2d(:,:)  ! pointer a slice of data in pbuf with the shape (pcols,pver)
+  integer :: fldidx               ! pbuf field index
+  integer :: im, ims              ! tracer loop index and its start value
+  integer :: ncol
 
-  !---------------------------------------
-  ! Exclude water species from the tracer list
+  !-----------
+  ! Inquiries
+  !-----------
+  ncol = state_old%ncol
+  call cnst_get_ind('NUMSNO', ims); ims = ims+1   ! Exclude water species from the list of tracers to be processed
 
-  call cnst_get_ind('NUMSNO', ims); ims = ims+1 
-
-  !---------------------------------------
+  !-----------------------------------------------------
+  ! Calculate tracer mass tendencies and save to pbuf
+  !-----------------------------------------------------
   fldidx = pbuf_get_index( fldname )
 
   do im = ims,pcnst
@@ -98,7 +119,14 @@ subroutine calculate_dqdt_and_save_to_pbuf( state_old, state_new, dtime, pbuf, f
                           start=(/1,1,im/),      &! in
                           kount=(/pcols,pver,1/) )! in
 
-     ptr2d(:,:) = ( state_new%q(:,:,im) - state_old%q(:,:,im) )/dtime
+     if (cnst_get_type_byind(im).eq.'dry') then
+        ptr2d(:ncol,:) = ( state_new%q(:ncol,:,im)*state_new%pdeldry(:ncol,:) &
+                          -state_old%q(:ncol,:,im)*state_old%pdeldry(:ncol,:) )/dtime
+     else
+        ptr2d(:ncol,:) = ( state_new%q(:ncol,:,im)*state_new%pdel(:ncol,:) &
+                          -state_old%q(:ncol,:,im)*state_old%pdel(:ncol,:) )/dtime
+     end if
+
   end do
 
 end subroutine calculate_dqdt_and_save_to_pbuf
