@@ -1282,7 +1282,7 @@ Tolerance for the "equal to" comparison type.
 Default: none
 </entry>
 
-<entry id="cnd_eval_chkpt" type="char*8(10)"  category="history"
+<entry id="cnd_eval_chkpt" type="char*12(10)"  category="history"
        group="conditional_diag_nl" valid_values="" >
 A List. Each element specifies the checkpoint at which the
 corresponding conditional sampling criterion
@@ -1291,7 +1291,7 @@ should match the number of non-empty elements in metric_name;
 Default: none
 </entry>
 
-<entry id="cnd_end_chkpt" type="char*8(10)"  category="history"
+<entry id="cnd_end_chkpt" type="char*12(10)"  category="history"
        group="conditional_diag_nl" valid_values="" >
 A List. Each element specifies the checkpoint that marks the end
 of the time step of the corresponding sampling condition.
@@ -1300,7 +1300,7 @@ and the masked values will be send to history buffer.
 Default: none
 </entry>
 
-<entry id="qoi_chkpt" type="char*8(99)"  category="history"
+<entry id="qoi_chkpt" type="char*12(99)"  category="history"
        group="conditional_diag_nl" valid_values="" >
 Checkpoints at which QoIs will be monitored.
 Default: none

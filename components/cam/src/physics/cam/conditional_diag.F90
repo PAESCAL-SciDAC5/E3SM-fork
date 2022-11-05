@@ -43,7 +43,7 @@ module conditional_diag
   integer, parameter :: qoiname_maxlen   = 8  ! string length for QoI name
 
   integer, parameter :: nchkpt_max       = 99 ! max # of active checkpoints in a single simulation
-  integer, parameter :: chkptname_maxlen = 8  ! string length for checkpoint name
+  integer, parameter :: chkptname_maxlen = 12 ! string length for checkpoint name
 
   ! what kind of dp (pressure layer thickness) to multiply QoI by
 
