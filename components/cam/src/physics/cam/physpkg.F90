@@ -45,6 +45,8 @@ module physpkg
   use modal_aero_calcsize,    only: modal_aero_calcsize_init, modal_aero_calcsize_diag, modal_aero_calcsize_reg
   use modal_aero_wateruptake, only: modal_aero_wateruptake_init, modal_aero_wateruptake_dr, modal_aero_wateruptake_reg
 
+  use aero_model, only: imozart
+
   implicit none
   private
 
@@ -1386,7 +1388,8 @@ subroutine tphysac (ztodt,   cam_in,               &
     use phys_control,       only: use_qqflx_fixer
     use radiation,          only: get_saved_qrl_qrs
     use radheat,            only: radheat_tend_add_subtract
-    use atm_cpl_utils,      only: copy_dqdt_from_ptend_to_pbuf, copy_dqdt_from_pbuf_to_ptend
+    use cnst_cpl_utils,     only: calculate_dqdt_and_save_to_pbuf 
+    use cnst_cpl_utils,     only: copy_dqdt_from_pbuf_to_ptend
 
 
     implicit none
@@ -1494,6 +1497,7 @@ subroutine tphysac (ztodt,   cam_in,               &
                       ,l_rad_out              = l_rad              &
                       ,radheat_cpl_opt_out    = radheat_cpl_opt    &
                       ,   cflx_cpl_opt_out    =    cflx_cpl_opt    &
+                      ,  dryrm_cpl_opt_out    =   dryrm_cpl_opt    &
                      )
 
     ! Adjust the surface fluxes to reduce instabilities in near sfc layer
@@ -1689,7 +1693,10 @@ if (l_tracer_aero) then
     !-------------------------------------------------------------------------
     ! Prepare IC for the drydep process
     !-------------------------------------------------------------------------
-    ! If cflx_cpl_opt==1, then the "state" variable already includes ztodt's worth 
+    call physics_state_copy(state,state_IC4drydep)
+
+    !------------------------------------------------------------------------------
+    ! If cflx_cpl_opt==1, then the state variable already includes ztodt's worth 
     ! of the cflx-induced increments; otherwise, it does not yet include the 
     ! cflx-induced increments.
 
@@ -1697,45 +1704,58 @@ if (l_tracer_aero) then
     case (51,52)
 
        ! Diagnose the clfx-induced tracer tendencies, then add 0.5dt's worth of the 
-       ! increments to to the tmp variable "state_IC4drydep" so that the IC-induced 
-       ! coupling error and isolation induced coupling can cancel each other at the 
+       ! increments to the tmp variable "state_IC4drydep" so that the IC-induced 
+       ! coupling error and isolation induced coupling error can cancel each other at the 
        ! leading order.
 
        call cflx_tend(state, cam_in, ptend)
        call physics_state_copy(state,state_IC4drydep)
        call physics_update(state_IC4drydep, ptend, 0.5_r8*ztodt)
 
-    case default
-       ! Use the current "state" as the IC for drydep. It might or might not have
-       ! include the cflx-induced increments:
-       !  cflx_cpl_opt == 1: yes
-       !  cflx_cpl_opt == 2, 3: no
-
-       call physics_state_copy(state,state_IC4drydep)
-
     end select
 
-   ! Retrieve turbulence-induced tracer tendencies from the previous time step 
+    !------------------------------------------------------------------------------------------
+    ! Turbulent transport has not been calculated yet 
 
-    lq(:) = .TRUE.
-    call physics_ptend_init(ptend_turb, state%psetcols, 'dqdt_turb', lq=lq)
-    call copy_dqdt_from_pbuf_to_ptend( pbuf, ptend_turb, 'DQDT_TURB', 1,pcnst, pcols,pver )
+    select case( dryrm_cpl_opt )
+    case (3)
+
+      ! Retrieve turbulence-induced tracer tendencies from the previous time step
+
+      lq(imozart:pcnst) = .TRUE.
+      call physics_ptend_init(ptend_turb, state%psetcols, 'dqdt_turb', lq=lq)
+      call copy_dqdt_from_pbuf_to_ptend( pbuf, ptend_turb, 'DQDT_TURB', imozart,pcnst, pcols,pver )
+
+      ! Subtract 0.5dt worth of the increments from the IC for dry deposition to avoid 
+      ! the situation of IC-induced error overcompensating the isolation-induced coupling error.
+      ! Note that this subtration is done to the tmp variable "state_IC4drydep", not "state".
+      ! So there is no need to add another 0.5dt's worth afterwards.
+
+      call physics_update(state_IC4drydep, ptend_turb, 0.5_r8*ztodt)
+
+    end select
     
-   ! note: in tphysbc, ptend_turb should be values averaged across macmic subcycles
+   ! note: in both copy routines, should save dq/dt *dp?
 
     !-------------------------------------------------------------------------
     ! Calculate drydep-induced tendencies; update the model state.
     ! Note that this physics_update only adds the drydep-induced increments
-    ! to the state. If cflx_cpl_opt==51, the cflx-induced increments
+    ! to the state. If cflx_cpl_opt == 51 or 52, the cflx-induced increments
     ! are added in the next call of tphysbc.
     !-------------------------------------------------------------------------
     call aero_model_drydep( state_IC4drydep, pbuf, obklen, surfric, cam_in, ztodt, cam_out, ptend )
-
-    call copy_dqdt_from_ptend_to_pbuf( ptend, pbuf, 'DQDT_DRYRM', 1,pcnst, pcols,pver )
     call physics_update(state, ptend, ztodt, tend)
-
     call t_stopf('aero_drydep')
     call cnd_diag_checkpoint( diag, 'AERDRYRM', state, pbuf, cam_in, cam_out )
+
+    !-------------------------------------------------------------------------
+    ! Save dqdt from drydep to pbuf for later use
+    !-------------------------------------------------------------------------
+    select case( dryrm_cpl_opt )
+    case (2,3)
+      call calculate_dqdt_and_save_to_pbuf( state_IC4drydep, state, ztodt, pbuf, 'DQDT_DRYRM', &
+                                            imozart,pcnst, pcols,pver )
+    end select
 
    !============================================
    ! CARMA microphysics
@@ -1967,7 +1987,7 @@ subroutine tphysbc (ztodt,                          &
     use microp_driver,   only: microp_driver_tend
     use microp_aero,     only: microp_aero_run
     use macrop_driver,   only: macrop_driver_tend
-    use physics_types,   only: physics_state, physics_tend, physics_ptend, &
+    use physics_types,   only: physics_state, physics_tend, physics_ptend, physics_state_copy, &
          physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale,physics_ptend_copy
     use cam_diagnostics, only: diag_conv_tend_ini, diag_phys_writeout, diag_conv, diag_export, diag_state_b4_phys_write
     use cam_history,     only: outfld, fieldname_len
@@ -2003,6 +2023,8 @@ subroutine tphysbc (ztodt,                          &
     use nudging,         only: Nudge_Model,Nudge_Loc_PhysOut,nudging_calc_tend
     use cld_cpl_utils,   only: set_state_and_tendencies, save_state_snapshot_to_pbuf
     use sfc_cpl_opt,     only: cflx_tend
+    use cnst_cpl_utils,  only: calculate_dqdt_and_save_to_pbuf 
+    use cnst_cpl_utils,  only: copy_dqdt_from_pbuf_to_ptend
 
     implicit none
 
@@ -2020,6 +2042,7 @@ subroutine tphysbc (ztodt,                          &
     real(r8), intent(in) :: sgh30(pcols)                     ! Std. deviation of 30 s orography for tms
 
     type(physics_state), intent(inout) :: state
+    type(physics_state), intent(inout) :: state_before_macmic
     type(physics_tend ), intent(inout) :: tend
     type(physics_buffer_desc), pointer :: pbuf(:)
     type(cnd_diag_t),    intent(inout) :: diag
@@ -2210,6 +2233,7 @@ subroutine tphysbc (ztodt,                          &
                       ,dribble_start_step_out = dribble_start_step &
                       ,radheat_cpl_opt_out = radheat_cpl_opt &
                       ,   cflx_cpl_opt_out =    cflx_cpl_opt &
+                      ,  dryrm_cpl_opt_out =   dryrm_cpl_opt &
                       )
   
     !-----------------------------------------------------------------------
@@ -2616,6 +2640,28 @@ end if
     end select
     call cnd_diag_checkpoint( diag, 'CFLX2', state, pbuf, cam_in, cam_out )
 
+   
+    !======================================================================
+    select case( dryrm_cpl_opt )
+    case (2,3)
+
+      ! Retrieve aerosol-dry-removal-induced tracer tendencies
+
+      lq(imozart:pcnst) = .TRUE.
+      call physics_ptend_init(ptend_dryrm, state%psetcols, 'dqdt_dryrm', lq=lq)
+      call copy_dqdt_from_pbuf_to_ptend( pbuf, ptend_dryrm, 'DQDT_DRYRM', imozart,pcnst, pcols,pver )
+
+      ! In tphysac, the dry-removal-induced increments have already been include in the "state" variable.
+      ! We now subtract 0.5dt worth of the increments from the IC to avoid the situation of 
+      ! IC-induced error overcompensating the isolation-induced coupling error.
+
+      call physics_ptend_copy(ptend_dryrm, ptend)
+      call physics_update(state, ptend, -0.5_r8*ztodt)
+
+    end select
+    call cnd_diag_checkpoint( diag, 'AERODRYRM2', state, pbuf, cam_in, cam_out )
+
+    if (dryrm_cpl_opt==3) call physics_state_copy(state, state_before_macmic)
 
     !======================================================================
     ! Stratiform clouds
@@ -2916,9 +2962,33 @@ end if
 
         call physics_ptend_copy(ptend_cflx, ptend)
         call physics_update(state, ptend, 0.5_r8*ztodt)
-        call cnd_diag_checkpoint( diag, 'CFLXAPPb', state, pbuf, cam_in, cam_out )
+
      end if
      call cnd_diag_checkpoint( diag, 'CFLX4', state, pbuf, cam_in, cam_out )
+
+     !===================================================
+     ! Aerosol dry removal again
+     !===================================================
+     select case( dryrm_cpl_opt )
+     case (2,3)
+
+       ! 0.5dt worth of aerosol-dry-removal-induced increments was subtracted from the IC 
+       ! of the macmic subcycles. We now add it back.
+
+       call physics_ptend_copy(ptend_dryrm, ptend)
+       call physics_update(state, ptend, 0.5_r8*ztodt)
+
+     end select
+     call cnd_diag_checkpoint( diag, 'AERODRYRM4', state, pbuf, cam_in, cam_out )
+
+     !===================================================
+     ! Save dqdt of gases and aerosols to pbuf
+     !===================================================
+     select case( dryrm_cpl_opt )
+     case (3)
+      call calculate_dqdt_and_save_to_pbuf( state_before_macmic, state, ztodt, pbuf, 'DQDT_TURB', &
+                                            imozart,pcnst, pcols,pver )
+     end select
      !---------------------------------------------------------------------
 
 
