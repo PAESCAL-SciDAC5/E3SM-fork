@@ -1478,6 +1478,7 @@ subroutine tphysac (ztodt,   cam_in,               &
     real(r8):: net_flx(pcols)
 
     integer :: cflx_cpl_opt
+    integer :: dryrm_cpl_opt
     logical :: lq(pcnst)
     !
     !-----------------------------------------------------------------------
@@ -1714,8 +1715,8 @@ if (l_tracer_aero) then
 
     end select
 
-    !------------------------------------------------------------------------------------------
-    ! Turbulent transport has not been calculated yet 
+    !-------------------------------------------------------------------------------
+    ! Take into account the impact of turbulent transport on drydep?
 
     select case( dryrm_cpl_opt )
     case (3)
@@ -1726,16 +1727,17 @@ if (l_tracer_aero) then
       call physics_ptend_init(ptend_turb, state%psetcols, 'dqdt_turb', lq=lq)
       call copy_dqdt_from_pbuf_to_ptend( pbuf, ptend_turb, 'DQDT_TURB', imozart,pcnst, pcols,pver )
 
-      ! Subtract 0.5dt worth of the increments from the IC for dry deposition to avoid 
-      ! the situation of IC-induced error overcompensating the isolation-induced coupling error.
-      ! Note that this subtration is done to the tmp variable "state_IC4drydep", not "state".
-      ! So there is no need to add another 0.5dt's worth afterwards.
+      ! Add 0.5dt worth of the increments to the IC for dry deposition to avoid 
+      ! the situation of IC-induced error overcompensating the isolation-induced splitting error.
+      ! Note that this addition is done to the tmp variable state_IC4drydep, not state,
+      ! so there is no need to add another 0.5dt's worth after "call aero_model_drydep" and 
+      ! the associated "call physics_update".
 
       call physics_update(state_IC4drydep, ptend_turb, 0.5_r8*ztodt)
 
     end select
     
-   ! note: in both copy routines, should save dq/dt *dp?
+   ! todo: should save and retrieve dq/dt *dp to ensure mass conservation
 
     !-------------------------------------------------------------------------
     ! Calculate drydep-induced tendencies; update the model state.
@@ -2217,6 +2219,7 @@ subroutine tphysbc (ztodt,                          &
     ! Added for revised radiation coupling
 
     integer :: cflx_cpl_opt
+    integer :: dryrm_cpl_opt
 
     call phys_getopts( microp_scheme_out      = microp_scheme, &
                        macrop_scheme_out      = macrop_scheme, &
@@ -2645,15 +2648,23 @@ end if
     select case( dryrm_cpl_opt )
     case (2,3)
 
-      ! Retrieve aerosol-dry-removal-induced tracer tendencies
+      ! Retrieve tracer tendencies caused by aerosol dry removal
 
       lq(imozart:pcnst) = .TRUE.
       call physics_ptend_init(ptend_dryrm, state%psetcols, 'dqdt_dryrm', lq=lq)
       call copy_dqdt_from_pbuf_to_ptend( pbuf, ptend_dryrm, 'DQDT_DRYRM', imozart,pcnst, pcols,pver )
 
-      ! In tphysac, the dry-removal-induced increments have already been include in the "state" variable.
-      ! We now subtract 0.5dt worth of the increments from the IC to avoid the situation of 
-      ! IC-induced error overcompensating the isolation-induced coupling error.
+      ! In tphysac, the physics_update call after "call aero_model_drydep" has added
+      ! 1.0dt's worth of the dry-removal-induced increments state variable.
+      ! We now subtract 0.5dt worth of the increments from the state variable 
+      ! to avoid the situation of IC-induced error overcompensating the isolation-induced coupling error.
+      !
+      ! Note that this state variable is the one that is both
+      !  - used as IC for processes in the macmic subcycles below and
+      !  - continuously updated using tendencies from processes in the subcycles.
+      ! Since we subtract 0.5dt's worth of the aerosol dry removal here, we have to 
+      ! add back 0.5dt's worth after all macmic subcycles are completed.
+      ! To avoid re-diagnosing ptend_dryrm, we use below a tmp variable ptend for the physics_update call.
 
       call physics_ptend_copy(ptend_dryrm, ptend)
       call physics_update(state, ptend, -0.5_r8*ztodt)
