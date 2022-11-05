@@ -20,7 +20,7 @@ subroutine get_saved_dqdt( pbuf, fldname, state, pcols, pver, ptend )
 !------------------------------------------------------------------------------------------
 
   use constituents,   only: pcnst, cnst_get_ind, cnst_get_type_byind
-  use physics_types,  only: physics_ptend, physics_ptend_init
+  use physics_types,  only: physics_ptend, physics_ptend_init, physics_state
   use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 
   ! Arguments
@@ -28,7 +28,6 @@ subroutine get_saved_dqdt( pbuf, fldname, state, pcols, pver, ptend )
   type(physics_buffer_desc), pointer :: pbuf(:)  ! physics puffer
   character(len=*),intent(in) :: fldname         ! name of the pbuf field to retrieve info from 
   type(physics_state), intent(in) :: state       ! state variable containing rpdel(dry) and dimensin size info
-  integer, intent(in) :: psetcols                ! # of grid columns to initialize ptend for
   integer, intent(in) :: pcols, pver             ! # of grid columns and vertical layers in this chunk
 
   type(physics_ptend),intent(out) :: ptend       ! contains dqdt to be passed to the calling routine
