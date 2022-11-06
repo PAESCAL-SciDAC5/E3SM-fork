@@ -2639,6 +2639,7 @@ end if
 
    
     !======================================================================
+   if (nstep>1) then
     select case( dryrm_cpl_opt )
     case (2,3)
 
@@ -2662,6 +2663,7 @@ end if
       call physics_update(state, ptend, -0.5_r8*ztodt)
 
     end select
+   end if
     call cnd_diag_checkpoint( diag, 'AERODRYRM2', state, pbuf, cam_in, cam_out )
 
     if (dryrm_cpl_opt==3) call physics_state_copy(state, state_before_macmic)
@@ -2972,6 +2974,7 @@ end if
      !===================================================
      ! Aerosol dry removal again
      !===================================================
+   if (nstep>1) then
      select case( dryrm_cpl_opt )
      case (2,3)
 
@@ -2982,6 +2985,7 @@ end if
        call physics_update(state, ptend, 0.5_r8*ztodt)
 
      end select
+   end if
      call cnd_diag_checkpoint( diag, 'AERODRYRM4', state, pbuf, cam_in, cam_out )
 
      !===================================================
