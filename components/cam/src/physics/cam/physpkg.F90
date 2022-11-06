@@ -1723,11 +1723,23 @@ if (l_tracer_aero) then
 
       ! Add 0.5dt worth of the increments to the IC for dry deposition to avoid 
       ! the situation of IC-induced error overcompensating the isolation-induced splitting error.
-      ! Note that this addition is done to the tmp variable state_IC4drydep, not state,
-      ! so there is no need to add another 0.5dt's worth after "call aero_model_drydep" and 
+      ! Note that this is done to the tmp variable state_IC4drydep, not state,
+      ! so there is no need to subtract 0.5dt's worth after "call aero_model_drydep" and 
       ! the associated "call physics_update".
 
       call physics_update(state_IC4drydep, ptend_turb, 0.5_r8*ztodt)
+
+    case (4)
+
+      ! Retrieve turbulence-induced tracer tendencies from the previous time step
+      call get_saved_dqdt( pbuf, 'DQDT_TURB', state, pcols, pver, ptend_turb )
+
+      ! Subtract 0.5dt worth of the increments from the IC for dry deposition.
+      ! Note that this is done to the tmp variable state_IC4drydep, not state,
+      ! so there is no need to add 0.5dt's worth after "call aero_model_drydep" and 
+      ! the associated "call physics_update".
+
+      call physics_update(state_IC4drydep, ptend_turb, -0.5_r8*ztodt)
 
     end select
     
@@ -1747,7 +1759,7 @@ if (l_tracer_aero) then
     ! is pdel*dqdt instead of dqdt as we need to ensure mass conservation.)
     !-------------------------------------------------------------------------
     select case( dryrm_cpl_opt )
-    case (2,3)
+    case (2,3,4)
       call calculate_dqdt_and_save_to_pbuf( state_IC4drydep, state, ztodt, pbuf, 'DQDT_DRYRM', pcols,pver )
     end select
 
@@ -2641,7 +2653,7 @@ end if
     !======================================================================
    if (nstep>1) then
     select case( dryrm_cpl_opt )
-    case (2,3)
+    case (2,3,4)
 
       ! Retrieve tracer tendencies caused by aerosol dry removal
 
@@ -2666,7 +2678,7 @@ end if
    end if
     call cnd_diag_checkpoint( diag, 'AERODRYRM2', state, pbuf, cam_in, cam_out )
 
-    if (dryrm_cpl_opt==3) call physics_state_copy(state, state_before_macmic)
+    if (dryrm_cpl_opt==3 .or. dryrm_cpl_opt==4) call physics_state_copy(state, state_before_macmic)
 
     !======================================================================
     ! Stratiform clouds
@@ -2976,7 +2988,7 @@ end if
      !===================================================
    if (nstep>1) then
      select case( dryrm_cpl_opt )
-     case (2,3)
+     case (2,3,4)
 
        ! 0.5dt worth of aerosol-dry-removal-induced increments was subtracted from the IC 
        ! of the macmic subcycles. We now add it back.
@@ -2986,13 +2998,14 @@ end if
 
      end select
    end if
+
      call cnd_diag_checkpoint( diag, 'AERODRYRM4', state, pbuf, cam_in, cam_out )
 
      !===================================================
      ! Save dqdt of gases and aerosols to pbuf
      !===================================================
      select case( dryrm_cpl_opt )
-     case (3)
+     case (3,4)
       call calculate_dqdt_and_save_to_pbuf( state_before_macmic, state, ztodt, pbuf, 'DQDT_TURB', pcols,pver )
      end select
      !---------------------------------------------------------------------

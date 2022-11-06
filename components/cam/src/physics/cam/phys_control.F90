@@ -371,10 +371,10 @@ subroutine phys_ctl_readnl(nlfile)
 
    ! Handling of cflx during time integration
 
-   write(iulog,*) 'cflx_cpl_opt = ',cflx_cpl_opt
+   if (masterproc) write(iulog,*) 'cflx_cpl_opt = ',cflx_cpl_opt
 
    select case (cflx_cpl_opt)
-   case( 1,2,3,51,52,53 )
+   case( 1,2,3,51,52 )
      continue
    case default
      call endrun('Unsupported value for cflx_cpl_opt')
@@ -382,10 +382,10 @@ subroutine phys_ctl_readnl(nlfile)
 
    ! Process coupling for aerosol dry removal 
 
-   write(iulog,*) 'dryrm_cpl_opt = ',dryrm_cpl_opt
+   if (masterproc) write(iulog,*) 'dryrm_cpl_opt = ',dryrm_cpl_opt
 
    select case (dryrm_cpl_opt)
-   case( 1,2,3 )
+   case( 1,2,3,4 )
      continue
    case default
      call endrun('Unsupported value for dryrm_cpl_opt')
