@@ -374,7 +374,7 @@ subroutine phys_ctl_readnl(nlfile)
    if (masterproc) write(iulog,*) 'cflx_cpl_opt = ',cflx_cpl_opt
 
    select case (cflx_cpl_opt)
-   case( 1,2,3,51,52 )
+   case( 1,2,3,51,52,53 )
      continue
    case default
      call endrun('Unsupported value for cflx_cpl_opt')

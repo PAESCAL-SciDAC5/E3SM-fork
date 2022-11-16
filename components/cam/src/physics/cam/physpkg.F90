@@ -1746,7 +1746,7 @@ if (l_tracer_aero) then
     !-------------------------------------------------------------------------
     ! Calculate drydep-induced tendencies; update the model state.
     ! Note that this physics_update only adds the drydep-induced increments
-    ! to the state. If cflx_cpl_opt == 51 or 52, the cflx-induced increments
+    ! to the state. If cflx_cpl_opt == 51, 52 or 53, the cflx-induced increments
     ! are added in the next call of tphysbc.
     !-------------------------------------------------------------------------
     call aero_model_drydep( state_IC4drydep, pbuf, obklen, surfric, cam_in, ztodt, cam_out, ptend )
@@ -2630,7 +2630,7 @@ end if
        call physics_update(state, ptend, ztodt)
        call cnd_diag_checkpoint( diag, 'CFLXAPP', state, pbuf, cam_in, cam_out )
 
-    case(52)
+    case(52,53)
 
        ! The "state" variable at this point does not yet include any contribution from cflx.
        ! Diagnose the clfx-induced tracer tendencies, then add 0.5dt's worth of the 
@@ -2972,7 +2972,8 @@ end if
      !===================================================
      ! Surface emissions again
      !===================================================
-     if (cflx_cpl_opt==52) then
+     select case (cflx_cpl_opt)
+     case(52,53)
 
         ! 0.5dt worth of clfx-induced increments was added before the macmic subcycles. 
         ! Here we add another 0.5dt worth, then we are done with cflx.
@@ -2980,7 +2981,7 @@ end if
         call physics_ptend_copy(ptend_cflx, ptend)
         call physics_update(state, ptend, 0.5_r8*ztodt)
 
-     end if
+     end select 
      call cnd_diag_checkpoint( diag, 'CFLX4', state, pbuf, cam_in, cam_out )
 
      !===================================================
