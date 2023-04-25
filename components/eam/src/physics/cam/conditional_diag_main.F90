@@ -471,6 +471,8 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         !---------
         ! cam_in 
         !---------
+        case('QFLX')
+           arrayout(1:ncol,1) = cam_in%cflx(1:ncol,1)
 
         case('LWUP')
            arrayout(1:ncol,1) = cam_in%lwup(1:ncol)
@@ -511,6 +513,30 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
         case('NETSW')
            arrayout(1:ncol,1) = cam_out%netsw(1:ncol)
+
+        case('UBOTOUT')
+           arrayout(1:ncol,1) = cam_out%ubot(1:ncol)
+
+        case('VBOTOUT')
+           arrayout(1:ncol,1) = cam_out%vbot(1:ncol)
+
+        case('QBOTOUT')
+           arrayout(1:ncol,1) = cam_out%qbot(1:ncol,1)
+
+        case('TBOTOUT')
+           arrayout(1:ncol,1) = cam_out%tbot(1:ncol)
+
+        case('THBOTOUT')
+           arrayout(1:ncol,1) = cam_out%thbot(1:ncol)
+
+        case('ZBOTOUT')
+           arrayout(1:ncol,1) = cam_out%zbot(1:ncol)
+
+        case('PBOTOUT')
+           arrayout(1:ncol,1) = cam_out%pbot(1:ncol)
+
+        case('RHOOUT')
+           arrayout(1:ncol,1) = cam_out%rho(1:ncol)
 
         !----------
         ! pbuf
