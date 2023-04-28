@@ -412,9 +412,9 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
   !--------------------------------------------------------------------------------
   ! If the requested variable is one of the advected tracers, get it from state%q
   !--------------------------------------------------------------------------------
-  ! cnst_get_ind returns the index of a tracer in the host  model's advected 
-  ! tracer array. If variable is not found on the tracer list, and index value 
-  ! of -1 will be returned
+  ! The function cnst_get_ind returns the index of the requested varname in the host model's
+  ! list of advected tracers. If varname is not found on the tracer list, an index value
+  ! of -1 will be returned.
 
   call cnst_get_ind(trim(adjustl(varname)),idx, abrtf=.false.)  !in, out, in
 
@@ -426,6 +426,8 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
   ! If the requested variable is the surface flux of an advected tracer, get it
   ! from cam_in%cflx
   !--------------------------------------------------------------------------------
+     ! Search through the list of variable names for tracer fluxes
+
      do m = 1,pcnst
         if (trim(adjustl(varname)).eq.trim(sflxnam(m))) then
            idx = m ; exit
@@ -461,6 +463,9 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
         case('ZM')
            arrayout(1:ncol,:) = state%zm(1:ncol,:)
+
+        case('ZMBOT')
+           arrayout(1:ncol,1) = state%zm(1:ncol,pver)
 
         case('ZI')
            arrayout(1:ncol,:) = state%zi(1:ncol,:)
