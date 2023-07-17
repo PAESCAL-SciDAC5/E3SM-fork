@@ -43,6 +43,7 @@ module elm_cpl_indices
   integer, public ::index_l2x_Sl_snowh        ! snow height
   integer, public ::index_l2x_Sl_u10          ! 10m wind
   integer, public ::index_l2x_Sl_ddvel        ! dry deposition velocities (optional)
+  integer, public ::index_l2x_Sl_fvdiff       ! last friction velocity difference
   integer, public ::index_l2x_Sl_fv           ! friction velocity  
   integer, public ::index_l2x_Sl_ram1         ! aerodynamical resistance
   integer, public ::index_l2x_Sl_soilw        ! volumetric soil water
@@ -198,6 +199,7 @@ contains
     index_l2x_Sl_qref       = mct_avect_indexra(l2x,'Sl_qref')
     index_l2x_Sl_u10        = mct_avect_indexra(l2x,'Sl_u10')
     index_l2x_Sl_ram1       = mct_avect_indexra(l2x,'Sl_ram1')
+!    index_l2x_Sl_fvdiff     = mct_avect_indexra(l2x,'Sl_fvdiff')
     index_l2x_Sl_fv         = mct_avect_indexra(l2x,'Sl_fv')
     index_l2x_Sl_soilw      = mct_avect_indexra(l2x,'Sl_soilw',perrwith='quiet')
     index_l2x_Flrl_wslake     = mct_avect_indexra(l2x,'Flrl_wslake')

@@ -93,6 +93,8 @@ contains
                cam_in(c)%ram1(i) =  x2a(index_x2a_Sl_ram1 , ig)
           if ( associated(cam_in(c)%fv) ) &
                cam_in(c)%fv(i)   =  x2a(index_x2a_Sl_fv   , ig)
+          if ( associated(cam_in(c)%fvdiff) ) &
+               cam_in(c)%fvdiff(i) = x2a(index_x2a_Sl_fvdiff, ig)
           if ( associated(cam_in(c)%soilw) ) &
                cam_in(c)%soilw(i) =  x2a(index_x2a_Sl_soilw, ig)
           if ( associated(cam_in(c)%dstflx) ) then
@@ -115,6 +117,7 @@ contains
           ! fields needed to calculate water isotopes to ocean evaporation processes
           !
           cam_in(c)%ustar(i) = x2a(index_x2a_So_ustar,ig)
+!          cam_in(c)%ustar_diff(i) = x2a(index_x2a_So_ustar_diff,ig)
           cam_in(c)%re(i)    = x2a(index_x2a_So_re   ,ig)
           cam_in(c)%ssq(i)   = x2a(index_x2a_So_ssq  ,ig)
           !

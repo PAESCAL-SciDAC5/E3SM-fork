@@ -377,6 +377,7 @@ contains
          z0hv                 => frictionvel_vars%z0hv_patch               , & ! Output: [real(r8) (:)   ]  roughness length over vegetation, sensible heat [m]
          z0qv                 => frictionvel_vars%z0qv_patch               , & ! Output: [real(r8) (:)   ]  roughness length over vegetation, latent heat [m]
          rb1                  => frictionvel_vars%rb1_patch                , & ! Output: [real(r8) (:)   ]  boundary layer resistance (s/m)
+         fvdiff_veg           => frictionvel_vars%fvdiff_veg               , & ! Output: [real(r8) (:)   ]  iteration friction velocity difference (m/s)
 
          t_h2osfc             => col_es%t_h2osfc             , & ! Input:  [real(r8) (:)   ]  surface water temperature
          t_soisno             => col_es%t_soisno             , & ! Input:  [real(r8) (:,:) ]  soil temperature (Kelvin)
@@ -714,6 +715,7 @@ contains
             ur(p) = max(1.0_r8,sqrt(forc_u(t)*forc_u(t)+forc_v(t)*forc_v(t)) + ugust(t))
          end if
          tau_diff(p) = 1.e100_r8
+         ustar(p) = 0._r8
 
          dth(p) = thm(p)-taf(p)
          dqh(p) = forc_q(t)-qaf(p)
@@ -760,6 +762,15 @@ contains
       call t_start_lnd(event)
       ITERATION : do while (itlef <= itmax .and. fn > 0)
 
+         do f = 1, fn
+            p = filterp(f)
+            c = veg_pp%column(p)
+            t = veg_pp%topounit(p)
+            g = veg_pp%gridcell(p)
+
+            fvdiff_veg(p) = -1. * ustar(p)
+         end do
+
          ! Determine friction velocity, and potential temperature and humidity
          ! profiles of the surface boundary layer
          call FrictionVelocity (begp, endp, fn, filterp, &
@@ -777,6 +788,7 @@ contains
             tlbef(p) = t_veg(p)
             del2(p) = del(p)
 
+            fvdiff_veg(p) = fvdiff_veg(p) + ustar(p)
             ! Determine aerodynamic resistances
             ram1(p)  = 1._r8/(ustar(p)*ustar(p)/um(p))
             rah(p,1) = 1._r8/(temp1(p)*ustar(p))

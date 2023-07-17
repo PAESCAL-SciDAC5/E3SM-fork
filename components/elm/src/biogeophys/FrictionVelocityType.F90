@@ -30,6 +30,10 @@ module FrictionVelocityType
      real(r8), pointer :: u10_elm_patch    (:)   ! patch 10-m wind (m/s) (for elm_map2gcell)
      real(r8), pointer :: va_patch         (:)   ! patch atmospheric wind speed plus convective velocity (m/s)
      real(r8), pointer :: vds_patch        (:)   ! patch deposition velocity term (m/s) (for dry dep SO4, NH4NO3)
+     real(r8), pointer :: fvdiff_urbpoi    (:)   ! urban patch friction velocity diff (m/s)
+     real(r8), pointer :: fvdiff_soil      (:)   ! soil patch friction velocity diff (m/s)
+     real(r8), pointer :: fvdiff_veg       (:)   ! vegetated patch friction velocity diff (m/s)
+     real(r8), pointer :: fvdiff_patch     (:)   ! patch friction velocity diff (m/s)
      real(r8), pointer :: fv_patch         (:)   ! patch friction velocity (m/s) (for dust model)
      real(r8), pointer :: rb1_patch        (:)   ! patch aerodynamical resistance (s/m) (for dry deposition of chemical tracers)
      real(r8), pointer :: ram1_patch       (:)   ! patch aerodynamical resistance (s/m)
@@ -81,10 +85,12 @@ contains
     ! !LOCAL VARIABLES:
     integer :: begp, endp
     integer :: begc, endc
+    integer :: begl, endl
     !------------------------------------------------------------------------
 
     begp = bounds%begp; endp= bounds%endp
     begc = bounds%begc; endc= bounds%endc
+    begl = bounds%begl; endl= bounds%endl
 
     allocate(this%forc_hgt_u_patch (begp:endp)) ; this%forc_hgt_u_patch (:)   = spval
     allocate(this%forc_hgt_t_patch (begp:endp)) ; this%forc_hgt_t_patch (:)   = spval
@@ -93,6 +99,10 @@ contains
     allocate(this%u10_elm_patch    (begp:endp)) ; this%u10_elm_patch    (:)   = spval
     allocate(this%va_patch         (begp:endp)) ; this%va_patch         (:)   = spval
     allocate(this%vds_patch        (begp:endp)) ; this%vds_patch        (:)   = spval
+    allocate(this%fvdiff_urbpoi    (begl:endl)) ; this%fvdiff_urbpoi    (:)   = spval
+    allocate(this%fvdiff_soil      (begp:endp)) ; this%fvdiff_soil      (:)   = spval
+    allocate(this%fvdiff_veg       (begp:endp)) ; this%fvdiff_veg       (:)   = spval
+    allocate(this%fvdiff_patch(begp:endp))      ; this%fvdiff_patch(:)   = spval
     allocate(this%fv_patch         (begp:endp)) ; this%fv_patch         (:)   = spval
     allocate(this%rb1_patch        (begp:endp)) ; this%rb1_patch        (:)   = spval
     allocate(this%ram1_patch       (begp:endp)) ; this%ram1_patch       (:)   = spval

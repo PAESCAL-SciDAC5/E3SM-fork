@@ -23,7 +23,7 @@ module subgridAveMod
   implicit none
   save
 
-  integer, parameter :: unity = 0, urbanf = 1, urbans = 2
+  integer, parameter :: unity = 0, urbanf = 1, urbans = 2, mxval=-1
   integer, parameter :: natveg = 3, veg =4, ice=5, nonurb=6, lake=7
   !
   ! !PUBLIC MEMBER FUNCTIONS:
@@ -57,6 +57,12 @@ module subgridAveMod
      module procedure p2g_1d_gpu
      module procedure p2g_2d
      module procedure p2g_2d_gpu
+  end interface
+  interface p2g_max
+     module procedure p2g_1d_max
+!     module procedure p2g_1d_gpu
+!     module procedure p2g_2d
+!     module procedure p2g_2d_gpu
   end interface
   interface c2l
      module procedure c2l_1d
@@ -581,6 +587,7 @@ contains
     real(r8) :: scale_c2l(bounds%begc:bounds%endc) ! scale factor
     real(r8) :: scale_l2g(bounds%begl:bounds%endl) ! scale factor
     real(r8) :: sumwt(bounds%begg:bounds%endg)     ! sum of weights
+    real(r8) :: pval
     !------------------------------------------------------------------------
 
     ! Enforce expected array sizes
@@ -590,6 +597,7 @@ contains
 
     call create_scale_c2l(bounds,c2l_scale_type,scale_c2l(bounds%begc:bounds%endc))
 
+!    if (p2c_scale_type == 'unity' .or. p2c_scale_type == 'max') then
     if (p2c_scale_type == 'unity') then
        do p = bounds%begp,bounds%endp
           scale_p2c(p) = 1.0_r8
@@ -601,16 +609,29 @@ contains
 
     garr(bounds%begg : bounds%endg) = spval
     sumwt(bounds%begg : bounds%endg) = 0._r8
+    if (p2c_scale_type == 'max') then
+       garr(bounds%begg : bounds%endg ) = 0._r8
+       sumwt(bounds%begg : bounds%endg ) = 1._r8
+    end if
     do p = bounds%begp,bounds%endp
        if (veg_pp%active(p) .and. veg_pp%wtgcell(p) /= 0._r8) then
           c = veg_pp%column(p)
           l = veg_pp%landunit(p)
           if (parr(p) /= spval .and. scale_c2l(c) /= spval .and. scale_l2g(l) /= spval) then
              g = veg_pp%gridcell(p)
+!           if (p2c_scale_type == 'max' .and. c2l_scale_type == 'max' .and. l2g_scale_type == 'max') then
+!             if (pval .lt. 0._r8) then
+!                pval = -1._r8 * parr(p)
+!             else
+!                pval = parr(p)
+!             end if
+!             if (pval .gt. garr(g)) garr(g) = pval
+!           else
              if (sumwt(g) == 0._r8) garr(g) = 0._r8
              garr(g) = garr(g) + parr(p) * scale_p2c(p) * scale_c2l(c) * scale_l2g(l) * veg_pp%wtgcell(p)
              sumwt(g) = sumwt(g) + veg_pp%wtgcell(p)
-          end if
+           end if
+!          end if
        end if
     end do
     found = .false.
@@ -929,6 +950,44 @@ contains
     end do
 
   end subroutine p2g_2d_gpu
+
+  !-----------------------------------------------------------------------
+  subroutine p2g_1d_max(bounds, parr, garr)
+    ! !DESCRIPTION:
+    ! Perfrom subgrid-average from pfts to gridcells.
+    ! Averaging is only done for points that are not equal to "spval".
+    !
+    ! !ARGUMENTS:
+    type(bounds_type), intent(in) :: bounds
+    real(r8), intent(in)  :: parr( bounds%begp: )  ! input pft array
+    real(r8), intent(out) :: garr( bounds%begg: )  ! output gridcell array
+    !
+    !  !LOCAL VARIABLES:
+    integer  :: p,c,l,g,index                   ! indices
+    logical  :: found                              ! temporary for error check
+    real(r8) :: pval
+    !------------------------------------------------------------------------
+
+    ! Enforce expected array sizes
+
+    garr(bounds%begg : bounds%endg) = 0._r8
+    do p = bounds%begp,bounds%endp
+       if (veg_pp%active(p) .and. veg_pp%wtgcell(p) /= 0._r8) then
+          c = veg_pp%column(p)
+          l = veg_pp%landunit(p)
+          g = veg_pp%gridcell(p)
+!           if (p2c_scale_type == 'max' .and. c2l_scale_type == 'max' .and. l2g_scale_type == 'max') then
+             if (parr(p) .lt. 0._r8) then
+                pval = -1._r8 * parr(p)
+             else
+                pval = parr(p)
+             end if
+             if (pval .gt. garr(g)) garr(g) = pval
+!          end if
+       end if
+    end do
+
+  end subroutine p2g_1d_max
 
   !-----------------------------------------------------------------------
   subroutine c2l_1d (bounds, carr, larr, c2l_scale_type)
@@ -1605,7 +1664,7 @@ contains
      ! the default value will be excluded from grid cell averages.
      scale_lookup(:) = spval
 
-     if (trim(l2g_scale_type) == 'unity') then
+     if (trim(l2g_scale_type) == 'unity' .or. trim(l2g_scale_type) == 'max') then
         scale_lookup(:) = 1.0_r8
      else if (trim(l2g_scale_type) == 'natveg') then
         scale_lookup(istsoil) = 1.0_r8
@@ -2350,7 +2409,7 @@ contains
     !-------------- local ----------!
     integer :: c,l
     !-------------------------------!
-    if (c2l_scale_type == 'unity') then
+    if (c2l_scale_type == 'unity' .or. c2l_scale_type == 'max' ) then
       do c = bounds%begc,bounds%endc
           scale_c2l(c) = 1.0_r8
       end do

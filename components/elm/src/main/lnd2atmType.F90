@@ -44,6 +44,7 @@ module lnd2atmType
      real(r8), pointer :: nee_grc            (:)   => null() ! net CO2 flux (kg CO2/m**2/s) [+ to atm]
      real(r8), pointer :: nem_grc            (:)   => null() ! gridcell average net methane correction to CO2 flux (g C/m^2/s)
      real(r8), pointer :: ram1_grc           (:)   => null() ! aerodynamical resistance (s/m)
+     real(r8), pointer :: fvdiff_grc         (:)   => null() ! difference in friction velocity between the last 2 iterations (m/s)
      real(r8), pointer :: fv_grc             (:)   => null() ! friction velocity (m/s) (for dust model)
      real(r8), pointer :: flxdst_grc         (:,:) => null() ! dust flux (size bins)
      real(r8), pointer :: ddvel_grc          (:,:) => null() ! dry deposition velocities
@@ -132,6 +133,7 @@ contains
     allocate(this%nem_grc              (begg:endg))            ; this%nem_grc              (:) =ival
     allocate(this%ram1_grc             (begg:endg))            ; this%ram1_grc             (:) =ival
     allocate(this%fv_grc               (begg:endg))            ; this%fv_grc               (:) =ival
+    allocate(this%fvdiff_grc           (begg:endg))            ; this%fvdiff_grc           (:) =ival 
     allocate(this%flxdst_grc           (begg:endg,1:ndst))     ; this%flxdst_grc         (:,:) =ival
     allocate(this%flux_ch4_grc         (begg:endg))            ; this%flux_ch4_grc         (:) =ival
     allocate(this%qflx_rofliq_grc      (begg:endg))            ; this%qflx_rofliq_grc      (:) =ival

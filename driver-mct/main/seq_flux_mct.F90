@@ -103,6 +103,7 @@ module seq_flux_mct
   real(r8), allocatable :: nInc       (:) ! diagnostic: a/o flux   , increment
 
   real(r8), allocatable ::  ustar(:)  ! saved ustar
+  real(r8), allocatable ::  ustar_diff(:) ! saved ustar iteration difference
   real(r8), allocatable ::  re   (:)  ! saved re
   real(r8), allocatable ::  ssq  (:)  ! saved sq
 
@@ -167,6 +168,7 @@ module seq_flux_mct
   integer :: index_xao_Faox_swdn
   integer :: index_xao_Faox_swup
   integer :: index_xao_So_ustar
+  integer :: index_xao_So_ustar_diff
   integer :: index_xao_So_re
   integer :: index_xao_So_ssq
   integer :: index_xao_So_duu10n
@@ -281,6 +283,9 @@ contains
     allocate(ustar(nloc),stat=ier)
     if(ier/=0) call mct_die(subName,'allocate ustar',ier)
     ustar = 0.0_r8
+    allocate(ustar_diff(nloc),stat=ier)
+    if(ier/=0) call mct_die(subName,'allocate ustar_diff',ier)
+    ustar_diff = 0.0_r8
     allocate(re(nloc), stat=ier)
     if(ier/=0) call mct_die(subName,'allocate re',ier)
     re = 0.0_r8
@@ -987,6 +992,7 @@ contains
     integer(in) :: index_qref
     integer(in) :: index_duu10n
     integer(in) :: index_ustar
+    integer(in) :: index_ustar_diff
     integer(in) :: index_ssq
     integer(in) :: index_re
     integer(in) :: index_u10
@@ -1157,7 +1163,8 @@ contains
             roce_16O, roce_HDO, roce_18O,    &
             evap , evap_16O, evap_HDO, evap_18O, taux, tauy, tref, qref , &
             ocn_surface_flux_scheme, &
-            duu10n,ustar, re  , ssq , missval = 0.0_r8, &
+            duu10n,ustar, re, ssq, missval = 0.0_r8, &
+!            duu10n,ustar, ustar_diff, re  , ssq , missval = 0.0_r8, &
             wsresp=wsresp, tau_est=tau_est, ugust=ugust)
     endif
 
@@ -1176,7 +1183,8 @@ contains
     index_tref   = mct_aVect_indexRA(xaop_ae,"So_tref")
     index_qref   = mct_aVect_indexRA(xaop_ae,"So_qref")
     index_duu10n = mct_aVect_indexRA(xaop_ae,"So_duu10n")
-    index_ustar  = mct_aVect_indexRA(xaop_ae,"So_ustar")
+!    index_ustar  = mct_aVect_indexRA(xaop_ae,"So_ustar")
+    index_ustar_diff = mct_aVect_indexRA(xaop_ae,"So_ustar_diff")
     index_ssq    = mct_aVect_indexRA(xaop_ae,"So_ssq")
     index_re     = mct_aVect_indexRA(xaop_ae,"So_re")
     index_u10    = mct_aVect_indexRA(xaop_ae,"So_u10")
@@ -1212,6 +1220,7 @@ contains
        xaop_oe%rAttr(index_tref  ,io) = xaop_oe%rAttr(index_tref  ,io) + tref(n)* wt
        xaop_oe%rAttr(index_qref  ,io) = xaop_oe%rAttr(index_qref  ,io) + qref(n)* wt
        xaop_oe%rAttr(index_ustar ,io) = xaop_oe%rAttr(index_ustar ,io) + ustar(n)*wt   ! friction velocity
+       xaop_oe%rAttr(index_ustar_diff, io) = xaop_oe%rAttr(index_ustar_diff, io) + ustar_diff(n)*wt ! friction velocity difference
        xaop_oe%rAttr(index_re    ,io) = xaop_oe%rAttr(index_re    ,io) + re(n)  * wt   ! reynolds number
        xaop_oe%rAttr(index_ssq   ,io) = xaop_oe%rAttr(index_ssq   ,io) + ssq(n) * wt   ! s.hum. saturation at Ts
        xaop_oe%rAttr(index_lwup  ,io) = xaop_oe%rAttr(index_lwup  ,io) + lwup(n)* wt
@@ -1246,6 +1255,7 @@ contains
        xaop_ae%rAttr(index_tref  ,ia) = xaop_ae%rAttr(index_tref  ,ia) + tref(n)* wt
        xaop_ae%rAttr(index_qref  ,ia) = xaop_ae%rAttr(index_qref  ,ia) + qref(n)* wt
        xaop_ae%rAttr(index_ustar ,ia) = xaop_ae%rAttr(index_ustar ,ia) + ustar(n)*wt   ! friction velocity
+       xaop_ae%rAttr(index_ustar_diff, ia) = xaop_ae%rAttr(index_ustar_diff, ia) + ustar_diff(n)*wt ! friction velocity difference
        xaop_ae%rAttr(index_re    ,ia) = xaop_ae%rAttr(index_re    ,ia) + re(n)  * wt   ! reynolds number
        xaop_ae%rAttr(index_ssq   ,ia) = xaop_ae%rAttr(index_ssq   ,ia) + ssq(n) * wt   ! s.hum. saturation at Ts
        xaop_ae%rAttr(index_lwup  ,ia) = xaop_ae%rAttr(index_lwup  ,ia) + lwup(n)* wt
@@ -1363,6 +1373,7 @@ contains
        index_xao_So_tref   = mct_aVect_indexRA(xao,'So_tref')
        index_xao_So_qref   = mct_aVect_indexRA(xao,'So_qref')
        index_xao_So_ustar  = mct_aVect_indexRA(xao,'So_ustar')
+       index_xao_So_ustar_diff = mct_aVect_indexRA(xao,'So_ustar_diff')
        index_xao_So_re     = mct_aVect_indexRA(xao,'So_re')
        index_xao_So_ssq    = mct_aVect_indexRA(xao,'So_ssq')
        index_xao_So_u10    = mct_aVect_indexRA(xao,'So_u10')
@@ -1617,7 +1628,8 @@ contains
             roce_16O, roce_HDO, roce_18O,    &
             evap , evap_16O, evap_HDO, evap_18O, taux , tauy, tref, qref , &
             ocn_surface_flux_scheme, &
-            duu10n,ustar, re  , ssq, &
+!            duu10n, ustar, re, ssq, &
+            duu10n,ustar, ustar_diff, re  , ssq, &
             wsresp=wsresp, tau_est=tau_est, ugust=ugust_atm)
        !missval should not be needed if flux calc
        !consistent with mrgx2a fraction
@@ -1637,6 +1649,7 @@ contains
           xao%rAttr(index_xao_So_tref  ,n) = tref(n)
           xao%rAttr(index_xao_So_qref  ,n) = qref(n)
           xao%rAttr(index_xao_So_ustar ,n) = ustar(n)  ! friction velocity
+          xao%rAttr(index_xao_So_ustar_diff, n) = ustar_diff(n) ! friction velocity difference
           xao%rAttr(index_xao_So_re    ,n) = re(n)     ! reynolds number
           xao%rAttr(index_xao_So_ssq   ,n) = ssq(n)    ! s.hum. saturation at Ts
           xao%rAttr(index_xao_Faox_lwup,n) = lwup(n)

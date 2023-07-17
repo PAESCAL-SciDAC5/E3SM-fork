@@ -149,7 +149,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            &               evap  ,evap_16O, evap_HDO, evap_18O, &
            &               taux  ,tauy  ,tref  ,qref  ,   &
            &               ocn_surface_flux_scheme, &
-           &               duu10n,  ustar_sv   ,re_sv ,ssq_sv,   &
+!           &               duu10n, ustar_sv, re_sv, ssq_sv, &
+           &               duu10n,  ustar_sv   , ustar_diff, re_sv ,ssq_sv,   &
            &               missval, wsresp, tau_est, ugust)
 
 ! !USES:
@@ -196,6 +197,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
    real(R8),intent(out)  :: duu10n(nMax) ! diag: 10m wind speed squared (m/s)^2
 
    real(R8),intent(out),optional :: ustar_sv(nMax) ! diag: ustar
+   real(R8),intent(out),optional :: ustar_diff(nMax) ! diag: ustar difference
    real(R8),intent(out),optional :: re_sv   (nMax) ! diag: sqrt of exchange coefficient (water)
    real(R8),intent(out),optional :: ssq_sv  (nMax) ! diag: sea surface humidity  (kg/kg)
 
@@ -424,6 +426,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            tstar = rh * delt
            qstar = re * delq
 
+           ustar_diff = ustar - ustar_prev
            if (present(wsresp) .and. present(tau_est)) then
               ! Update stress and magnitude of mean wind.
               tau = rbot(n) * ustar * rd * wind_adj

@@ -179,6 +179,7 @@ contains
          rh_ref2m_r       =>    veg_ws%rh_ref2m_r      , & ! Output: [real(r8) (:)   ]  Rural 2 m height surface relative humidity (%)
          rh_ref2m         =>    veg_ws%rh_ref2m        , & ! Output: [real(r8) (:)   ]  2 m height surface relative humidity (%)
 
+         fvdiff_soil      =>    frictionvel_vars%fvdiff_soil          , & ! Output: [real(r8) (:)   ]  iteration friction velocity difference [m/s]
          z0mg_col         =>    frictionvel_vars%z0mg_col             , & ! Output: [real(r8) (:)   ]  roughness length, momentum [m]
          z0hg_col         =>    frictionvel_vars%z0hg_col             , & ! Output: [real(r8) (:)   ]  roughness length, sensible heat [m]
          z0qg_col         =>    frictionvel_vars%z0qg_col             , & ! Output: [real(r8) (:)   ]  roughness length, latent heat [m]
@@ -234,6 +235,7 @@ contains
             ur(p)    = max(1.0_r8,sqrt(forc_u(t)*forc_u(t)+forc_v(t)*forc_v(t)) + ugust(t))
          end if
          tau_diff(p) = 1.e100_r8
+         ustar(p) = 0._r8
 
          dth(p)   = thm(p)-t_grnd(c)
          dqh(p)   = forc_q(t) - qg(c)
@@ -267,6 +269,15 @@ contains
 
       ITERATION: do iter = 1, loopmax
 
+         do f = 1, fn
+            p = filterp(f)
+            c = veg_pp%column(p)
+            t = veg_pp%topounit(p)
+            g = veg_pp%gridcell(p)
+
+            fvdiff_soil(p) = -1. * ustar(p)
+         end do
+
          call FrictionVelocity(begp, endp, fn, filterp, &
               displa(begp:endp), z0mg_patch(begp:endp), z0hg_patch(begp:endp), z0qg_patch(begp:endp), &
               obu(begp:endp), iter, ur(begp:endp), um(begp:endp), ustar(begp:endp), &
@@ -279,6 +290,7 @@ contains
             t = veg_pp%topounit(p)
             g = veg_pp%gridcell(p)
 
+            fvdiff_soil(p) = fvdiff_soil(p) + ustar(p)
             ! Calculate magnitude of stress and update wind speed.
             if (implicit_stress) then
                ram = 1._r8/(ustar(p)*ustar(p)/um(p))

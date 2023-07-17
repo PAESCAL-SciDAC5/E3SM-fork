@@ -1404,6 +1404,7 @@ contains
        ! Additional fields for DUST, PROGSSLT, dry-deposition and VOC
        ! These are now standard fields, but the check on the index makes sure the driver handles them
        if (index_l2x_Sl_ram1      /= 0 )  l2x(index_l2x_Sl_ram1,i)     =  lnd2atm_vars%ram1_grc(g)
+       if (index_l2x_Sl_fvdiff    /= 0 )  l2x(index_l2x_Sl_fvdiff,i)   =  lnd2atm_vars%fvdiff_grc(g)
        if (index_l2x_Sl_fv        /= 0 )  l2x(index_l2x_Sl_fv,i)       =  lnd2atm_vars%fv_grc(g)
        if (index_l2x_Sl_soilw     /= 0 )  l2x(index_l2x_Sl_soilw,i)    =  lnd2atm_vars%h2osoi_vol_grc(g,1)
        if (index_l2x_Fall_flxdst1 /= 0 )  l2x(index_l2x_Fall_flxdst1,i)= -lnd2atm_vars%flxdst_grc(g,1)

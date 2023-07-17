@@ -116,9 +116,11 @@ module camsrfexch
      real(r8), allocatable :: ocnfrac(:)    ! ocean areal fraction
      real(r8), pointer, dimension(:) :: ram1       !aerodynamical resistance (s/m) (pcols)
      real(r8), pointer, dimension(:) :: fv         !friction velocity (m/s) (pcols)
+     real(r8), pointer, dimension(:) :: fvdiff     !friction velocity difference (m/s) (pcols)
      real(r8), pointer, dimension(:) :: soilw      !volumetric soil water (m3/m3)
      real(r8), allocatable :: cflx(:,:)     ! constituent flux (emissions)
      real(r8), allocatable :: ustar(:)      ! atm/ocn saved version of ustar
+!     real(r8), allocatable :: ustar_diff(:) ! atm/ocn ustar iteration diff
      real(r8), allocatable :: re(:)         ! atm/ocn saved version of re
      real(r8), allocatable :: ssq(:)        ! atm/ocn saved version of ssq
      real(r8), pointer, dimension(:,:) :: depvel   ! deposition velocities
@@ -147,7 +149,8 @@ CONTAINS
 !
   subroutine hub2atm_alloc( cam_in )
     use seq_drydep_mod,  only: lnd_drydep, n_drydep
-    use cam_cpl_indices, only: index_x2a_Sl_ram1, index_x2a_Sl_fv, index_x2a_Sl_soilw, index_x2a_Fall_flxdst1
+    use cam_cpl_indices, only: index_x2a_Sl_ram1, index_x2a_Sl_fv, index_x2a_Sl_fvdiff, index_x2a_Sl_soilw, index_x2a_Fall_flxdst1
+    ! index_x2a_Sl_fvdiff
     use cam_cpl_indices, only: index_x2a_Fall_flxvoc
     use shr_megan_mod,   only: shr_megan_mechcomps_n
 
@@ -174,6 +177,7 @@ CONTAINS
     do c = begchunk,endchunk
        nullify(cam_in(c)%ram1)
        nullify(cam_in(c)%fv)
+       nullify(cam_in(c)%fvdiff)
        nullify(cam_in(c)%soilw)
        nullify(cam_in(c)%depvel)
        nullify(cam_in(c)%dstflx)
@@ -257,6 +261,10 @@ CONTAINS
           allocate (cam_in(c)%fv(pcols), stat=ierror)
           if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error fv')
        endif
+       if (index_x2a_Sl_fvdiff>0) then
+          allocate (cam_in(c)%fvdiff(pcols), stat=ierror)
+          if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error fvdiff')
+       endif
        if (index_x2a_Sl_soilw /= 0) then
           allocate (cam_in(c)%soilw(pcols), stat=ierror)
           if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error soilw')
@@ -267,6 +275,9 @@ CONTAINS
 
        allocate (cam_in(c)%ustar(pcols), stat=ierror)
        if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error ustar')
+
+!       allocate (cam_in(c)%ustar_diff(pcols), stat=ierror)
+!       if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error ustar_diff')
 
        allocate (cam_in(c)%re(pcols), stat=ierror)
        if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error re')
@@ -323,6 +334,8 @@ CONTAINS
             cam_in(c)%ram1  (:) = 0.1_r8
        if (associated(cam_in(c)%fv)) &
             cam_in(c)%fv    (:) = 0.1_r8
+       if (associated(cam_in(c)%fvdiff)) &
+            cam_in(c)%fvdiff(:) = 0.0_r8
        if (associated(cam_in(c)%soilw)) &
             cam_in(c)%soilw (:) = 0.0_r8
        if (associated(cam_in(c)%dstflx)) &

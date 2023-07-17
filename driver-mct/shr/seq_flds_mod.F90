@@ -1221,6 +1221,15 @@ contains
     attname  = 'Sl_fv'
     call metadata_set(attname, longname, stdname, units)
 
+    ! Surface friction velocity iteration difference in land (land/atm only)
+    call seq_flds_add(l2x_states,"Sl_fvdiff")
+    call seq_flds_add(x2a_states,"Sl_fvdiff")
+    longname = 'Surface friction velocity difference in land'
+    stdname  = 'friction_velocity_difference'
+    units    = 'm s-1'
+    attname  = 'Sl_fvdiff'
+    call metadata_set(attname, longname, stdname, units)
+
     ! Aerodynamical resistance (land/atm only)
     call seq_flds_add(l2x_states,"Sl_ram1")
     call seq_flds_add(x2a_states,"Sl_ram1")
@@ -1474,6 +1483,15 @@ contains
     stdname  = 'fraction_velocity'
     units    = 'm s-1'
     attname  = 'So_ustar'
+    call metadata_set(attname, longname, stdname, units)
+
+    ! Surface friction velocity iteration difference in ocean
+    call seq_flds_add(xao_states,"So_ustar_diff")
+    call seq_flds_add(x2a_states,"So_ustar_diff")
+    longname = 'Surface friction velocity difference in ocean'
+    stdname  = 'friction_velocity'
+    units    = 'm s-1'
+    attname  = 'So_ustar_diff'
     call metadata_set(attname, longname, stdname, units)
 
     ! Water temperature heat flux from ocean

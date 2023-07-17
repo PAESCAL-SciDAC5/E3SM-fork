@@ -13,6 +13,7 @@ module SoilFluxesMod
   use elm_varpar	, only : nlevsno, nlevgrnd, nlevurb, max_patch_per_col
   use atm2lndType	, only : atm2lnd_type
   use CanopyStateType   , only : canopystate_type
+  use FrictionVelocityType, only : frictionvel_type
   use EnergyFluxType    , only : energyflux_type
   use SolarAbsorbedType , only : solarabs_type
   use TopounitDataType  , only : top_af
@@ -38,7 +39,7 @@ contains
   subroutine SoilFluxes (bounds, num_urbanl, filter_urbanl, &
        num_nolakec, filter_nolakec, num_nolakep, filter_nolakep, &
        atm2lnd_vars, solarabs_vars, canopystate_vars, &
-       energyflux_vars)
+       frictionvel_vars, energyflux_vars)
     !
     ! !DESCRIPTION:
     ! Update surface fluxes based on the new ground temperature
@@ -61,6 +62,7 @@ contains
     type(atm2lnd_type)     , intent(in)    :: atm2lnd_vars
     type(solarabs_type)    , intent(in)    :: solarabs_vars
     type(canopystate_type) , intent(in)    :: canopystate_vars
+    type(frictionvel_type) , intent(in)    :: frictionvel_vars
     type(energyflux_type)  , intent(inout) :: energyflux_vars
     real(r8) :: dtime                                              ! land model time step (sec)
 
@@ -160,7 +162,11 @@ contains
          eflx_lh_vegt            => veg_ef%eflx_lh_vegt      , & ! Output: [real(r8) (:)   ]  veg transpiration heat flux (W/m**2) [+ to atm]
          eflx_lh_grnd            => veg_ef%eflx_lh_grnd      , & ! Output: [real(r8) (:)   ]  ground evaporation heat flux (W/m**2) [+ to atm]
          errsoi_col              => col_ef%errsoi              , & ! Output: [real(r8) (:)   ]  column-level soil/lake energy conservation error (W/m**2)
-         errsoi_patch            => veg_ef%errsoi              & ! Output: [real(r8) (:)   ]  pft-level soil/lake energy conservation error (W/m**2)
+         errsoi_patch            => veg_ef%errsoi              , & ! Output: [real(r8) (:)   ]  pft-level soil/lake energy conservation error (W/m**2)
+         fvdiff_patch     => frictionvel_vars%fvdiff_patch, & ! Output: [ real(r8) (:) ] pft-level friction velocity iteration difference (m/s)
+         fvdiff_urbpoi           => frictionvel_vars%fvdiff_urbpoi, & ! Output: [ real(r8) (:) ] friction velocity iteration difference for urban (m/s)
+         fvdiff_soil             => frictionvel_vars%fvdiff_soil, & ! Output: [ real(r8) (:) ] friction velocity iteration difference from bare ground (m/s)
+         fvdiff_veg              => frictionvel_vars%fvdiff_veg &   ! Output: [ real(r8) (:) ] friction velocity iteration difference from vegetation
          )
 
          dtime = dtime_mod
@@ -441,6 +447,16 @@ contains
             eflx_lwrad_net(p) = eflx_lwrad_net(p) + eflx_lwrad_del(p)
             eflx_lwrad_net_u(p) = eflx_lwrad_net_u(p) + eflx_lwrad_del(p)
             eflx_lwrad_out_u(p) = eflx_lwrad_out(p)
+         end if
+
+         if (lun_pp%urbpoi(l)) then
+            fvdiff_patch(p) = fvdiff_urbpoi(l)
+         else
+!            fvdiff_patch(p) = max(fvdiff_soil(p), fvdiff_veg(p))
+            fvdiff_patch(p) = fvdiff_soil(p)
+            if(fvdiff_veg(p) .gt. fvdiff_soil(p)) then
+              fvdiff_patch(p) = fvdiff_veg(p)
+            end if
          end if
       end do
 

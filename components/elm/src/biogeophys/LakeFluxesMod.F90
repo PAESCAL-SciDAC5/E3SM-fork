@@ -227,6 +227,7 @@ contains
          taux             =>    veg_ef%taux             , & ! Output: [real(r8) (:)   ]  wind (shear) stress: e-w (kg/m/s**2)
          tauy             =>    veg_ef%tauy             , & ! Output: [real(r8) (:)   ]  wind (shear) stress: n-s (kg/m/s**2)
 
+         fvdiff_patch     =>    frictionvel_vars%fvdiff_patch          , & ! Output: [real(r8) (:)   ]  friction velocity iteration difference (m/s)
          ks               =>    lakestate_vars%ks_col                  , & ! Output: [real(r8) (:)   ]  coefficient passed to LakeTemperature
          ws               =>    lakestate_vars%ws_col                  , & ! Output: [real(r8) (:)   ]  surface friction velocity (m/s)
          betaprime        =>    lakestate_vars%betaprime_col           , & ! Output: [real(r8) (:)   ]  fraction of solar rad absorbed at surface: equal to NIR fraction
@@ -361,6 +362,7 @@ contains
             ur(p) = max(1.0_r8,sqrt(forc_u(t)*forc_u(t)+forc_v(t)*forc_v(t)) + ugust(t))
          end if
          tau_diff(p) = 1.e100_r8
+         fvdiff_patch(p) = 0._r8
 
          dth(p)   = thm(p)-t_grnd(c)
          dqh(p)   = forc_q(t)-qsatg(c)
@@ -385,6 +387,15 @@ contains
 
       ITERATION : do while (iter <= itmax .and. fncopy > 0)
 
+         do fp = 1, fncopy
+            p = fpcopy(fp)
+            c = veg_pp%column(p)
+            t = veg_pp%topounit(p)
+            g = veg_pp%gridcell(p)
+
+            fvdiff_patch(p) = -1. * ustar(p)
+         end do
+
          ! Determine friction velocity, and potential temperature and humidity
          ! profiles of the surface boundary layer
 
@@ -399,6 +410,8 @@ contains
             c = veg_pp%column(p)
             t = veg_pp%topounit(p)
             g = veg_pp%gridcell(p)
+
+            fvdiff_patch(p) = fvdiff_patch(p) + ustar(p)
 
             tgbef(c) = t_grnd(c)
             if (t_grnd(c) > tfrz .and. t_lake(c,1) > tfrz .and. snl(c) == 0) then

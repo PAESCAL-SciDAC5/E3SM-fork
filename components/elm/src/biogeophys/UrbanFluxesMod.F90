@@ -254,6 +254,8 @@ contains
          forc_hgt_u_patch    =>   frictionvel_vars%forc_hgt_u_patch         , & ! Input:  [real(r8) (:)   ]  observational height of wind at pft-level (m)
          forc_hgt_t_patch    =>   frictionvel_vars%forc_hgt_t_patch         , & ! Input:  [real(r8) (:)   ]  observational height of temperature at pft-level (m)
          ram1                =>   frictionvel_vars%ram1_patch               , & ! Output: [real(r8) (:)   ]  aerodynamical resistance (s/m)
+         fvdiff_urbpoi       =>   frictionvel_vars%fvdiff_urbpoi            , &
+! Output: [real(r8) (:)   ]  iteration friction difference (m/s)
 
          htvp                =>   col_ef%htvp                  , & ! Input:  [real(r8) (:)   ]  latent heat of evaporation (/sublimation) (J/kg)
          eflx_urban_ac       =>   col_ef%eflx_urban_ac         , & ! Input:  [real(r8) (:)   ]  urban air conditioning flux (W/m**2)
@@ -345,6 +347,7 @@ contains
             ur(l) = max(1.0_r8,sqrt(forc_u(t)*forc_u(t)+forc_v(t)*forc_v(t)) + ugust(t))
          end if
          tau_diff(l) = 1.e100_r8
+         ustar(l) = 0._r8
 
       end do
 
@@ -404,6 +407,14 @@ contains
 
       ITERATION: do iter = 1, loopmax
 
+         do fl = 1, fnl_iter
+            l = filterl_copy(fl)
+            t = lun_pp%topounit(l)
+            g = lun_pp%gridcell(l)
+
+            fvdiff_urbpoi(l) = -1. * ustar(l)
+         end do
+
          ! Get friction velocity, relation for potential
          ! temperature and humidity profiles of surface boundary layer.
 
@@ -421,6 +432,7 @@ contains
             t = lun_pp%topounit(l)
             g = lun_pp%gridcell(l)
 
+            fvdiff_urbpoi(l) = fvdiff_urbpoi(l) + ustar(l)
             ! Determine aerodynamic resistance to fluxes from urban canopy air to
             ! atmosphere
             ramu(l) = 1._r8/(ustar(l)*ustar(l)/um(l))

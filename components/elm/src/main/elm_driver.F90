@@ -848,7 +848,7 @@ contains
             filter(nc)%num_nolakec, filter(nc)%nolakec,    &
             filter(nc)%num_nolakep, filter(nc)%nolakep,    &
             atm2lnd_vars, solarabs_vars, canopystate_vars, &
-            energyflux_vars )
+            frictionvel_vars, energyflux_vars )
        call t_stopf('bgp2')
 
        ! ============================================================================

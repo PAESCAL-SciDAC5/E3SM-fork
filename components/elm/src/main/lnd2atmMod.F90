@@ -16,7 +16,7 @@ module lnd2atmMod
   use tracer_varcon        , only : is_active_betr_bgc
   use seq_drydep_mod   , only : n_drydep, drydep_method, DD_XLND
   use decompMod            , only : bounds_type
-  use subgridAveMod        , only : p2g, c2g, p2t  
+  use subgridAveMod        , only : p2g, p2g_max, c2g, p2t  
   use lnd2atmType          , only : lnd2atm_type
   use atm2lndType          , only : atm2lnd_type
   use CH4Mod               , only : ch4_type
@@ -189,6 +189,8 @@ contains
       fsa_grc   =>lnd2atm_vars%fsa_grc    , &
       fv_patch  => frictionvel_vars%fv_patch , &
       fv_grc    => lnd2atm_vars%fv_grc       , &
+      fvdiff_patch => frictionvel_vars%fvdiff_patch, &
+      fvdiff_grc => lnd2atm_vars%fvdiff_grc  , &
       ram1_patch  => frictionvel_vars%ram1_patch , &
       ram1_grc    => lnd2atm_vars%ram1_grc       , &
       eflx_sh_tot => veg_ef%eflx_sh_tot , &
@@ -274,6 +276,11 @@ contains
          fsa_patch(bounds%begp:bounds%endp) , &
          fsa_grc  (bounds%begg:bounds%endg)  , &
          p2c_scale_type=unity, c2l_scale_type= urbanf, l2g_scale_type=unity)
+
+    call p2g_max(bounds, &
+         fvdiff_patch(bounds%begp:bounds%endp), &
+         fvdiff_grc  (bounds%begg:bounds%endg))
+!         p2c_scale_type=unity, c2l_scale_type=unity, l2g_scale_type=unity)
 
     call p2g(bounds, &
          fv_patch(bounds%begp:bounds%endp) , &

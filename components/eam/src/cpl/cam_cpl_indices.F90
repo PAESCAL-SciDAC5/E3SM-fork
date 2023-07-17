@@ -64,6 +64,7 @@ module cam_cpl_indices
   integer :: index_x2a_Sl_snowh        ! surface snow depth over land
   integer :: index_x2a_Si_snowh        ! surface snow depth over ice
   integer :: index_x2a_Sl_fv           ! friction velocity
+  integer :: index_x2a_Sl_fvdiff       ! friction velocity difference
   integer :: index_x2a_Sl_ram1         ! aerodynamical resistance
   integer :: index_x2a_Sl_soilw        ! volumetric soil water
   integer :: index_x2a_Faxx_taux       ! wind stress, zonal              
@@ -82,6 +83,7 @@ module cam_cpl_indices
   integer :: index_x2a_Faoo_fdms_ocn   ! dms flux from ocean
   integer :: index_x2a_Faoo_h2otemp    ! water temperature heat flux from ocean  
   integer :: index_x2a_So_ustar	       ! surface friction velocity in ocean
+!  integer :: index_x2a_So_ustar_diff   ! surface friction velocity difference
   integer :: index_x2a_So_re           ! square of atm/ocn exch. coeff 
   integer :: index_x2a_So_ssq          ! surface saturation specific humidity in ocean 
   integer :: index_x2a_Sl_ddvel        ! dry deposition velocities from land
@@ -111,6 +113,7 @@ contains
     index_x2a_Si_snowh      = mct_avect_indexra(x2a,'Si_snowh')
     
     index_x2a_Sl_fv         = mct_avect_indexra(x2a,'Sl_fv')
+    index_x2a_Sl_fvdiff     = mct_avect_indexra(x2a,'Sl_fvdiff')
     index_x2a_Sl_ram1       = mct_avect_indexra(x2a,'Sl_ram1')
     index_x2a_Sl_soilw      = mct_avect_indexra(x2a,'Sl_soilw',perrWith='quiet')
     
@@ -129,6 +132,7 @@ contains
     index_x2a_Faxx_lwup     = mct_avect_indexra(x2a,'Faxx_lwup')
     index_x2a_Faxx_evap     = mct_avect_indexra(x2a,'Faxx_evap')
     index_x2a_So_ustar      = mct_avect_indexra(x2a,'So_ustar')
+!    index_x2a_So_ustar_diff = mct_avect_indexra(x2a,'So_ustar_diff')
     index_x2a_So_re         = mct_avect_indexra(x2a,'So_re')
     index_x2a_So_ssq        = mct_avect_indexra(x2a,'So_ssq')
     index_x2a_Sl_fv         = mct_avect_indexra(x2a,'Sl_fv')
