@@ -502,6 +502,12 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         case('SST')
            arrayout(1:ncol,1) = cam_in%sst(1:ncol)
 
+        case('FV')
+           arrayout(1:ncol,1) = cam_in%fv(1:ncol)
+
+        case('FVDIFF')
+           arrayout(1:ncol,1) = cam_in%fvdiff(1:ncol)
+
         !----------
         ! cam_out
         !----------
