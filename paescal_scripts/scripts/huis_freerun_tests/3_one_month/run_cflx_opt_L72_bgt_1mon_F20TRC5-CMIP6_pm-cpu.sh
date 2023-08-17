@@ -61,9 +61,9 @@ readonly RUN_REFCASE="20210625.v2rc3c-GWD.piControl.ne30pg2_EC30to60E2r2.chrysal
 readonly RUN_REFDATE="1001-01-01"   # same as MODEL_START_DATE for 'branch', can be different for 'hybrid'
 
 # Set paths
-readonly CODE_ROOT="/global/cfs/projectdirs/m4359/jli628/cflx_202305_update/"     #need to change
+CODE_ROOT="/global/cfs/projectdirs/m4359/jli628/cflx_202305_update/"     #need to change
 if [ "${do_fetch_code,,}" != "false" ]; then
-	CODE_ROOT=${CODE_ROOT}/${CCSMTAG}     #need to change
+	CODE_ROOT=${CODE_ROOT}${CCSMTAG}     #need to change
 fi
 echo $CODE_ROOT
 readonly CASE_ROOT="${SCRATCH}/E3SMv${E3SM_version}/${CASE_NAME}"
@@ -252,6 +252,8 @@ fetch_code() {
     pushd ${path}
 
     git clone -b $BRANCH --recursive git@github.com:${repo}.git .
+
+    cp ./paescal_scripts/addtional_files/ODEMod.F90 ./components/clm/src/external_models/sbetr/src/betr/betr_math/
 
     # Setup git hooks
     #rm -rf .git/hooks
