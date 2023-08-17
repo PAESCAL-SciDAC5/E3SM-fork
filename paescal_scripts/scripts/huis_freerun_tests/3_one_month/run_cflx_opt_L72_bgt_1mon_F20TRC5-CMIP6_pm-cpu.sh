@@ -253,8 +253,6 @@ fetch_code() {
 
     git clone -b $BRANCH --recursive git@github.com:${repo}.git .
 
-    cp ./paescal_scripts/addtional_files/ODEMod.F90 ./components/clm/src/external_models/sbetr/src/betr/betr_math/
-
     # Setup git hooks
     #rm -rf .git/hooks
     #git clone git@github.com:E3SM-Project/E3SM-Hooks.git .git/hooks
@@ -287,6 +285,8 @@ create_newcase() {
         echo $'\n----- Skipping create_newcase -----\n'
         return
     fi
+
+    cp ${CODE_ROOT}paescal_scripts/addtional_files/ODEMod.F90 ${CODE_ROOT}components/clm/src/external_models/sbetr/src/betr/betr_math/
 
     echo $'\n----- Starting create_newcase -----\n'
 
