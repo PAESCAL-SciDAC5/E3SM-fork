@@ -44,7 +44,7 @@ readonly CASE_NAME="E3SMv${E3SM_version}.${COMPSET}.${RESOLUTION}.${date_string}
 # readonly CASE_GROUP=""
 
 # Code and compilation
-readonly BRANCH="huiwanpnnl/gmd_2020_330_forc+cflx_202305"
+readonly BRANCH="huiwanpnnl/gmd_2020_330_forc+cflx_202305_pm_cpu_gnu"
 readonly REPO_name="PAESCAL-SciDAC5/E3SM-fork"
 readonly DEBUG_COMPILE=false
 readonly CCSMTAG="gmd_2020_330_cflx_202305"
@@ -61,7 +61,7 @@ readonly RUN_REFCASE="20210625.v2rc3c-GWD.piControl.ne30pg2_EC30to60E2r2.chrysal
 readonly RUN_REFDATE="1001-01-01"   # same as MODEL_START_DATE for 'branch', can be different for 'hybrid'
 
 # Set paths
-readonly CODE_ROOT="/global/cfs/projectdirs/m4359/jli628/cflx_202305/"     #need to change
+readonly CODE_ROOT="/global/cfs/projectdirs/m4359/jli628/cflx_202305_update/"     #need to change
 if [ "${do_fetch_code,,}" != "false" ]; then
 	CODE_ROOT=${CODE_ROOT}/${CCSMTAG}     #need to change
 fi
@@ -77,12 +77,12 @@ readonly CASE_SCRIPTS_DIR=${CASE_ROOT}/case_scripts
 readonly CASE_RUN_DIR=${CASE_ROOT}/run
 #PELAYOUT doesn't work on pm-cpu
 #readonly PELAYOUT="X2"   #Allowed options are  ('S','M','L','X1','X2','[0-9]x[0-9]','[0-9]').
-readonly WALLTIME="01:00:00"
-readonly QUEUE="regular"
-readonly STOP_OPTION="nmonths"
-readonly STOP_N="1"
-readonly REST_OPTION="nmonths"
-readonly REST_N="1"
+readonly WALLTIME="00:10:00"
+readonly QUEUE="debug"
+readonly STOP_OPTION="ndays"
+readonly STOP_N="3"
+readonly REST_OPTION="ndays"
+readonly REST_N="3"
 readonly RESUBMIT="0"
 readonly DO_SHORT_TERM_ARCHIVING=false
 
