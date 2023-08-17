@@ -286,7 +286,7 @@ create_newcase() {
         return
     fi
 
-    cp ${CODE_ROOT}paescal_scripts/addtional_files/ODEMod.F90 ${CODE_ROOT}components/clm/src/external_models/sbetr/src/betr/betr_math/
+    cp ${CODE_ROOT}/paescal_scripts/addtional_files/ODEMod.F90 ${CODE_ROOT}/components/clm/src/external_models/sbetr/src/betr/betr_math/
 
     echo $'\n----- Starting create_newcase -----\n'
 
