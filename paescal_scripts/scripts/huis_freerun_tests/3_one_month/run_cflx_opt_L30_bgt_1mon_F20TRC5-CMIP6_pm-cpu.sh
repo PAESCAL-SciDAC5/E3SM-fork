@@ -61,7 +61,7 @@ readonly RUN_REFCASE="20210625.v2rc3c-GWD.piControl.ne30pg2_EC30to60E2r2.chrysal
 readonly RUN_REFDATE="1001-01-01"   # same as MODEL_START_DATE for 'branch', can be different for 'hybrid'
 
 # Set paths
-CODE_ROOT="/global/cfs/projectdirs/m4359/jli628/cflx_202305_update/"     #need to change
+CODE_ROOT="/global/cfs/projectdirs/m4359/jli628/E3SM_v1.0_SciDAC/"     #need to change
 if [ "${do_fetch_code,,}" != "false" ]; then
 	CODE_ROOT=${CODE_ROOT}${CCSMTAG}     #need to change
 fi

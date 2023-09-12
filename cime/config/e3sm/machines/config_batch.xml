@@ -310,6 +310,7 @@
      <queues>
        <queue walltimemax="00:30:00" nodemin="1" nodemax="8" strict="true">debug</queue>
        <queue walltimemax="00:35:00" nodemin="1" nodemax="4096" strict="true">preempt</queue>
+       <queue walltimemax="00:30:00" nodemax="200">overrun</queue>
        <queue walltimemax="01:00:00" nodemin="1" nodemax="4096" default="true">regular</queue>
      </queues>
    </batch_system>

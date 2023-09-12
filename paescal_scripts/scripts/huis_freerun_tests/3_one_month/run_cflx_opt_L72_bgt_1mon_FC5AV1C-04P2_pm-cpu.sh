@@ -31,11 +31,11 @@ do_case_build=true
 do_case_submit=true
 
 # atmospheric coupling option
-readonly cflx_cpl_opt=44
+readonly cflx_cpl_opt=4
 readonly nverlvl=72
 
 # Simulation
-readonly COMPSET="F20TRC5-CMIP6"
+readonly COMPSET="FC5AV1C-04P2"
 readonly RESOLUTION="ne30_ne30"
 # BEFORE RUNNING : CHANGE the following CASE_NAME to desired value
 readonly date_string=`date +"%Y%m%d%H%M"`
@@ -77,12 +77,12 @@ readonly CASE_SCRIPTS_DIR=${CASE_ROOT}/case_scripts
 readonly CASE_RUN_DIR=${CASE_ROOT}/run
 #PELAYOUT doesn't work on pm-cpu
 #readonly PELAYOUT="X2"   #Allowed options are  ('S','M','L','X1','X2','[0-9]x[0-9]','[0-9]').
-readonly WALLTIME="00:10:00"
-readonly QUEUE="debug"
-readonly STOP_OPTION="ndays"
-readonly STOP_N="3"
-readonly REST_OPTION="ndays"
-readonly REST_N="3"
+readonly WALLTIME="10:00:00"
+readonly QUEUE="regular"
+readonly STOP_OPTION="nmonths"
+readonly STOP_N="63"
+readonly REST_OPTION="nmonths"
+readonly REST_N="1"
 readonly RESUBMIT="0"
 readonly DO_SHORT_TERM_ARCHIVING=false
 
@@ -157,53 +157,95 @@ cflx_cpl_opt = ${cflx_cpl_opt}
 
 dtime           = 1800
 
-!...................
-! conditional diag
-!...................
-metric_name = 'ALL',
-!
-qoi_chkpt = 'CHEM','CFLX1','AERDRYRM1',    ! tphysac
-            'PBCINI','CFLX2',              ! tphysbc, before mac-mic subcycles
-            'CFLX3_01','AERDRYRM2_01',
-            'CFLX3_02','AERDRYRM2_02',
-            'CFLX3_03','AERDRYRM2_03',
-            'CFLX3_04','AERDRYRM2_04',
-            'CFLX3_05','AERDRYRM2_05',
-            'CFLX3_06','AERDRYRM2_06',
-            'AERDRYRM3','AERWETRM',        ! tphysbc, after mac-mic subcycles
-!
-qoi_name = 'dst_a1','dst_a1','dst_a3','dst_a3'
-qoi_nver =  72,      72,      72,      72
-qoi_x_dp =   0,       2,       0,       2
-!
-l_output_state = .true.
-l_output_incrm = .true.
-!
-!
-!.......................................................
-! history files
-!.......................................................
-! hist_tape_with_all_output = 1,
-!
-! nhtfrq          =  0,
-! mfilt           =  1,
-! avgflag_pertape = 'A'
+zmconv_ke = 5.00E-06
+so4_sz_thresh_icenuc = 5.00E-08
+clubb_C14 = 1.06
 
-!----
- hist_tape_with_all_output = 1,2,3
- 
- fincl2lonlat = '0e:360e_5n:55n'
- fincl3lonlat = '0e:360e_5n:55n'
- 
- nhtfrq          =  0,  0 ,  -6,
- mfilt           =  1,  1   120,
- avgflag_pertape = 'A', 'A','I',
-!----
+inithist = 'MONTHLY'
+inithist_all = .true.
+!
+ rad_diag_1 = 'A:Q:H2O', 'N:O2:O2', 'N:CO2:CO2',
+             'A:O3:O3', 'N:N2O:N2O', 'N:CH4:CH4',
+             'N:CFC11:CFC11', 'N:CFC12:CFC12',
+ docosp    = .true.,
+ cosp_lite = .true.,
+ cosp_ncolumns        = 10
+ cosp_nradsteps       = 3
+ cosp_lmisr_sim       = .true.
+ cosp_lisccp_sim      = .true.
+ cosp_lmodis_sim      = .true.
+ cosp_llidar_sim      = .true.
+ history_amwg         = .true.
+ history_aero_optics  = .true.
+ history_aerosol      = .true.
+ history_clubb        = .true.
+ history_budget       = .true.
+ history_verbose      = .true.
+ hist_hetfrz_classnuc = .true.
+ do_aerocom_ind3 = .true.
 
- history_amwg        = .true.
- history_aero_optics = .true.
- history_aerosol     = .true.
- history_verbose     = .true.
+!Nudge_Model          = .False.
+!Nudge_Path           = '/compyfs/zhan524/TMP/ndata/eraint_ne30L72_se/'
+!Nudge_File_Template  = 'interim_se_%y%m%d00.nc'
+!Nudge_Times_Per_Day  = 4  !! nudging input data frequency
+!Model_Times_Per_Day  = 48 !! should not be larger than 48 if dtime = 1800s
+!Nudge_Uprof          = 2
+!Nudge_Ucoef          = 1.
+!Nudge_Vprof          = 2
+!Nudge_Vcoef          = 1.
+!Nudge_Tprof          = 0
+!Nudge_Tcoef          = 0.
+!Nudge_Qprof          = 0
+!Nudge_Qcoef          = 0.
+!Nudge_PSprof         = 0
+!Nudge_PScoef         = 0.
+!Nudge_Beg_Year       = 0001
+!Nudge_Beg_Month      = 1
+!Nudge_Beg_Day        = 1
+!Nudge_End_Year       = 9999
+!Nudge_End_Month      = 1
+!Nudge_End_Day        = 1
+!Nudge_Vwin_Lindex    = 5.
+!Nudge_Vwin_Hindex    = 58.
+!Nudge_Vwin_Ldelta    = 0.1
+!Nudge_Vwin_Hdelta    = 0.1
+!Nudge_Vwin_lo        = 0.
+!Nudge_Vwin_hi        = 1.
+!Nudge_Method         = 'Linear'
+!Nudge_Loc_PhysOut    = .True.
+!Nudge_Tau            = 6.        !! relaxation time scale, unit: 6h
+!Nudge_CurrentStep    = .False.
+!Nudge_File_Ntime     = 4
+
+!.......................................................
+! emissions
+!.......................................................
+ext_frc_specifier              = 'SO2         -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_so2_elev_1850-2014_c180205.nc',
+        'SOAG        -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_soag_elev_1850-2014_c180205.nc',
+        'bc_a4       -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_bc_a4_elev_1850-2014_c180205.nc',
+        'num_a1      -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_num_a1_elev_1850-2014_c180205.nc',
+        'num_a2      -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_num_a2_elev_1850-2014_c180205.nc',
+        'num_a4      -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_num_a4_elev_1850-2014_c180205.nc',
+        'pom_a4      -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_pom_a4_elev_1850-2014_c180205.nc',
+        'so4_a1      -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_so4_a1_elev_1850-2014_c180205.nc',
+        'so4_a2      -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_so4_a2_elev_1850-2014_c180205.nc'
+ext_frc_type           = 'CYCLICAL'
+ext_frc_cycle_yr       = 2010
+srf_emis_specifier             = 'DMS       -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/DMSflux.2010.1deg_latlon_conserv.POPmonthlyClimFromACES4BGC_c20190220.nc',
+        'SO2       -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_so2_surf_1850-2014_c180205.nc',
+        'bc_a4     -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_bc_a4_surf_1850-2014_c180205.nc',
+        'num_a1    -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_num_a1_surf_1850-2014_c180205.nc',
+        'num_a2    -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_num_a2_surf_1850-2014_c180205.nc',
+        'num_a4    -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_num_a4_surf_1850-2014_c180205.nc',
+        'pom_a4    -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_pom_a4_surf_1850-2014_c180205.nc',
+        'so4_a1    -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_so4_a1_surf_1850-2014_c180205.nc',
+        'so4_a2    -> /global/cfs/projectdirs/m4359/jli628/emissions_2010/cmip6_mam4_so4_a2_surf_1850-2014_c180205.nc'
+srf_emis_type          = 'CYCLICAL'
+srf_emis_cycle_yr      = 2010
+
+ nhtfrq          =  0,
+ mfilt           =  1,
+ avgflag_pertape = 'A',
 !
 !...................
 ! change init data
