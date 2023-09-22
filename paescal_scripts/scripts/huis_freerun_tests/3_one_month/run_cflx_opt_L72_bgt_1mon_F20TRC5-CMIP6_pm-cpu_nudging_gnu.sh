@@ -21,6 +21,7 @@ main() {
 readonly E3SM_version="1.0"
 readonly MACHINE=pm-cpu
 readonly PROJECT="m4359"      #need to change
+readonly COMPILER=gnu
 readonly email_address="jianfeng.li@pnnl.gov"             #need to change
 
 # --- Toggle flags for what to do ----
@@ -31,7 +32,7 @@ do_case_build=true
 do_case_submit=true
 
 # atmospheric coupling option
-readonly cflx_cpl_opt=1
+readonly cflx_cpl_opt=42
 readonly nverlvl=72
 
 # Simulation
@@ -82,7 +83,7 @@ readonly QUEUE="regular"
 readonly STOP_OPTION="nmonths"
 readonly STOP_N="15"
 readonly REST_OPTION="nmonths"
-readonly REST_N="15"
+readonly REST_N="1"
 readonly RESUBMIT="0"
 readonly DO_SHORT_TERM_ARCHIVING=false
 
@@ -390,6 +391,7 @@ create_newcase() {
 			--compset ${COMPSET} \
 			--res ${RESOLUTION} \
 			--machine ${MACHINE} \
+			--compiler ${COMPILER} \
 			--project ${PROJECT}
 			#--walltime ${WALLTIME} \
 			#--queue ${QUEUE} \
@@ -404,6 +406,7 @@ create_newcase() {
 			--compset ${COMPSET} \
 			--res ${RESOLUTION} \
 			--machine ${MACHINE} \
+			--compiler ${COMPILER} \
 			--project ${PROJECT}
 			#--walltime ${WALLTIME} \
 			#--queue ${QUEUE} \

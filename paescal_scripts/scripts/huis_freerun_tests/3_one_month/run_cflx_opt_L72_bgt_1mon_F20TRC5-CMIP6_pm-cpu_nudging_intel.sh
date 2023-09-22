@@ -20,7 +20,8 @@ main() {
 # Machine and project
 readonly E3SM_version="1.0"
 readonly MACHINE=pm-cpu
-readonly PROJECT="m4199"      #need to change
+readonly PROJECT="m4359"      #need to change
+readonly COMPILER=intel
 readonly email_address="jianfeng.li@pnnl.gov"             #need to change
 
 # --- Toggle flags for what to do ----
@@ -31,7 +32,7 @@ do_case_build=true
 do_case_submit=true
 
 # atmospheric coupling option
-readonly cflx_cpl_opt=1
+readonly cflx_cpl_opt=42
 readonly nverlvl=72
 
 # Simulation
@@ -77,18 +78,18 @@ readonly CASE_SCRIPTS_DIR=${CASE_ROOT}/case_scripts
 readonly CASE_RUN_DIR=${CASE_ROOT}/run
 #PELAYOUT doesn't work on pm-cpu
 #readonly PELAYOUT="X2"   #Allowed options are  ('S','M','L','X1','X2','[0-9]x[0-9]','[0-9]').
-readonly WALLTIME="2:00:00"
-readonly QUEUE="overrun"
+readonly WALLTIME="12:00:00"
+readonly QUEUE="regular"
 readonly STOP_OPTION="nmonths"
 readonly STOP_N="15"
-readonly REST_OPTION="ndays"
-readonly REST_N="3"
+readonly REST_OPTION="nmonths"
+readonly REST_N="15"
 readonly RESUBMIT="0"
 readonly DO_SHORT_TERM_ARCHIVING=false
 
 # Setup processor layout
-readonly nnodes_atm=40
-readonly nnodes_ocn=40     #be careful, not all parallel configurations are available for maps-seaice 
+readonly nnodes_atm=8
+readonly nnodes_ocn=8     #be careful, not all parallel configurations are available for maps-seaice 
 readonly nthreads=1
 readonly mpi_tasks_per_node=128
 readonly ntasks_atm=$(expr ${nnodes_atm} \* ${mpi_tasks_per_node})
@@ -390,6 +391,7 @@ create_newcase() {
 			--compset ${COMPSET} \
 			--res ${RESOLUTION} \
 			--machine ${MACHINE} \
+			--compiler ${COMPILER} \
 			--project ${PROJECT}
 			#--walltime ${WALLTIME} \
 			#--queue ${QUEUE} \
@@ -404,6 +406,7 @@ create_newcase() {
 			--compset ${COMPSET} \
 			--res ${RESOLUTION} \
 			--machine ${MACHINE} \
+			--compiler ${COMPILER} \
 			--project ${PROJECT}
 			#--walltime ${WALLTIME} \
 			#--queue ${QUEUE} \

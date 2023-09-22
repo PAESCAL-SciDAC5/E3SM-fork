@@ -20,7 +20,7 @@ main() {
 # Machine and project
 readonly E3SM_version="1.0"
 readonly MACHINE=pm-cpu
-readonly PROJECT="m4359"      #need to change
+readonly PROJECT="m2645"      #need to change
 readonly email_address="jianfeng.li@pnnl.gov"             #need to change
 
 # --- Toggle flags for what to do ----
@@ -31,7 +31,7 @@ do_case_build=true
 do_case_submit=true
 
 # atmospheric coupling option
-readonly cflx_cpl_opt=44
+readonly cflx_cpl_opt=40
 readonly nverlvl=72
 
 # Simulation
@@ -87,8 +87,8 @@ readonly RESUBMIT="0"
 readonly DO_SHORT_TERM_ARCHIVING=false
 
 # Setup processor layout
-readonly nnodes_atm=8
-readonly nnodes_ocn=8     #be careful, not all parallel configurations are available for maps-seaice 
+readonly nnodes_atm=4
+readonly nnodes_ocn=4     #be careful, not all parallel configurations are available for maps-seaice 
 readonly nthreads=1
 readonly mpi_tasks_per_node=128
 readonly ntasks_atm=$(expr ${nnodes_atm} \* ${mpi_tasks_per_node})

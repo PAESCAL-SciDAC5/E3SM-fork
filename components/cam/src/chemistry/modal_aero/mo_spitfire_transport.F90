@@ -160,6 +160,7 @@ contains
     do ii = 1,ncol
        if (intz(ii).eq.0) then
           write(iulog,*) ' interval was not found for col i ', ii
+          write(iulog,*) ' interval was not found for value ', xins(ii) !added by Jianfeng Li
           call endrun('mo_spitfire_transport: cfint2 -- interval was not found ')
        endif
     end do
@@ -210,6 +211,7 @@ contains
 !##############################################################################
 ! Calculate the derivative for the interpolating polynomial.
 ! Multi column version.
+! Reference: Hung T. Huync, Accurate Monotone Cubic Interpolation (1991). NASA Technical Memorandum 103789, 61 pages.
 !##############################################################################
 
   subroutine cfdotmc_pro (ncol, xw, ff, fdot)
@@ -268,14 +270,19 @@ contains
 
        do ii = 1, ncol
           delxh(ii,kk) = xw(ii,kk+1) - xw(ii,kk)
-             sh(ii,kk) = (ff(ii,kk+1)-ff(ii,kk))/delxh(ii,kk)
+
+          !first divided difference, Eq (2.1) on Page 4 of Huynh (1991)
+          sh(ii,kk) = (ff(ii,kk+1)-ff(ii,kk))/delxh(ii,kk)
        end do
 
        ! First and second divided differences at nodes
 
        if (kk.ge.2) then
           do ii = 1,ncol
+             !second divided difference, Eq (3.1) on Page 19 of Huynh (1991)
              dd(ii,kk) = (sh(ii,kk)-sh(ii,kk-1))/(xw(ii,kk+1)-xw(ii,kk-1))
+
+             !Eq (2.8) on Page 8 of Huynh (1991)
              ss(ii,kk) = minmod(sh(ii,kk),sh(ii,kk-1))
           end do
        endif
@@ -286,7 +293,10 @@ contains
 
     do kk = 2,pver-1
     do ii = 1,ncol
+          !third divided difference, Eq (4.1) on Page 36 of Huynh (1991)
           eh(ii,kk) = ( dd(ii,kk+1)-dd(ii,kk) )/( xw(ii,kk+2)-xw(ii,kk-1) )
+
+          !Eq (3.4) on Page 19 of Huynh (1991)
           dh(ii,kk) = minmod( dd(ii,kk), dd(ii,kk+1) )
     end do
     end do
@@ -299,17 +309,21 @@ contains
        ee(ii,pver) = eh(ii,pver-1)
 
        ! Outside level
-
+       ! The first equation after Eq 5.1 on Page 42 of Huynh (1991)
        fdot(ii,1) = sh(ii,1) - dd(ii,2)*delxh(ii,1) - eh(ii,2)*delxh(ii,1)*(xw(ii,1)-xw(ii,3))
+       
+       !Eq 5.2 on Page 43 of Huynh (1991)
        fdot(ii,1) = minmod( fdot(ii,1), 3*sh(ii,1))
 
        fdot(ii,pverp) = sh(ii,pver) + dd(ii,pver)*delxh(ii,pver)  &
                       + eh(ii,pver-1)*delxh(ii,pver)*(xw(ii,pverp)-xw(ii,pver-1))
+       !Eq 5.2 on Page 43 of Huynh (1991)
        fdot(ii,pverp) = minmod( fdot(ii,pverp), 3*sh(ii,pver) )
 
        ! One in from boundary
-
+       ! The second equation after Eq 5.1 on Page 42 of Huynh (1991)
        fdot(ii,2) = sh(ii,1) + dd(ii,2)*delxh(ii,1) - eh(ii,2)*delxh(ii,1)*delxh(ii,2)
+
        fdot(ii,2) = minmod(fdot(ii,2),3*ss(ii,2))
 
        fdot(ii,pver) = sh(ii,pver) - dd(ii,pver)*delxh(ii,pver)   &
@@ -321,6 +335,7 @@ contains
 
     do kk = 3,pver-1
     do ii = 1,ncol
+       !Eq (4.4) on Page 37 of Huynh (1991)
        ee(ii,kk) = minmod( eh(ii,kk), eh(ii,kk-1) )
     end do
     end do
@@ -330,17 +345,22 @@ contains
     do ii = 1,ncol
 
        ! p prime at k-0.5
+       ! The first Equation after Eq 3.16' on Page 24 of Huynh (1991)
        ppl(ii,kk)=sh(ii,kk-1) + dh(ii,kk-1)*delxh(ii,kk-1)  
 
+       ! The second Equation after Eq 3.16' on Page 24 of Huynh (1991)
        ! p prime at k+0.5
        ppr(ii,kk)=sh(ii,kk)   - dh(ii,kk)  *delxh(ii,kk)
 
+       ! The third Equation after Eq 3.16'  on Page 24 of Huynh (1991)
        tt = minmod(ppl(ii,kk),ppr(ii,kk))
 
        ! derivate from parabola thru f(i,k-1), f(i,k), and f(i,k+1)
+       ! The second Equation of Eq 3.5b on Page 20 of Huynh (1991)
        pp = sh(ii,kk-1) + dd(ii,kk)*delxh(ii,kk-1) 
 
        ! quartic estimate of fdot
+       ! Eq 4.21 on Page 42 of Huynh (1991)
        fdot(ii,kk) = pp                                      &
                    - delxh(ii,kk-1)*delxh(ii,kk)             &
                    *(  eh(ii,kk-1)*(xw(ii,kk+2)-xw(ii,kk  )) &
@@ -348,19 +368,31 @@ contains
                    )/(xw(ii,kk+2)-xw(ii,kk-2))
 
        ! now limit it
+       ! Eq 4.8b on Page 38 of Huynh (1991)
        qpl = sh(ii,kk-1)       &
            + delxh(ii,kk-1)*minmod( dd(ii,kk-1)+ee(ii,kk-1)*(xw(ii,kk)-xw(ii,kk-2)), &
                                     dd(ii,kk)  -ee(ii,kk  )*delxh(ii,kk)             )
+
+       ! Eq 4.8a on Page 38 of Huynh (1991)
+       !qpr = sh - delxh ... ? by Jianfeng Li                     
        qpr = sh(ii,kk)         &
            + delxh(ii,kk  )*minmod(dd(ii,kk)  +ee(ii,kk)*delxh(ii,kk-1),        &
                                    dd(ii,kk+1)+ee(ii,kk+1)*(xw(ii,kk)-xw(ii,kk+2)))
 
+
+       ! Eq 4.22 on Page 42 of Huynh (1991)
        fdot(ii,kk) = medan( fdot(ii,kk), qpl, qpr )
 
+       ! Eq 4.11 on Page 38 of Huynh (1991)
        ttlmt = minmod(qpl, qpr)
+
+       ! Eq 4.19a on Page 41 of Huynh (1991)
        tmin = min(0._r8,3*ss(ii,kk),1.5_r8*tt,ttlmt)
+
+       ! Eq 4.19b on Page 41 of Huynh (1991)
        tmax = max(0._r8,3*ss(ii,kk),1.5_r8*tt,ttlmt)
 
+       ! Eq 4.20 on Page 41 of Huynh (1991)
        fdot(ii,kk) = fdot(ii,kk) + minmod( tmin-fdot(ii,kk), tmax-fdot(ii,kk))
 
     end do
