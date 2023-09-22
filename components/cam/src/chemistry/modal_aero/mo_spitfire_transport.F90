@@ -171,12 +171,14 @@ contains
        kk = intz(ii)
        dx = (xw(ii,kk+1)-xw(ii,kk))
        ss = (ff(ii,kk+1)-ff(ii,kk))/dx
+
+       !cubic Hermite interpolant coefficient, Eq 2.2 on Page 5 of Huynh (1991)
        c2 = (3*ss-2*fdot(ii,kk)-fdot(ii,kk+1))/dx
        c3 = (fdot(ii,kk)+fdot(ii,kk+1)-2*ss)/dx**2
        xx = (xins(ii)-xw(ii,kk))
-       fxdot(ii) =  (3*c3*xx + 2*c2)*xx + fdot(ii,kk)
-       fxdd (ii) = 6*c3*xx + 2*c2
-       cfint = ((c3*xx + c2)*xx + fdot(ii,kk))*xx + ff(ii,kk)
+       fxdot(ii) =  (3*c3*xx + 2*c2)*xx + fdot(ii,kk) !first-order derivative of q(x)
+       fxdd (ii) = 6*c3*xx + 2*c2 !second-order derivative of q(x)
+       cfint = ((c3*xx + c2)*xx + fdot(ii,kk))*xx + ff(ii,kk) !q(x)
 
        ! limit the interpolant
 
