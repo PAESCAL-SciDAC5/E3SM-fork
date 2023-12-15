@@ -1636,7 +1636,6 @@ end subroutine clubb_init_cnst
    call pbuf_get_field(pbuf, pdf_zm_varnce_w_2_idx, pdf_zm_varnce_w_2, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
    call pbuf_get_field(pbuf, pdf_zm_mixt_frac_idx, pdf_zm_mixt_frac, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
 
-   call pbuf_get_field(pbuf, tke_idx,     tke)
    call pbuf_get_field(pbuf, qrl_idx,     qrl)
    call pbuf_get_field(pbuf, radf_idx,    radf_clubb)
 
@@ -2594,62 +2593,8 @@ end subroutine clubb_init_cnst
    ! ------------------------------------------------------------ !
    call t_startf('clubb_tend_cam_diag')
 
-   ! --------------------------------------------------------------------------------- !
-   !  COMPUTE THE ICE CLOUD DETRAINMENT                                                !
-   !  Detrainment of convective condensate into the environment or stratiform cloud    !
-   ! --------------------------------------------------------------------------------- !
 
-   !  Initialize the shallow convective detrainment rate, will always be zero
-   dlf2(:,:) = 0.0_r8
-
-   lqice(:)        = .false.
-   lqice(ixcldliq) = .true.
-   lqice(ixcldice) = .true.
-   lqice(ixnumliq) = .true.
-   lqice(ixnumice) = .true.
-
-   call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_det', ls=.true., lq=lqice)
-
-   call t_startf('ice_cloud_detrain_diag')
-   do k=1,pver
-      do i=1,ncol
-         if( state1%t(i,k) > clubb_tk1 ) then
-            dum1 = 0.0_r8
-         elseif ( state1%t(i,k) < clubb_tk2 ) then
-            dum1 = 1.0_r8
-         else
-            !Note: Denominator is changed from 30.0_r8 to (clubb_tk1 - clubb_tk2),
-            !(clubb_tk1 - clubb_tk2) is also 30.0 but it introduced a non-bfb change
-            dum1 = ( clubb_tk1 - state1%t(i,k) ) /(clubb_tk1 - clubb_tk2)
-         endif
-
-         ptend_loc%q(i,k,ixcldliq) = dlf(i,k) * ( 1._r8 - dum1 )
-         ptend_loc%q(i,k,ixcldice) = dlf(i,k) * dum1
-         ptend_loc%q(i,k,ixnumliq) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) * ( 1._r8 - dum1 ) ) &
-                                     / (4._r8*3.14_r8* clubb_liq_deep**3*997._r8) + & ! Deep    Convection
-                                     3._r8 * (                         dlf2(i,k)    * ( 1._r8 - dum1 ) ) &
-                                     / (4._r8*3.14_r8*clubb_liq_sh**3*997._r8)     ! Shallow Convection
-         ptend_loc%q(i,k,ixnumice) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) *  dum1 ) &
-                                     / (4._r8*3.14_r8*clubb_ice_deep**3*500._r8) + & ! Deep    Convection
-                                     3._r8 * (                         dlf2(i,k)    *  dum1 ) &
-                                     / (4._r8*3.14_r8*clubb_ice_sh**3*500._r8)     ! Shallow Convection
-         ptend_loc%s(i,k)          = dlf(i,k) * dum1 * latice
-
-         ! Only rliq is saved from deep convection, which is the reserved liquid.  We need to keep
-         !   track of the integrals of ice and static energy that is effected from conversion to ice
-         !   so that the energy checker doesn't complain.
-         det_s(i)                  = det_s(i) + ptend_loc%s(i,k)*state1%pdel(i,k)*invrs_gravit
-         det_ice(i)                = det_ice(i) - ptend_loc%q(i,k,ixcldice)*state1%pdel(i,k)*invrs_gravit
-
-      enddo
-   enddo
-
-   det_ice(:ncol) = det_ice(:ncol)/1000._r8  ! divide by density of water
-   call t_stopf('ice_cloud_detrain_diag')
-
-   call outfld( 'DPDLFLIQ', ptend_loc%q(:,:,ixcldliq), pcols, lchnk)
-   call outfld( 'DPDLFICE', ptend_loc%q(:,:,ixcldice), pcols, lchnk)
-   call outfld( 'DPDLFT',   ptend_loc%s(:,:)/cpair, pcols, lchnk)
+#include "detrain.inc"
 
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
@@ -2658,295 +2603,48 @@ end subroutine clubb_init_cnst
    ! dry constituents to dry air basis.
    do ixind = 1, pcnst
       if (lq(ixind) .and. cnst_type(ixind).eq.'dry') then
-         do k = 1, pver
-            do i = 1, ncol
-               ptend_all%q(i,k,ixind) = ptend_all%q(i,k,ixind)*state1%pdel(i,k)/state1%pdeldry(i,k)
-            end do
-         end do
+      ptend_all%q(:ncol,:pver,ixind) = ptend_all%q(:ncol,:pver,ixind)*state1%pdel(:ncol,:pver)/state1%pdeldry(1:ncol,:pver)
       end if
    end do
 
-   ! ------------------------------------------------- !
-   ! Diagnose relative cloud water variance            !
-   ! ------------------------------------------------- !
-
-   if (deep_scheme .eq. 'CLUBB_SGS') then
-      relvarmax = 2.0_r8
-   else
-      relvarmax = 10.0_r8
-   endif
-
-   relvar(:,:) = relvarmax  ! default
-!
-!PMA c20161114: The lower bound of 0.7 is the mean of scattered Cu in Barker et al (1996).
-!     With the new formulation the lower bound and is rarely reached.
-!
-   relvarmin   = 0.7_r8
-
-!PMA c20161114: Xue Zheng identified the issue with small relvar: the original
-!               code uses grid mean variance and water content instead of in-cloud
-!               quantities.
-!               Following equation A7 in Guo et al (2014), relvar is now  calculated
-!               using in-cloud variance and in-cloud total water instead of grid
-!               mean. This effectively reduces autoconversion rate especially
-!               for thin clouds.
-!
-!
-
-   relvarc(:ncol,:pver)=fillvalue
-
-   if (deep_scheme .ne. 'CLUBB_SGS') then
-      if (relvar_fix) then
-         where (rcm(:ncol,:pver) > qsmall .and. qclvar(:ncol,:pver) /= 0._r8)  &
-              relvar(:ncol,:pver) = min(relvarmax,max(relvarmin,rcm(:ncol,:pver)**2/max(qsmall,  &
-              cloud_frac(:ncol,:pver)*qclvar(:ncol,:pver)-  &
-              (1._r8-cloud_frac(:ncol,:pver))*rcm(:ncol,:pver)**2)))
-              relvarc(:ncol,:pver) = min(relvarmax,max(relvarmin,rcm(:ncol,:pver)**2/max(qsmall,  &
-              cloud_frac(:ncol,:pver)*qclvar(:ncol,:pver)-  &
-              (1._r8-cloud_frac(:ncol,:pver))*rcm(:ncol,:pver)**2)))
-      else
-
-         where (rcm(:ncol,:pver) /= 0 .and. qclvar(:ncol,:pver) /= 0) &
-              relvar(:ncol,:pver) = min(relvarmax,max(0.001_r8,rcm(:ncol,:pver)**2/qclvar(:ncol,:pver)))
-      endif
-   endif
+#include "relvar.inc"
 
    ! ------------------------------------------------- !
    ! Optional Accretion enhancement factor             !
    ! ------------------------------------------------- !
-
-     accre_enhan(:ncol,:pver) = micro_mg_accre_enhan_fac !default is 1._r8
-
+    accre_enhan(:ncol,:pver) = micro_mg_accre_enhan_fac !default is 1._r8
 
    ! ------------------------------------------------- !
-   ! Diagnose some output variables                    !
+   ! TKE
    ! ------------------------------------------------- !
+   call pbuf_get_field(pbuf, tke_idx,     tke)
+   tke(1:ncol,1:pverp) = 0.5_r8*(up2(:ncol,:pverp)+vp2(:ncol,:pverp)+wp2(:ncol,:pverp))  !  turbulent kinetic energy
 
-   !  density
-   rho(:ncol,1:pver) = state1%pmid(:ncol,1:pver)/(rair*state1%t(:ncol,1:pver))
-   rho(:ncol,pverp)  = state1%ps(:ncol)/(rair*state1%t(:ncol,pver))
+#include "clubb_misc_diag_and_outfld.inc"
 
-   eps = rair/rh2o
-   wpthvp_diag(:,:) = 0.0_r8
-   do k=1,pver
-      do i=1,ncol
-         !  buoyancy flux
-         wpthvp_diag(i,k) = (wpthlp(i,k)-(apply_const*wpthlp_const))+((1._r8-eps)/eps)*real(theta0, kind = r8)* &
-                       (wprtp(i,k)-(apply_const*wprtp_const))+((latvap/cpair)* &
-                       state1%exner(i,k)-(1._r8/eps)*real(theta0, kind = r8))*wprcp(i,k)
+   call t_stopf('clubb_tend_cam_diag')
 
-         !  total water mixing ratio
-         qt_output(i,k) = state1%q(i,k,ixq)+state1%q(i,k,ixcldliq)+state1%q(i,k,ixcldice)
-         !  liquid water potential temperature
-         thetal_output(i,k) = (state1%t(i,k)*state1%exner(i,k))-(latvap/cpair)*state1%q(i,k,ixcldliq)
-         !  liquid water static energy
-         sl_output(i,k) = cpair*state1%t(i,k)+gravit*state1%zm(i,k)-latvap*state1%q(i,k,ixcldliq)
-      enddo
-   enddo
+   ! ------------------------------------------------------------ !
+   ! Diagnose various cloud fractions.
+   ! ATTENTION:
+   !  - before this block of code, the variable cloud_frac
+   !    contained the cloud fraction calculated by CLUBB;
+   !  - at the end of this block of code, cloud_frac becomes
+   !    max(alst, aist) + deepcu
+   !  - note that the diagnosis of PBL height uses cloud_frac.
+   !    Need to check if there is a real dependency and if the
+   !    the current code is intended. In any case, be careful
+   !    when moving PBLH diagnosis relative to this block.
+   ! ------------------------------------------------------------ !
+#include "cloud_frac_diags.inc"
 
-   do k=1,pverp
-      do i=1,ncol
-         wpthlp_output(i,k)  = (wpthlp(i,k)-(apply_const*wpthlp_const))*rho(i,k)*cpair !  liquid water potential temperature flux
-         wprtp_output(i,k)   = (wprtp(i,k)-(apply_const*wprtp_const))*rho(i,k)*latvap  !  total water mixig ratio flux
-         rtpthlp_output(i,k) = rtpthlp(i,k)-(apply_const*rtpthlp_const)                !  rtpthlp output
-         wp3_output(i,k)     = wp3(i,k) - (apply_const*wp3_const)                      !  wp3 output
-         tke(i,k)            = 0.5_r8*(up2(i,k)+vp2(i,k)+wp2(i,k))                     !  turbulent kinetic energy
-      enddo
-   enddo
+   ! ------------------------------------------------------------ !
+   ! Diagnose PBL height          
+   ! ------------------------------------------------------------ !
+#include "pblh_diag.inc"
 
-   ! --------------------------------------------------------------------------------- !
-   !  Diagnose some quantities that are computed in macrop_tend here.                  !
-   !  These are inputs required for the microphysics calculation.                      !
-   !                                                                                   !
-   !  FIRST PART COMPUTES THE STRATIFORM CLOUD FRACTION FROM CLUBB CLOUD FRACTION      !
-   ! --------------------------------------------------------------------------------- !
 
-  ! HW: set alst to alst_o before getting updated
-  if(liqcf_fix) then
-      if(.not.is_first_step()) alst_o(:ncol,:pver) = alst(:ncol,:pver)
-   endif
-
-   !  initialize variables
-   alst(:,:) = 0.0_r8
-   qlst(:,:) = 0.0_r8
-
-   do k=1,pver
-      do i=1,ncol
-         alst(i,k) = cloud_frac(i,k)
-         qlst(i,k) = rcm(i,k)/max(0.01_r8,alst(i,k))  ! Incloud stratus condensate mixing ratio
-      enddo
-   enddo
-
-   ! HW
-   if(liqcf_fix) then
-      if(is_first_step()) alst_o(:ncol,:pver) = alst(:ncol,:pver)
-   endif
-   !HW
-
-   ! --------------------------------------------------------------------------------- !
-   !  THIS PART COMPUTES CONVECTIVE AND DEEP CONVECTIVE CLOUD FRACTION                 !
-   ! --------------------------------------------------------------------------------- !
-
-   deepcu(:,pver) = 0.0_r8
-   shalcu(:,pver) = 0.0_r8
-
-   do k=1,pver-1
-      do i=1,ncol
-         !  diagnose the deep convective cloud fraction, as done in macrophysics based on the
-         !  deep convective mass flux, read in from pbuf.  Since shallow convection is never
-         !  called, the shallow convective mass flux will ALWAYS be zero, ensuring that this cloud
-         !  fraction is purely from deep convection scheme.
-         deepcu(i,k) = max(0.0_r8,min(dp1*log(1.0_r8+500.0_r8*(cmfmc(i,k+1)-cmfmc_sh(i,k+1))),0.6_r8))
-         shalcu(i,k) = 0._r8
-
-         if (deepcu(i,k) <= frac_limit .or. dp_icwmr(i,k) < ic_limit) then
-            deepcu(i,k) = 0._r8
-         endif
-
-         !  using the deep convective cloud fraction, and CLUBB cloud fraction (variable
-         !  "cloud_frac"), compute the convective cloud fraction.  This follows the formulation
-         !  found in macrophysics code.  Assumes that convective cloud is all nonstratiform cloud
-         !  from CLUBB plus the deep convective cloud fraction
-         concld(i,k) = min(cloud_frac(i,k)-alst(i,k)+deepcu(i,k),0.80_r8)
-      enddo
-   enddo
-
-   if (single_column) then
-      if (trim(scm_clubb_iop_name) .eq. 'ATEX_48hr'       .or. &
-          trim(scm_clubb_iop_name) .eq. 'BOMEX_5day'      .or. &
-          trim(scm_clubb_iop_name) .eq. 'DYCOMSrf01_4day' .or. &
-          trim(scm_clubb_iop_name) .eq. 'DYCOMSrf02_06hr' .or. &
-          trim(scm_clubb_iop_name) .eq. 'RICO_3day'       .or. &
-          trim(scm_clubb_iop_name) .eq. 'ARM_CC') then
-
-             deepcu(:,:) = 0.0_r8
-             concld(:,:) = 0.0_r8
-
-      endif
-   endif
-
-   ! --------------------------------------------------------------------------------- !
-   !  COMPUTE THE ICE CLOUD FRACTION PORTION                                           !
-   !  use the aist_vector function to compute the ice cloud fraction                   !
-   ! --------------------------------------------------------------------------------- !
-
-   call t_startf('ice_cloud_frac_diag')
-   do k=1,pver
-      call aist_vector(state1%q(:,k,ixq),state1%t(:,k),state1%pmid(:,k),state1%q(:,k,ixcldice), &
-           state1%q(:,k,ixnumice),cam_in%landfrac(:),cam_in%snowhland(:),aist(:,k),ncol)
-   enddo
-   call t_stopf('ice_cloud_frac_diag')
-
-   ! --------------------------------------------------------------------------------- !
-   !  THIS PART COMPUTES THE LIQUID STRATUS FRACTION                                   !
-   !                                                                                   !
-   !  For now leave the computation of ice stratus fraction from macrop_driver intact  !
-   !  because CLUBB does nothing with ice.  Here I simply overwrite the liquid stratus !
-   !  fraction that was coded in macrop_driver                                         !
-   ! --------------------------------------------------------------------------------- !
-
-   !  Recompute net stratus fraction using maximum over-lapping assumption, as done
-   !  in macrophysics code, using alst computed above and aist read in from physics buffer
-
-   cldthresh=1.e-18_r8
-
-   do k=1,pver
-      do i=1,ncol
-
-         ast(i,k) = max(alst(i,k),aist(i,k))
-
-         qist(i,k) = state1%q(i,k,ixcldice)/max(0.01_r8,aist(i,k))
-      enddo
-   enddo
-
-   !  Probably need to add deepcu cloud fraction to the cloud fraction array, else would just
-   !  be outputting the shallow convective cloud fraction
-
-   do k=1,pver
-      do i=1,ncol
-         cloud_frac(i,k) = min(ast(i,k)+deepcu(i,k),1.0_r8)
-      enddo
-   enddo
-
-   ! --------------------------------------------------------------------------------- !
-   !  DIAGNOSE THE PBL DEPTH                                                           !
-   !  this is needed for aerosol code                                                  !
-   ! --------------------------------------------------------------------------------- !
-
-   call t_startf('pbl_depth_diag')
-   do i=1,ncol
-      do k=1,pver
-         th(i,k) = state1%t(i,k)*state1%exner(i,k)
-         if (use_sgv) then
-           thv(i,k) = th(i,k)*(1.0_r8+zvir*state1%q(i,k,ixq) &
-                    - state1%q(i,k,ixcldliq))  !PMA corrects thv formula
-         else
-           thv(i,k) = th(i,k)*(1.0_r8+zvir*state1%q(i,k,ixq))
-         end if
-      enddo
-   enddo
-
-   ! diagnose surface friction and obukhov length (inputs to diagnose PBL depth)
-   do i=1,ncol
-      rrho = invrs_gravit*(state1%pdel(i,pver)/dz_g(pver))
-      call calc_ustar( state1%t(i,pver), state1%pmid(i,pver), cam_in%wsx(i), cam_in%wsy(i), &
-                       rrho, ustar2(i) )
-      call calc_obklen( th(i,pver), thv(i,pver), cam_in%cflx(i,1), cam_in%shf(i), rrho, ustar2(i), &
-                        kinheat(i), kinwat(i), kbfs(i), obklen(i) )
-   enddo
-
-   dummy2(:) = 0._r8
-   dummy3(:) = 0._r8
-
-   where (kbfs .eq. -0.0_r8) kbfs = 0.0_r8
-
-   !  Compute PBL depth according to Holtslag-Boville Scheme
-   call pblintd(ncol, thv, state1%zm, state1%u, state1%v, &
-                ustar2, obklen, kbfs, pblh, dummy2, &
-                state1%zi, cloud_frac(:,1:pver), 1._r8-cam_in%landfrac, dummy3)
-   call t_stopf('pbl_depth_diag')
-
-   !  Output the PBL depth
-   call outfld('PBLH', pblh, pcols, lchnk)
-
-   ! Assign the first pver levels of cloud_frac back to cld
-   cld(:,1:pver) = cloud_frac(:,1:pver)
-
-!PMA adds gustiness and tpert
-
-    vmag_gust(:)    = 0._r8
-    vmag_gust_dp(:) = 0._r8
-    vmag_gust_cl(:) = 0._r8
-    ktopi(:)        = pver
-
-    if (use_sgv) then
-       do i=1,ncol
-           up2b(i)          = up2(i,pver)
-           vp2b(i)          = vp2(i,pver)
-           umb(i)           = state1%u(i,pver)
-           vmb(i)           = state1%v(i,pver)
-           prec_gust(i)     = max(0._r8,prec_dp(i)-snow_dp(i))*1.e3_r8
-           if (cam_in%landfrac(i).gt.0.95_r8) then
-             gust_fac(i)   = gust_facl
-           else
-             gust_fac(i)   = gust_faco
-           endif
-           vmag(i)         = max(1.e-5_r8,sqrt( umb(i)**2._r8 + vmb(i)**2._r8))
-           vmag_gust_dp(i) = ugust(min(prec_gust(i),6.94444e-4_r8),gust_fac(i)) ! Limit for the ZM gustiness equation set in Redelsperger et al. (2000)
-           vmag_gust_dp(i) = max(0._r8, vmag_gust_dp(i) )!/ vmag(i))
-           vmag_gust_cl(i) = gust_facc*(sqrt(max(0._r8,up2b(i)+vp2b(i))+vmag(i)**2._r8)-vmag(i))
-           vmag_gust_cl(i) = max(0._r8, vmag_gust_cl(i) )!/ vmag(i))
-           vmag_gust(i)    = vmag_gust_cl(i) + vmag_gust_dp(i)
-          do k=1,pver
-             if (state1%zi(i,k)>pblh(i).and.state1%zi(i,k+1)<=pblh(i)) then
-                ktopi(i) = k
-                exit
-             end if
-          end do
-          tpert(i) = min(2._r8,(sqrt(thlp2(i,ktopi(i)))+(latvap/cpair)*state1%q(i,ktopi(i),ixcldliq)) &
-                    /max(state1%exner(i,ktopi(i)),1.e-3_r8)) !proxy for tpert
-       end do
-    end if
+#include "vmag_gust.inc"
 
    if (linearize_pbl_winds .and. macmic_it == cld_macmic_num_steps) then
       do i = 1, ncol
@@ -2961,91 +2659,8 @@ end subroutine clubb_init_cnst
       end do
    end if
 
-   call outfld('VMAGGUST', vmag_gust, pcols, lchnk)
-   call outfld('VMAGDP', vmag_gust_dp, pcols, lchnk)
-   call outfld('VMAGCL', vmag_gust_cl, pcols, lchnk)
-   call outfld('TPERTBLT', tpert, pcols, lchnk)
-
-   call t_stopf('clubb_tend_cam_diag')
-
-   ! --------------------------------------------------------------------------------- !
-   !  END CLOUD FRACTION DIAGNOSIS, begin to store variables back into buffer          !
-   ! --------------------------------------------------------------------------------- !
-
-   !  Output calls of variables goes here
-   call outfld( 'RELVAR',           relvar,                  pcols, lchnk )
-   call outfld( 'RELVARC',          relvarc,                 pcols, lchnk )
-   call outfld( 'RHO_CLUBB',        rho,                     pcols, lchnk )
-   call outfld( 'WP2_CLUBB',        wp2,                     pcols, lchnk )
-   call outfld( 'UP2_CLUBB',        up2,                     pcols, lchnk )
-   call outfld( 'VP2_CLUBB',        vp2,                     pcols, lchnk )
-   call outfld( 'WP3_CLUBB',        wp3_output,              pcols, lchnk )
-   call outfld( 'UPWP_CLUBB',       upwp,                    pcols, lchnk )
-   call outfld( 'VPWP_CLUBB',       vpwp,                    pcols, lchnk )
-   call outfld( 'WPTHLP_CLUBB',     wpthlp_output,           pcols, lchnk )
-   call outfld( 'WPRTP_CLUBB',      wprtp_output,            pcols, lchnk )
-   tmp_array = rtp2(:ncol,:)*1000._r8
-   call outfld( 'RTP2_CLUBB',       tmp_array,               ncol,  lchnk )
-   call outfld( 'THLP2_CLUBB',      thlp2,                   pcols, lchnk )
-   tmp_array = rtpthlp_output(:ncol,:)*1000._r8
-   call outfld( 'RTPTHLP_CLUBB',    tmp_array,               ncol,  lchnk )
-   tmp_array = rcm(:ncol,:)*1000._r8
-   call outfld( 'RCM_CLUBB',        tmp_array,               ncol,  lchnk )
-   tmp_array = wprcp(:ncol,:)*latvap
-   call outfld( 'WPRCP_CLUBB',      tmp_array,               ncol,  lchnk )
-   call outfld( 'CLOUDFRAC_CLUBB',  alst,                    pcols, lchnk )
-   tmp_array = rcm_in_layer(:ncol,:)*1000._r8
-   call outfld( 'RCMINLAYER_CLUBB', tmp_array,               ncol,  lchnk )
-   call outfld( 'CLOUDCOVER_CLUBB', cloud_frac,              pcols, lchnk )
-   tmp_array = wpthvp_diag(:ncol,:)*cpair
-   call outfld( 'WPTHVP_CLUBB',     tmp_array,               ncol,  lchnk )
-   tmp_array = 1._r8*zt_out(:ncol,:)
-   call outfld( 'ZT_CLUBB',         tmp_array,               ncol,  lchnk )
-   tmp_array = 1._r8*zi_out(:ncol,:)
-   call outfld( 'ZM_CLUBB',         tmp_array,               ncol,  lchnk )
-   call outfld( 'UM_CLUBB',         um,                      pcols, lchnk )
-   call outfld( 'VM_CLUBB',         vm,                      pcols, lchnk )
-   call outfld( 'THETAL',           thetal_output,           pcols, lchnk )
-   call outfld( 'QT',               qt_output,               pcols, lchnk )
-   call outfld( 'SL',               sl_output,               pcols, lchnk )
-   call outfld( 'CONCLD',           concld,                  pcols, lchnk )
-
-   !  Output CLUBB history here
-   if (l_stats) then
-
-      do i=1,stats_zt%num_output_fields
-
-         temp1 = trim(stats_zt%file%var(i)%name)
-         sub   = temp1
-         if (len(temp1) .gt. 16) sub = temp1(1:16)
-
-         call outfld(trim(sub), out_zt(:,:,i), pcols, lchnk )
-      enddo
-
-      do i=1,stats_zm%num_output_fields
-
-         temp1 = trim(stats_zm%file%var(i)%name)
-         sub   = temp1
-         if (len(temp1) .gt. 16) sub = temp1(1:16)
-
-         call outfld(trim(sub),out_zm(:,:,i), pcols, lchnk)
-      enddo
-
-      if (l_output_rad_files) then
-         do i=1,stats_rad_zt%num_output_fields
-            call outfld(trim(stats_rad_zt%file%var(i)%name), out_radzt(:,:,i), pcols, lchnk)
-         enddo
-
-         do i=1,stats_rad_zm%num_output_fields
-            call outfld(trim(stats_rad_zm%file%var(i)%name), out_radzm(:,:,i), pcols, lchnk)
-         enddo
-      endif
-
-      do i=1,stats_sfc%num_output_fields
-         call outfld(trim(stats_sfc%file%var(i)%name), out_sfc(:,:,i), pcols, lchnk)
-      enddo
-
-   endif
+#include "clubb_outfld.inc"
+#include "clubb_stats_output.inc"
 
    return
 #endif
