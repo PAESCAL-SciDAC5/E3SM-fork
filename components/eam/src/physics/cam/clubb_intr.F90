@@ -184,7 +184,6 @@ module clubb_intr
     cmeliq_idx, &       ! cmeliq_idx index in physics buffer
     relvar_idx, &       ! relative cloud water variance
     accre_enhan_idx, &  ! optional accretion enhancement factor for MG
-    naai_idx, &         ! ice number concentration
     prer_evap_idx, &    ! rain evaporation rate
     qrl_idx, &          ! longwave cooling rate
     radf_idx
@@ -1564,11 +1563,8 @@ end subroutine clubb_init_cnst
    call cnst_get_ind('NUMLIQ',ixnumliq)
    call cnst_get_ind('NUMICE',ixnumice)
 
- !  Initialize physics tendency arrays, copy the state to state1 array to use in this routine
+   !copy the state to state1 array to use in this routine
 
-   if (.not. micro_do_icesupersat) then
-     call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_ice1', ls=.true., lu=.true., lv=.true., lq=lq)
-   endif
 
    call physics_state_copy(state,state1)
 
@@ -1577,12 +1573,6 @@ end subroutine clubb_init_cnst
    cnst_type_loc(:) = cnst_type(:)
    call co2_cycle_set_cnst_type(cnst_type_loc, 'wet')
    call set_dry_to_wet(state1, cnst_type_loc)
-
-   if (micro_do_icesupersat) then
-     naai_idx      = pbuf_get_index('NAAI')
-     call pbuf_get_field(pbuf, naai_idx, naai)
-     call physics_ptend_init(ptend_all, state%psetcols, 'clubb_ice2')
-   endif
 
    !  Determine number of columns and which chunk computation is to be performed on
 
@@ -1676,21 +1666,43 @@ end subroutine clubb_init_cnst
                            !  from moments since it has not been added yet
    endif
 
-   if (micro_do_icesupersat) then  ! This is .false. in default EAM
-#include "ice_macro.inc"
+   !-----------------------------------------------------
+   ! Initialize physics tendency arrays for "all"
+   !-----------------------------------------------------
+   if (micro_do_icesupersat) then ! This is .false. in default EAM
+     call physics_ptend_init(ptend_all, state1%psetcols, 'clubb_ice2')
+   else
+     call physics_ptend_init(ptend_all, state1%psetcols, 'clubb_ice4')
    endif
 
+   !-----------------------------------------------------
+   ! Ice Saturation Adjustment; update state1
+   !-----------------------------------------------------
+   if (micro_do_icesupersat) then  ! This is .false. in default EAM
+     ! Init a ptend_loc with the label "iceadj"; call ice_macro_tend;
+     ! then call physics_update for state1; add ptend_loc to ptend_all
+#include "ice_macro.inc"
+     ! Later, before do_tms and before the column loops for calling advance_clubb_core, there is
+     ! a call physics_ptend_init with the label 'clubb_ice3' that is used to store CLUBB's tend.
+   endif
+   !-----------------------------------------
 
+
+!-----------------------------------------
 #include "clubb_stepsize.inc"
 ! input: clubb_timestep, hdtime, core_rknd
 ! output: dtime, nadv
+!-----------------------------------------
  
 
-
-   minqn = 0._r8
-   newfice(:,:) = 0._r8
-   where(state1%q(:ncol,:pver,3) .gt. minqn) &
-       newfice(:ncol,:pver) = state1%q(:ncol,:pver,3)/(state1%q(:ncol,:pver,2)+state1%q(:ncol,:pver,3))
+   !-------------------------
+   ! Is newfice used at all?
+   !-------------------------
+  !minqn = 0._r8
+  !newfice(:,:) = 0._r8
+  !where(state1%q(:ncol,:pver,3) .gt. minqn) &
+  !    newfice(:ncol,:pver) = state1%q(:ncol,:pver,3)/(state1%q(:ncol,:pver,2)+state1%q(:ncol,:pver,3))
+   !---------------------
 
    !  Compute exner function consistent with CLUBB's definition, which uses a constant
    !  surface pressure.  CAM's exner (in state does not).  Therefore, for consistent
@@ -1816,14 +1828,16 @@ end subroutine clubb_init_cnst
                      tautmsx,      tautmsy,   cam_in%landfrac )
        call t_stopf('compute_tms')
     endif
-
-   if (micro_do_icesupersat) then
-     call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_ice3', ls=.true., lu=.true., lv=.true., lq=lq)
-   endif
-
    ! ------------------------------------------------- !
    ! End module to compute turbulent mountain stress   !
    ! ------------------------------------------------- !
+
+   ! ptend for CLUBB
+   if (micro_do_icesupersat) then
+     call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_ice3', ls=.true., lu=.true., lv=.true., lq=lq)
+   else
+     call physics_ptend_init(ptend_loc, state1%psetcols, 'clubb_ice1', ls=.true., lu=.true., lv=.true., lq=lq)
+   endif
 
    call t_startf('adv_clubb_core_col_loop')
    !  Loop over all columns in lchnk to advance CLUBB core
@@ -2481,9 +2495,6 @@ end subroutine clubb_init_cnst
    call outfld( 'CMELIQ',        cmeliq, pcols, lchnk)
 
    !  Update physics tendencies
-   if (.not. micro_do_icesupersat) then
-      call physics_ptend_init(ptend_all, state%psetcols, 'clubb_ice4')
-   endif
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
 

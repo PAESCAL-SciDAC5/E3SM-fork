@@ -17,6 +17,8 @@
      qitend(:ncol,:)=0._r8
      initend(:ncol,:)=0._r8
 
+     call pbuf_get_field(pbuf, pbuf_get_index('NAAI'), naai)
+
      call t_startf('ice_macro_tend')
      call ice_macro_tend(naai(:ncol,top_lev:pver),state1%t(:ncol,top_lev:pver), &
         state1%pmid(:ncol,top_lev:pver),state1%q(:ncol,top_lev:pver,1),state1%q(:ncol,top_lev:pver,ixcldice),&
