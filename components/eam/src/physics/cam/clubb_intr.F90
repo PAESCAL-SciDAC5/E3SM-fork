@@ -1676,97 +1676,16 @@ end subroutine clubb_init_cnst
                            !  from moments since it has not been added yet
    endif
 
-   if (micro_do_icesupersat) then
-
-     ! -------------------------------------- !
-     ! Ice Saturation Adjustment Computation  !
-     ! -------------------------------------- !
-
-     lq2(:)  = .FALSE.
-     lq2(1)  = .TRUE.
-     lq2(ixcldice) = .TRUE.
-     lq2(ixnumice) = .TRUE.
-
-     latsub = latvap + latice
-
-     call physics_ptend_init(ptend_loc, state%psetcols, 'iceadj', ls=.true., lq=lq2 )
-
-     stend(:ncol,:)=0._r8
-     qvtend(:ncol,:)=0._r8
-     qitend(:ncol,:)=0._r8
-     initend(:ncol,:)=0._r8
-
-     call t_startf('ice_macro_tend')
-     call ice_macro_tend(naai(:ncol,top_lev:pver),state1%t(:ncol,top_lev:pver), &
-        state1%pmid(:ncol,top_lev:pver),state1%q(:ncol,top_lev:pver,1),state1%q(:ncol,top_lev:pver,ixcldice),&
-        state1%q(:ncol,top_lev:pver,ixnumice),latsub,hdtime,&
-        stend(:ncol,top_lev:pver),qvtend(:ncol,top_lev:pver),qitend(:ncol,top_lev:pver),&
-        initend(:ncol,top_lev:pver))
-     call t_stopf('ice_macro_tend')
-
-     ! update local copy of state with the tendencies
-     ptend_loc%q(:ncol,top_lev:pver,1)=qvtend(:ncol,top_lev:pver)
-     ptend_loc%q(:ncol,top_lev:pver,ixcldice)=qitend(:ncol,top_lev:pver)
-     ptend_loc%q(:ncol,top_lev:pver,ixnumice)=initend(:ncol,top_lev:pver)
-     ptend_loc%s(:ncol,top_lev:pver)=stend(:ncol,top_lev:pver)
-
-    ! Add the ice tendency to the output tendency
-     call physics_ptend_sum(ptend_loc, ptend_all, ncol)
-
-    ! ptend_loc is reset to zero by this call
-     call physics_update(state1, ptend_loc, hdtime)
-
-    !Write output for tendencies:
-    !        oufld: QVTENDICE,QITENDICE,NITENDICE
-     call outfld( 'TTENDICE',  stend/cpair, pcols, lchnk )
-     call outfld( 'QVTENDICE', qvtend, pcols, lchnk )
-     call outfld( 'QITENDICE', qitend, pcols, lchnk )
-     call outfld( 'NITENDICE', initend, pcols, lchnk )
-
+   if (micro_do_icesupersat) then  ! This is .false. in default EAM
+#include "ice_macro.inc"
    endif
 
-   !  Determine CLUBB time step and make it sub-step friendly
-   !  For now we want CLUBB time step to be 5 min since that is
-   !  what has been scientifically validated.  However, there are certain
-   !  instances when a 5 min time step will not be possible (based on
-   !  host model time step or on macro-micro sub-stepping
 
-   dtime = clubb_timestep
-   hdtime_core_rknd = real(hdtime, kind = core_rknd)
+#include "clubb_stepsize.inc"
+! input: clubb_timestep, hdtime, core_rknd
+! output: dtime, nadv
+ 
 
-   !  Now check to see if dtime is greater than the host model
-   !    (or sub stepped) time step.  If it is, then simply
-   !    set it equal to the host (or sub step) time step.
-   !    This section is mostly to deal with small host model
-   !    time steps (or small sub-steps)
-
-   if (dtime .gt. hdtime_core_rknd) then
-     dtime = hdtime_core_rknd
-   endif
-
-   !  Now check to see if CLUBB time step divides evenly into
-   !    the host model time step.  If not, force it to divide evenly.
-   !    We also want it to be 5 minutes or less.  This section is
-   !    mainly for host model time steps that are not evenly divisible
-   !    by 5 minutes
-
-   if (mod(hdtime_core_rknd,dtime) .ne. 0) then
-     dtime = hdtime_core_rknd/2._core_rknd
-     do while (dtime .gt. 300._core_rknd)
-       dtime = dtime/2._core_rknd
-     end do
-   endif
-
-   !  If resulting host model time step and CLUBB time step do not divide evenly
-   !    into each other, have model throw a fit.
-
-   if (mod(hdtime_core_rknd,dtime) .ne. 0) then
-     call endrun('clubb_tend_cam:  CLUBB time step and HOST time step NOT compatible'//errmsg(__FILE__,__LINE__))
-   endif
-
-   !  determine number of timesteps CLUBB core should be advanced,
-   !  host time step divided by CLUBB time step
-   nadv = max(hdtime_core_rknd/dtime,1._core_rknd)
 
    minqn = 0._r8
    newfice(:,:) = 0._r8
@@ -1795,27 +1714,31 @@ end subroutine clubb_init_cnst
        um(i,k)      = state1%u(i,k)
        vm(i,k)      = state1%v(i,k)
        thlm(i,k)    = state1%t(i,k)*exner_clubb(i,k)-(latvap/cpair)*state1%q(i,k,ixcldliq)
-
-       if (clubb_do_adv) then
-          if (macmic_it .eq. 1) then
-
-            !  Note that some of the moments below can be positive or negative.
-            !    Remove a constant that was added to prevent dynamics from clipping
-            !    them to prevent dynamics from making them positive.
-            thlp2(i,k)   = state1%q(i,k,ixthlp2)
-            rtp2(i,k)    = state1%q(i,k,ixrtp2)
-            rtpthlp(i,k) = state1%q(i,k,ixrtpthlp) - (rtpthlp_const*apply_const)
-            wpthlp(i,k)  = state1%q(i,k,ixwpthlp) - (wpthlp_const*apply_const)
-            wprtp(i,k)   = state1%q(i,k,ixwprtp) - (wprtp_const*apply_const)
-            wp2(i,k)     = state1%q(i,k,ixwp2)
-            wp3(i,k)     = state1%q(i,k,ixwp3) - (wp3_const*apply_const)
-            up2(i,k)     = state1%q(i,k,ixup2)
-            vp2(i,k)     = state1%q(i,k,ixvp2)
-          endif
-       endif
-
      enddo
    enddo
+
+   if (clubb_do_adv.and.(macmic_it==1)) then
+
+      do k=1,pver   ! loop over levels
+        do i=1,ncol ! loop over columns
+
+          !  Note that some of the moments below can be positive or negative.
+          !    Remove a constant that was added to prevent dynamics from clipping
+          !    them to prevent dynamics from making them positive.
+          thlp2(i,k)   = state1%q(i,k,ixthlp2)
+          rtp2(i,k)    = state1%q(i,k,ixrtp2)
+          rtpthlp(i,k) = state1%q(i,k,ixrtpthlp) - (rtpthlp_const*apply_const)
+          wpthlp(i,k)  = state1%q(i,k,ixwpthlp) - (wpthlp_const*apply_const)
+          wprtp(i,k)   = state1%q(i,k,ixwprtp) - (wprtp_const*apply_const)
+          wp2(i,k)     = state1%q(i,k,ixwp2)
+          wp3(i,k)     = state1%q(i,k,ixwp3) - (wp3_const*apply_const)
+          up2(i,k)     = state1%q(i,k,ixup2)
+          vp2(i,k)     = state1%q(i,k,ixvp2)
+        enddo
+      enddo
+
+   endif
+
 
    if (clubb_do_adv) then
      ! If not last step of macmic loop then set apply_const back to
@@ -1826,6 +1749,8 @@ end subroutine clubb_init_cnst
        apply_const = 0._r8
      endif
    endif
+
+   ! Assign value to ghost level
 
    rtm(1:ncol,pverp)  = rtm(1:ncol,pver)
    um(1:ncol,pverp)   = state1%u(1:ncol,pver)
@@ -1844,6 +1769,7 @@ end subroutine clubb_init_cnst
       vp2(1:ncol,pverp)=vp2(1:ncol,pver)
    endif
 
+   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++=
    ! Compute integrals of static energy, kinetic energy, water vapor, and liquid water
    ! for the computation of total energy before CLUBB is called.  This is for an
    ! effort to conserve energy since liquid water potential temperature (which CLUBB
@@ -1862,6 +1788,13 @@ end subroutine clubb_init_cnst
        wl_b(i) = wl_b(i) + state1%q(i,k,ixcldliq)*state1%pdel(i,k)*invrs_gravit
      enddo
    enddo
+
+   ! Total energy: sum up the components and also take into account the surface fluxes of heat and moisture
+   do i=1,ncol
+      te_b(i) = se_b(i) + ke_b(i) + (latvap+latice)*wv_b(i)+latice*wl_b(i)
+      te_b(i) = te_b(i)+(cam_in%shf(i)+(cam_in%cflx(i,1))*(latvap+latice))*hdtime
+   enddo
+   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++=
 
    !  Compute virtual potential temperature, which is needed for CLUBB
    do k=1,pver
@@ -2436,52 +2369,22 @@ end subroutine clubb_init_cnst
 
       zi_out(i,1) = 0._r8
 
-      ! Compute integrals for static energy, kinetic energy, water vapor, and liquid water
-      ! after CLUBB is called.  This is for energy conservation purposes.
-      se_a = 0._r8
-      ke_a = 0._r8
-      wv_a = 0._r8
-      wl_a = 0._r8
-      do k=1,pver
-         enthalpy = cpair*((thlm(i,k)+(latvap/cpair)*rcm(i,k))/exner_clubb(i,k))
-         clubb_s(k) = enthalpy + gravit*state1%zm(i,k)+state1%phis(i)
-!         se_a(i) = se_a(i) + clubb_s(k)*state1%pdel(i,k)*invrs_gravit
-         se_a(i) = se_a(i) + enthalpy * state1%pdel(i,k)*invrs_gravit
-         ke_a(i) = ke_a(i) + 0.5_r8*(um(i,k)**2+vm(i,k)**2)*state1%pdel(i,k)*invrs_gravit
-         wv_a(i) = wv_a(i) + (rtm(i,k)-rcm(i,k))*state1%pdel(i,k)*invrs_gravit
-         wl_a(i) = wl_a(i) + (rcm(i,k))*state1%pdel(i,k)*invrs_gravit
-      enddo
 
-      ! Based on these integrals, compute the total energy before and after CLUBB call
-      ! TE as in Williamson2015, E= \int_{whole domain} (K+c_p*T) +
-      ! \int_{surface} p_s\phi_s (up to water forms), but we ignore surface term
-      ! under assumption that CLUBB does not change surface pressure
-      do k=1,pver
-         te_a(i) = se_a(i) + ke_a(i) + (latvap+latice)*wv_a(i)+latice*wl_a(i)
-         te_b(i) = se_b(i) + ke_b(i) + (latvap+latice)*wv_b(i)+latice*wl_b(i)
-      enddo
+#include "clubb_efix_aft.inc"
+!------------------------------------------------------
+! input: thlm(i,:),rcm(i,:),enxner_clubb(i,:)
+!        state1%zm(i,:), state1%phis(i),state1%pdel(i,:)
+!        rtm(i,:), rcm(i,:) um(i,:), vm(i,:)
+! params: invrs_gravit, gravit
+!
+! output: clubb_s(:)
+!------------------------------------------------------
 
-      ! Take into account the surface fluxes of heat and moisture
-      te_b(i) = te_b(i)+(cam_in%shf(i)+(cam_in%cflx(i,1))*(latvap+latice))*hdtime
 
-      ! Limit the energy fixer to find highest layer where CLUBB is active
-      ! Find first level where wp2 is higher than lowest threshold
-      clubbtop = 1
-      do while (wp2(i,clubbtop) .eq. w_tol_sqd .and. clubbtop .lt. pver-1)
-         clubbtop = clubbtop + 1
-      enddo
-
-      ! Compute the disbalance of total energy, over depth where CLUBB is active
-      se_dis = (te_a(i) - te_b(i))/(state1%pint(i,pverp)-state1%pint(i,clubbtop))
-
-      ! Apply this fixer throughout the column evenly, but only at layers where
-      ! CLUBB is active.
-      do k=clubbtop,pver
-         clubb_s(k) = clubb_s(k) - se_dis*gravit
-      enddo
-
+      !---------------------------------------------------------------------------------
       !  Now compute the tendencies of CLUBB to CAM, note that pverp is the ghost point
       !  for all variables and therefore is never called in this loop
+      !---------------------------------------------------------------------------------
       do k=1,pver
 
          ptend_loc%u(i,k)   = (um(i,k)-state1%u(i,k))*invrs_hdtime                  ! east-west wind
@@ -2543,6 +2446,7 @@ end subroutine clubb_init_cnst
          enddo
 
       enddo
+      !---------------------------------------------------------------------------------
 
    enddo  ! end column loop
    call t_stopf('adv_clubb_core_col_loop')
