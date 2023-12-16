@@ -1326,9 +1326,9 @@ end subroutine clubb_init_cnst
    real(r8) :: pdf_zm_mixt_frac_inout(pverp)    ! work array for pdf_params_zm%mixt_frac
 
    ! Variables below are needed to compute energy integrals for conservation
-   real(r8) :: ke_a(pcols), ke_b(pcols), te_a(pcols), te_b(pcols)
-   real(r8) :: wv_a(pcols), wv_b(pcols), wl_b(pcols), wl_a(pcols)
-   real(r8) :: se_dis, se_a(pcols), se_b(pcols), clubb_s(pver), enthalpy
+   real(r8) :: se_b, ke_b, wv_b, wl_b, te_b
+   real(r8) :: se_a, ke_a, wv_a, wl_a, te_a
+   real(r8) :: enthalpy, se_dis, clubb_s(pver)
 
    real(r8) :: exner_clubb(pcols,pverp)         ! Exner function consistent with CLUBB          [-]
    real(r8) :: wpthlp_output(pcols,pverp)       ! Heat flux output variable                     [W/m2]
@@ -1781,32 +1781,6 @@ end subroutine clubb_init_cnst
       vp2(1:ncol,pverp)=vp2(1:ncol,pver)
    endif
 
-   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++=
-   ! Compute integrals of static energy, kinetic energy, water vapor, and liquid water
-   ! for the computation of total energy before CLUBB is called.  This is for an
-   ! effort to conserve energy since liquid water potential temperature (which CLUBB
-   ! conserves) and static energy (which CAM conserves) are not exactly equal.
-   se_b = 0._r8
-   ke_b = 0._r8
-   wv_b = 0._r8
-   wl_b = 0._r8
-   do k=1,pver
-     do i=1,ncol
-       ! use s=c_pT+g*z, total energy needs term c_pT but not gz
-       se_b(i) = se_b(i) + (state1%s(i,k) - gravit*state1%zm(i,k) - state1%phis(i)) &
-                         *  state1%pdel(i,k)*invrs_gravit
-       ke_b(i) = ke_b(i) + 0.5_r8*(um(i,k)**2+vm(i,k)**2)*state1%pdel(i,k)*invrs_gravit
-       wv_b(i) = wv_b(i) + state1%q(i,k,ixq)*state1%pdel(i,k)*invrs_gravit
-       wl_b(i) = wl_b(i) + state1%q(i,k,ixcldliq)*state1%pdel(i,k)*invrs_gravit
-     enddo
-   enddo
-
-   ! Total energy: sum up the components and also take into account the surface fluxes of heat and moisture
-   do i=1,ncol
-      te_b(i) = se_b(i) + ke_b(i) + (latvap+latice)*wv_b(i)+latice*wl_b(i)
-      te_b(i) = te_b(i)+(cam_in%shf(i)+(cam_in%cflx(i,1))*(latvap+latice))*hdtime
-   enddo
-   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++=
 
    !  Compute virtual potential temperature, which is needed for CLUBB
    do k=1,pver
@@ -1842,6 +1816,31 @@ end subroutine clubb_init_cnst
    call t_startf('adv_clubb_core_col_loop')
    !  Loop over all columns in lchnk to advance CLUBB core
    do i=1,ncol   ! loop over columns
+
+      !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      ! Compute integrals of static energy, kinetic energy, water vapor, and liquid water
+      ! for the computation of total energy before CLUBB is called.  This is for an
+      ! effort to conserve energy since liquid water potential temperature (which CLUBB
+      ! conserves) and static energy (which CAM conserves) are not exactly equal.
+
+      se_b = 0._r8  ! initialize vertical integrals
+      ke_b = 0._r8
+      wv_b = 0._r8
+      wl_b = 0._r8
+
+      do k=1,pver ! vertical integral
+         ! use s=c_pT+g*z, total energy needs term c_pT but not gz
+         se_b = se_b + (state1%s(i,k) - gravit*state1%zm(i,k) - state1%phis(i)) &
+                      *  state1%pdel(i,k)*invrs_gravit
+         ke_b = ke_b + 0.5_r8*(state1%u(i,k)**2+state1%v(i,k)**2)*state1%pdel(i,k)*invrs_gravit
+         wv_b = wv_b + state1%q(i,k,ixq)*state1%pdel(i,k)*invrs_gravit
+         wl_b = wl_b + state1%q(i,k,ixcldliq)*state1%pdel(i,k)*invrs_gravit
+      enddo
+
+      ! Total energy: sum up the components and also take into account the surface fluxes of heat and moisture
+      te_b = se_b + ke_b + (latvap+latice)*wv_b + latice*wl_b
+      te_b = te_b +(cam_in%shf(i)+(cam_in%cflx(i,1))*(latvap+latice))*hdtime
+      !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
       !  Set time_elapsed to host model time step, this is for
       !  CLUBB's budget stats
