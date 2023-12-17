@@ -1,6 +1,11 @@
 
 !PMA adds gustiness and tpert
 
+    call pbuf_get_field(pbuf, tpert_idx,   tpert)
+    call pbuf_get_field(pbuf, prec_dp_idx, prec_dp)
+    call pbuf_get_field(pbuf, snow_dp_idx, snow_dp)
+    call pbuf_get_field(pbuf, vmag_gust_idx, vmag_gust)
+
     vmag_gust(:)    = 0._r8
     vmag_gust_dp(:) = 0._r8
     vmag_gust_cl(:) = 0._r8

@@ -31,6 +31,8 @@
    ! --------------------------------------------------------------------------------- !
    !  THIS PART COMPUTES CONVECTIVE AND DEEP CONVECTIVE CLOUD FRACTION                 !
    ! --------------------------------------------------------------------------------- !
+   frac_limit = 0.01_r8
+     ic_limit = 1.e-12_r8
 
    deepcu(:,pver) = 0.0_r8
    shalcu(:,pver) = 0.0_r8

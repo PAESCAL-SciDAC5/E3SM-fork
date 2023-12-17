@@ -18,6 +18,9 @@
    enddo
 
    ! diagnose surface friction and obukhov length (inputs to diagnose PBL depth)
+
+   invrs_gravit = 1._r8 / gravit
+
    do i=1,ncol
       rrho = invrs_gravit*(state1%pdel(i,pver)/dz_g(pver))
       call calc_ustar( state1%t(i,pver), state1%pmid(i,pver), cam_in%wsx(i), cam_in%wsy(i), &
