@@ -1508,11 +1508,6 @@ end subroutine clubb_init_cnst
    frac_limit = 0.01_r8
    ic_limit   = 1.e-12_r8
 
-   if (clubb_do_adv) then
-     apply_const = 1._r8  ! Initialize to one, only if CLUBB's moments are advected
-   else
-     apply_const = 0._r8  ! Never want this if CLUBB's moments are not advected
-   endif
 
    !  Define forcings from CAM to CLUBB as zero for momentum and thermo,
    !  forcings already applied through CAM
@@ -1661,11 +1656,6 @@ end subroutine clubb_init_cnst
       call pbuf_get_field(pbuf, tau_est_idx, tau_est)
    end if
 
-   ! Intialize the apply_const variable (note special logic is due to eularian backstepping)
-   if (clubb_do_adv .and. (is_first_step() .or. all(wpthlp(1:ncol,1:pver) .eq. 0._r8))) then
-      apply_const = 0._r8  ! On first time through do not remove constant
-                           !  from moments since it has not been added yet
-   endif
 
    !-----------------------------------------------------
    ! Initialize physics tendency arrays for "all"
@@ -1705,63 +1695,24 @@ end subroutine clubb_init_cnst
   !    newfice(:ncol,:pver) = state1%q(:ncol,:pver,3)/(state1%q(:ncol,:pver,2)+state1%q(:ncol,:pver,3))
    !---------------------
 
+   !-------------------------------------------------------------------------------------
+   !  At each CLUBB call, initialize mean momentum  and thermo CLUBB state from the CAM state
+   !-------------------------------------------------------------------------------------
+
+
+     um(:ncol,:pver) = state1%u(:ncol,:pver)
+     vm(:ncol,:pver) = state1%v(:ncol,:pver)
+
+    rtm(:ncol,:pver) = state1%q(:ncol,:pver,ixq)+state1%q(:ncol,:pver,ixcldliq)
+    rvm(:ncol,:pver) = state1%q(:ncol,:pver,ixq)
+
    !  Compute exner function consistent with CLUBB's definition, which uses a constant
    !  surface pressure.  CAM's exner (in state does not).  Therefore, for consistent
    !  treatment with CLUBB code, anytime exner is needed to treat CLUBB variables
    !  (such as thlm), use "exner_clubb" other wise use the exner in state
 
-   do k=1,pver
-     do i=1,ncol
-       exner_clubb(i,k) = (real(p0_clubb, kind = r8 )/state1%pmid(i,k))**(rair/cpair)
-     enddo
-   enddo
-
-   !  At each CLUBB call, initialize mean momentum  and thermo CLUBB state
-   !  from the CAM state
-
-   do k=1,pver   ! loop over levels
-     do i=1,ncol ! loop over columns
-
-       rtm(i,k)     = state1%q(i,k,ixq)+state1%q(i,k,ixcldliq)
-       rvm(i,k)     = state1%q(i,k,ixq)
-       um(i,k)      = state1%u(i,k)
-       vm(i,k)      = state1%v(i,k)
-       thlm(i,k)    = state1%t(i,k)*exner_clubb(i,k)-(latvap/cpair)*state1%q(i,k,ixcldliq)
-     enddo
-   enddo
-
-   if (clubb_do_adv.and.(macmic_it==1)) then
-
-      do k=1,pver   ! loop over levels
-        do i=1,ncol ! loop over columns
-
-          !  Note that some of the moments below can be positive or negative.
-          !    Remove a constant that was added to prevent dynamics from clipping
-          !    them to prevent dynamics from making them positive.
-          thlp2(i,k)   = state1%q(i,k,ixthlp2)
-          rtp2(i,k)    = state1%q(i,k,ixrtp2)
-          rtpthlp(i,k) = state1%q(i,k,ixrtpthlp) - (rtpthlp_const*apply_const)
-          wpthlp(i,k)  = state1%q(i,k,ixwpthlp) - (wpthlp_const*apply_const)
-          wprtp(i,k)   = state1%q(i,k,ixwprtp) - (wprtp_const*apply_const)
-          wp2(i,k)     = state1%q(i,k,ixwp2)
-          wp3(i,k)     = state1%q(i,k,ixwp3) - (wp3_const*apply_const)
-          up2(i,k)     = state1%q(i,k,ixup2)
-          vp2(i,k)     = state1%q(i,k,ixvp2)
-        enddo
-      enddo
-
-   endif
-
-
-   if (clubb_do_adv) then
-     ! If not last step of macmic loop then set apply_const back to
-     !   zero to prevent output from being corrupted.
-     if (macmic_it .eq. cld_macmic_num_steps) then
-       apply_const = 1._r8
-     else
-       apply_const = 0._r8
-     endif
-   endif
+    exner_clubb(:ncol,:pver) = (real(p0_clubb, kind = r8 )/state1%pmid(:ncol,:pver))**(rair/cpair)
+           thlm(:ncol,:pver) = state1%t(:ncol,:pver)*exner_clubb(:ncol,:pver)-(latvap/cpair)*state1%q(:ncol,:pver,ixcldliq)
 
    ! Assign value to ghost level
 
@@ -1770,17 +1721,59 @@ end subroutine clubb_init_cnst
    vm(1:ncol,pverp)   = state1%v(1:ncol,pver)
    thlm(1:ncol,pverp) = thlm(1:ncol,pver)
 
-   if (clubb_do_adv) then
-      thlp2(1:ncol,pverp)=thlp2(1:ncol,pver)
-      rtp2(1:ncol,pverp)=rtp2(1:ncol,pver)
-      rtpthlp(1:ncol,pverp)=rtpthlp(1:ncol,pver)
-      wpthlp(1:ncol,pverp)=wpthlp(1:ncol,pver)
-      wprtp(1:ncol,pverp)=wprtp(1:ncol,pver)
-      wp2(1:ncol,pverp)=wp2(1:ncol,pver)
-      wp3(1:ncol,pverp)=wp3(1:ncol,pver)
-      up2(1:ncol,pverp)=up2(1:ncol,pver)
-      vp2(1:ncol,pverp)=vp2(1:ncol,pver)
-   endif
+   !-----------------------------------------------------------------------------------------
+   ! If CLUBB's moments are transported by the host model, get the moments from the host.
+   !-----------------------------------------------------------------------------------------
+   if (.not.clubb_do_adv) then ! no need to apply constant if CLUBB's moments are not advected
+
+     apply_const = 0._r8
+
+   else !-----------------------------------------------
+
+     ! Intialize the apply_const variable (note special logic is due to eularian backstepping)
+     if (is_first_step() .or. all(wpthlp(1:ncol,1:pver) .eq. 0._r8)) then
+        apply_const = 0._r8  ! On first time through do not remove constant
+                             !  from moments since it has not been added yet
+     else
+        apply_const = 1._r8  ! Initialize to one, only if CLUBB's moments are advected
+     endif
+
+     if (macmic_it==1) then
+        !  This is the first macmic substep. Get the moments from the host model.
+        !  Note that some of the moments below can be positive or negative.
+        !    Remove a constant that was added to prevent dynamics from clipping
+        !    them to prevent dynamics from making them positive.
+          thlp2(:ncol,:pver) = state1%q(:ncol,:pver,ixthlp2)
+           rtp2(:ncol,:pver) = state1%q(:ncol,:pver,ixrtp2)
+        rtpthlp(:ncol,:pver) = state1%q(:ncol,:pver,ixrtpthlp) - (rtpthlp_const*apply_const)
+         wpthlp(:ncol,:pver) = state1%q(:ncol,:pver,ixwpthlp)  - (wpthlp_const*apply_const)
+          wprtp(:ncol,:pver) = state1%q(:ncol,:pver,ixwprtp)   - (wprtp_const*apply_const)
+            wp2(:ncol,:pver) = state1%q(:ncol,:pver,ixwp2)
+            wp3(:ncol,:pver) = state1%q(:ncol,:pver,ixwp3)     - (wp3_const*apply_const)
+            up2(:ncol,:pver) = state1%q(:ncol,:pver,ixup2)
+            vp2(:ncol,:pver) = state1%q(:ncol,:pver,ixvp2)
+     endif
+
+     ! Assign value to ghost level
+     thlp2(1:ncol,pverp)=thlp2(1:ncol,pver)
+     rtp2(1:ncol,pverp)=rtp2(1:ncol,pver)
+     rtpthlp(1:ncol,pverp)=rtpthlp(1:ncol,pver)
+     wpthlp(1:ncol,pverp)=wpthlp(1:ncol,pver)
+     wprtp(1:ncol,pverp)=wprtp(1:ncol,pver)
+     wp2(1:ncol,pverp)=wp2(1:ncol,pver)
+     wp3(1:ncol,pverp)=wp3(1:ncol,pver)
+     up2(1:ncol,pverp)=up2(1:ncol,pver)
+     vp2(1:ncol,pverp)=vp2(1:ncol,pver)
+
+     ! If not last step of macmic loop then set apply_const back to
+     !   zero to prevent output from being corrupted.
+     if (macmic_it .eq. cld_macmic_num_steps) then
+       apply_const = 1._r8
+     else
+       apply_const = 0._r8
+     endif
+
+   endif  ! if (not.clubb_do_adv) !-----------------------------------------------
 
 
    call t_stopf('clubb_tend_cam_init')
