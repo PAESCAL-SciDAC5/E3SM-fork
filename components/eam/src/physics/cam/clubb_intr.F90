@@ -1340,7 +1340,8 @@ end subroutine clubb_init_cnst
    real(r8) :: sl_output(pcols,pver)            ! Liquid water static energy                    [J/kg]
    real(r8) :: ustar2(pcols)                    ! Surface stress for PBL height                 [m2/s2]
    real(r8) :: rho(pcols,pverp)                 ! Midpoint density in CAM                       [kg/m^3]
-   real(r8) :: thv(pcols,pver)                  ! virtual potential temperature                 [K]
+   real(r8) :: thv(pcols,pver)                        ! virtual potential temperature                 [K]
+   real(r8) :: thv1d(pver)
    real(r8) :: edsclr_out(pverp,edsclr_dim)     ! Scalars to be diffused through CLUBB          [units vary]
    real(r8) :: sclrpthvp(pcols,pverp,sclr_dim)  ! sclr'th_v' (momentum levels)                  [{units vary} K]
    real(r8) :: rcm_in_layer(pcols,pverp)        ! CLUBB in-cloud liquid water mixing ratio      [kg/kg]
@@ -1782,13 +1783,6 @@ end subroutine clubb_init_cnst
    endif
 
 
-   !  Compute virtual potential temperature, which is needed for CLUBB
-   do k=1,pver
-     do i=1,ncol
-       thv(i,k) = state1%t(i,k)*exner_clubb(i,k)*(1._r8+zvir*state1%q(i,k,ixq)&
-                  -state1%q(i,k,ixcldliq))
-     enddo
-   enddo
    call t_stopf('clubb_tend_cam_init')
 
    ! ------------------------------------------------- !
@@ -1796,10 +1790,11 @@ end subroutine clubb_init_cnst
    ! ------------------------------------------------- !
     if ( do_tms) then
        call t_startf('compute_tms')
-       call compute_tms( pcols,        pver,      ncol,                   &
-                     state1%u,     state1%v,  state1%t,  state1%pmid, &
-                     state1%exner, state1%zm, sgh30,     ksrftms,     &
-                     tautmsx,      tautmsy,   cam_in%landfrac )
+       call compute_tms( pcols,        pver,      ncol,                   &! in
+                         state1%u,     state1%v,  state1%t,  state1%pmid, &! in
+                         state1%exner, state1%zm, sgh30,                  &! in
+                         ksrftms,      tautmsx,   tautmsy,                &! out
+                         cam_in%landfrac                                  )! in
        call t_stopf('compute_tms')
     endif
    ! ------------------------------------------------- !
@@ -1819,10 +1814,14 @@ end subroutine clubb_init_cnst
 
 #include "clubb_efix_bef.inc"
 
-      !  Set time_elapsed to host model time step, this is for
-      !  CLUBB's budget stats
+      !------------------------------------------------------------------------------
+      !  Set time_elapsed to host model time step, this is for CLUBB's budget stats
+      !------------------------------------------------------------------------------
       time_elapsed = hdtime_core_rknd
 
+      !------------------------------------------------------------------------------
+      ! CLUBB's z-grid
+      !------------------------------------------------------------------------------
       !  Define the CLUBB momentum grid (in height, units of m)
       do k=1,pverp
          dum1 = state1%zi(i,pverp-k+1)-state1%zi(i,pver+1)
@@ -1842,6 +1841,13 @@ end subroutine clubb_init_cnst
       !  Set the elevation of the surface
       sfc_elevation = real(state1%zi(i,pver+1), kind = core_rknd)
 
+      !------------------------------------------------------------------------------
+      !  Compute virtual potential temperature, which is needed for CLUBB
+      do k=1,pver
+         thv1d(k) = state1%t(i,k)*exner_clubb(i,k)*(1._r8+zvir*state1%q(i,k,ixq)&
+                   -state1%q(i,k,ixcldliq))
+      enddo
+
       !  Compute thermodynamic stuff needed for CLUBB on thermo levels.
       !  Inputs for the momentum levels are set below setup_clubb core
       do k=1,pver
@@ -1850,7 +1856,9 @@ end subroutine clubb_init_cnst
          rho(i,k+1)           = invrs_gravit*state1%pdel(i,pver-k+1)/dz_g(pver-k+1)
          rho_ds_zt(k+1)       = real(rho(i,k+1), kind = core_rknd)
          invrs_rho_ds_zt(k+1) = 1._core_rknd/(rho_ds_zt(k+1))                               ! Inverse ds rho at thermo
-         thv_ds_zt(k+1)       = real(thv(i,pver-k+1), kind = core_rknd)                     ! thetav on thermo
+
+         thv_ds_zt(k+1)       = real(thv1d(pver-k+1), kind = core_rknd)                       ! thetav on thermo
+
          rfrzm(k+1)           = real(state1%q(i,pver-k+1,ixcldice), kind = core_rknd)
          radf(k+1)            = real(radf_clubb(i,pver-k+1), kind = core_rknd)
          dum1                 = qrl(i,pver-k+1)/(cpair*state1%pdel(i,pver-k+1))
