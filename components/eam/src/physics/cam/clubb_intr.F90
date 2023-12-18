@@ -1646,7 +1646,7 @@ end subroutine clubb_init_cnst
    call pbuf_get_field(pbuf, prer_evap_idx, prer_evap)
    call pbuf_get_field(pbuf, accre_enhan_idx, accre_enhan)
    call pbuf_get_field(pbuf, cmeliq_idx,  cmeliq)
-   call pbuf_get_field(pbuf, relvar_idx,  relvar)
+
    call pbuf_get_field(pbuf, dp_frac_idx, deepcu)
    call pbuf_get_field(pbuf, sh_frac_idx, shalcu)
    call pbuf_get_field(pbuf, kvm_idx,     khzt)
@@ -1748,9 +1748,22 @@ end subroutine clubb_init_cnst
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
 
+   ! ------------------------------------------------- !
+   ! TKE
+   ! ------------------------------------------------- !
+   call pbuf_get_field(pbuf, tke_idx,     tke)
+   tke(1:ncol,1:pverp) = 0.5_r8*(up2(:ncol,:pverp)+vp2(:ncol,:pverp)+wp2(:ncol,:pverp))  !  turbulent kinetic energy
 
+   ! ------------------------------------------------- !
+   ! relative liquid water variance
+   ! ------------------------------------------------- !
+#include "relvar.inc"
+   ! input: rcm, qcvar, cloud_frac
+   ! output:  relvar (in pbuf), relvarc (outfld)
 
+   ! ------------------------------------------------- !
    ! Add constant to ghost point so that output is not corrupted
+   ! ------------------------------------------------- !
    if (clubb_do_adv) then
       if (macmic_it .eq. cld_macmic_num_steps) then
          wp3(:,pverp) = wp3(:,pverp) + wp3_const
@@ -1784,18 +1797,12 @@ end subroutine clubb_init_cnst
       end if
    end do
 
-#include "relvar.inc"
 
    ! ------------------------------------------------- !
    ! Optional Accretion enhancement factor             !
    ! ------------------------------------------------- !
     accre_enhan(:ncol,:pver) = micro_mg_accre_enhan_fac !default is 1._r8
 
-   ! ------------------------------------------------- !
-   ! TKE
-   ! ------------------------------------------------- !
-   call pbuf_get_field(pbuf, tke_idx,     tke)
-   tke(1:ncol,1:pverp) = 0.5_r8*(up2(:ncol,:pverp)+vp2(:ncol,:pverp)+wp2(:ncol,:pverp))  !  turbulent kinetic energy
 
 #include "clubb_misc_diag_and_outfld.inc"
 

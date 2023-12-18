@@ -2,6 +2,7 @@
    ! ------------------------------------------------- !
    ! Diagnose relative cloud water variance            !
    ! ------------------------------------------------- !
+   call pbuf_get_field(pbuf, relvar_idx,  relvar)
 
    if (deep_scheme .eq. 'CLUBB_SGS') then
       relvarmax = 2.0_r8
