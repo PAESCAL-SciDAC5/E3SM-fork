@@ -1,10 +1,13 @@
 
+
    ! --------------------------------------------------------------------------------- !
    !  Diagnose some quantities that are computed in macrop_tend here.                  !
    !  These are inputs required for the microphysics calculation.                      !
    !                                                                                   !
    !  FIRST PART COMPUTES THE STRATIFORM CLOUD FRACTION FROM CLUBB CLOUD FRACTION      !
    ! --------------------------------------------------------------------------------- !
+   call pbuf_get_field(pbuf, alst_idx,    alst,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+   call pbuf_get_field(pbuf, qlst_idx,    qlst,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
 
   ! HW: set alst to alst_o before getting updated
   if(liqcf_fix) then
@@ -31,11 +34,18 @@
    ! --------------------------------------------------------------------------------- !
    !  THIS PART COMPUTES CONVECTIVE AND DEEP CONVECTIVE CLOUD FRACTION                 !
    ! --------------------------------------------------------------------------------- !
+   call pbuf_get_field(pbuf, dp_frac_idx, deepcu)
+   call pbuf_get_field(pbuf, sh_frac_idx, shalcu)
+   deepcu(:,pver) = 0.0_r8
+   shalcu(:,pver) = 0.0_r8
+
    frac_limit = 0.01_r8
      ic_limit = 1.e-12_r8
 
-   deepcu(:,pver) = 0.0_r8
-   shalcu(:,pver) = 0.0_r8
+   call pbuf_get_field(pbuf, icwmrdp_idx, dp_icwmr)
+   call pbuf_get_field(pbuf, cmfmc_sh_idx, cmfmc_sh)
+
+   call pbuf_get_field(pbuf, concld_idx,  concld,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
 
    do k=1,pver-1
       do i=1,ncol
@@ -77,6 +87,7 @@
    !  COMPUTE THE ICE CLOUD FRACTION PORTION                                           !
    !  use the aist_vector function to compute the ice cloud fraction                   !
    ! --------------------------------------------------------------------------------- !
+   call pbuf_get_field(pbuf, aist_idx,    aist,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
 
    call t_startf('ice_cloud_frac_diag')
    do k=1,pver
@@ -92,6 +103,8 @@
    !  because CLUBB does nothing with ice.  Here I simply overwrite the liquid stratus !
    !  fraction that was coded in macrop_driver                                         !
    ! --------------------------------------------------------------------------------- !
+   call pbuf_get_field(pbuf, ast_idx,     ast,     start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+   call pbuf_get_field(pbuf, qist_idx,    qist,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
 
    !  Recompute net stratus fraction using maximum over-lapping assumption, as done
    !  in macrophysics code, using alst computed above and aist read in from physics buffer
@@ -117,5 +130,7 @@
    enddo
 
    ! Assign the first pver levels of cloud_frac back to cld
+
+   call pbuf_get_field(pbuf, cld_idx,     cld,     start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    cld(:,1:pver) = cloud_frac(:,1:pver)
 

@@ -1,8 +1,9 @@
 
    !===========================================================================================
-   !  At each CLUBB call, initialize CLUBB's moments
+   !  At each CLUBB call, initialize CLUBB's PROGNOSTIC moments
    !===========================================================================================
    ! Associate pointers to arrays in pbuf
+   !-------------------------------------------------------------------------------------------
 
    call pbuf_get_field(pbuf, wp2_idx,     wp2,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
    call pbuf_get_field(pbuf, wp3_idx,     wp3,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
@@ -14,9 +15,9 @@
    call pbuf_get_field(pbuf, up2_idx,     up2,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
    call pbuf_get_field(pbuf, vp2_idx,     vp2,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
 
-   !-----------------------------------------------------------------------------------------
-   ! If CLUBB's moments are transported by the host model, get the moments from the host.
-   !-----------------------------------------------------------------------------------------
+   !----------------------------------------------------------------------------------------------------
+   ! If CLUBB's moments are transported by the host model, copy the moments from the host's state vector
+   !----------------------------------------------------------------------------------------------------
    if (.not.clubb_do_adv) then ! no need to apply constant if CLUBB's moments are not advected
 
      apply_const = 0._r8
@@ -68,3 +69,18 @@
 
    endif  ! if (not.clubb_do_adv) !-----------------------------------------------
 
+   !=====================
+   ! upwp and vpwp
+   !=====================
+   call pbuf_get_field(pbuf, upwp_idx,    upwp,    start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+   call pbuf_get_field(pbuf, vpwp_idx,    vpwp,    start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+
+   !=====================
+   ! Diagnostic moments
+   !=====================
+   call pbuf_get_field(pbuf, wpthvp_idx,     wpthvp,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+   call pbuf_get_field(pbuf, wp2thvp_idx,    wp2thvp,    start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+   call pbuf_get_field(pbuf, rtpthvp_idx,    rtpthvp,    start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+   call pbuf_get_field(pbuf, thlpthvp_idx,   thlpthvp,   start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+
+   !=====================

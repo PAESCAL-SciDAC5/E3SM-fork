@@ -1524,22 +1524,11 @@ end subroutine clubb_init_cnst
        call t_stopf('compute_tms')
     endif
 
- ! ! constituents are all treated as wet mmr by clubb
- ! ! don't convert co2 tracers to wet mixing ratios
- ! cnst_type_loc(:) = cnst_type(:)
- ! call co2_cycle_set_cnst_type(cnst_type_loc, 'wet')
- ! call set_dry_to_wet(state1, cnst_type_loc)
-
-
    !  Determine time step of physics buffer
 
    itim_old = pbuf_old_tim_idx()
 
    !  Establish associations between pointers and physics buffer fields
-
-
-   call pbuf_get_field(pbuf, upwp_idx,    upwp,    start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, vpwp_idx,    vpwp,    start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
 
    if (linearize_pbl_winds) then
       call pbuf_get_field(pbuf, um_pert_idx, um_pert, start=(/1,1/),          kount=(/pcols,pverp/))
@@ -1552,47 +1541,8 @@ end subroutine clubb_init_cnst
       nullify(upwp_pert)
       nullify(vpwp_pert)
    end if
-   call pbuf_get_field(pbuf, thlm_idx,    thlm,    start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, rtm_idx,     rtm,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, um_idx,      um,      start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, vm_idx,      vm,      start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
 
-   call pbuf_get_field(pbuf, wpthvp_idx,     wpthvp,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, wp2thvp_idx,    wp2thvp,    start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, rtpthvp_idx,    rtpthvp,    start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, thlpthvp_idx,   thlpthvp,   start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, rcm_idx,        rcm,        start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
    call pbuf_get_field(pbuf, cloud_frac_idx, cloud_frac, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-
-   call pbuf_get_field(pbuf, pdf_zm_w_1_idx, pdf_zm_w_1, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, pdf_zm_w_2_idx, pdf_zm_w_2, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, pdf_zm_varnce_w_1_idx, pdf_zm_varnce_w_1, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, pdf_zm_varnce_w_2_idx, pdf_zm_varnce_w_2, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, pdf_zm_mixt_frac_idx, pdf_zm_mixt_frac, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-
-   call pbuf_get_field(pbuf, qrl_idx,     qrl)
-   call pbuf_get_field(pbuf, radf_idx,    radf_clubb)
-
-   call pbuf_get_field(pbuf, cld_idx,     cld,     start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   call pbuf_get_field(pbuf, concld_idx,  concld,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   call pbuf_get_field(pbuf, ast_idx,     ast,     start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   call pbuf_get_field(pbuf, alst_idx,    alst,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   call pbuf_get_field(pbuf, aist_idx,    aist,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   call pbuf_get_field(pbuf, qlst_idx,    qlst,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   call pbuf_get_field(pbuf, qist_idx,    qist,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-
-   call pbuf_get_field(pbuf, prer_evap_idx, prer_evap)
-   call pbuf_get_field(pbuf, accre_enhan_idx, accre_enhan)
-   call pbuf_get_field(pbuf, cmeliq_idx,  cmeliq)
-
-   call pbuf_get_field(pbuf, dp_frac_idx, deepcu)
-   call pbuf_get_field(pbuf, sh_frac_idx, shalcu)
-   call pbuf_get_field(pbuf, kvm_idx,     khzt)
-   call pbuf_get_field(pbuf, kvh_idx,     khzm)
-   call pbuf_get_field(pbuf, pblh_idx,    pblh)
-   call pbuf_get_field(pbuf, icwmrdp_idx, dp_icwmr)
-   call pbuf_get_field(pbuf, cmfmc_sh_idx, cmfmc_sh)
-
 
    if (linearize_pbl_winds) then
       call pbuf_get_field(pbuf, wsresp_idx, wsresp)
@@ -1630,6 +1580,7 @@ end subroutine clubb_init_cnst
 ! output: 9 moments
 !-------------------------------------------------------------
 #include "clubb_timestep_init_forcing_and_boundary.inc"
+#include "clubb_misc_inout_fields.inc"
 
    !-------------------------------
    ! Initialize ptend for CLUBB
@@ -1679,6 +1630,7 @@ end subroutine clubb_init_cnst
    call outfld( 'UTEND_CLUBB',   ptend_loc%u,pcols, lchnk)
    call outfld( 'VTEND_CLUBB',   ptend_loc%v,pcols, lchnk)
 
+   call pbuf_get_field(pbuf, cmeliq_idx,  cmeliq)
    cmeliq(:,:) = ptend_loc%q(:,:,ixcldliq)
    call outfld( 'CMELIQ',        cmeliq, pcols, lchnk)
 
@@ -1707,6 +1659,7 @@ end subroutine clubb_init_cnst
    !----------------------------------------
    ! Optional Accretion enhancement factor
    !----------------------------------------
+   call pbuf_get_field(pbuf, accre_enhan_idx, accre_enhan)
     accre_enhan(:ncol,:pver) = micro_mg_accre_enhan_fac !default is 1._r8
 
    !============================================
@@ -1752,12 +1705,15 @@ end subroutine clubb_init_cnst
    !======================
    ! Diagnose PBL height          
    !======================
-#include "pblh_diag.inc"
+   call pbuf_get_field(pbuf, pblh_idx,    pblh)
 
+#include "pblh_diag.inc"
 
    !============
    ! Gustiness
    !============
+   ! Note: the calculation uses pblh.
+   !----------------------------------
 #include "vmag_gust.inc"
 
    !============================
