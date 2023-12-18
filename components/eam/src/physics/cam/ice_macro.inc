@@ -2,6 +2,8 @@
      ! -------------------------------------- !
      ! Ice Saturation Adjustment Computation  !
      ! -------------------------------------- !
+     call cnst_get_ind('CLDICE',ixcldice)
+     call cnst_get_ind('NUMLIQ',ixnumliq)
 
      lq2(:)  = .FALSE.
      lq2(1)  = .TRUE.

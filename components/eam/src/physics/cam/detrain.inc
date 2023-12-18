@@ -11,6 +11,9 @@
    !  Initialize the shallow convective detrainment rate, will always be zero
    dlf2(:,:) = 0.0_r8
 
+   call cnst_get_ind('NUMLIQ',ixnumliq)
+   call cnst_get_ind('NUMICE',ixnumice)
+
    lqice(:)        = .false.
    lqice(ixcldliq) = .true.
    lqice(ixcldice) = .true.

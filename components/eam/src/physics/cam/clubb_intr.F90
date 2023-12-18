@@ -1493,10 +1493,6 @@ end subroutine clubb_init_cnst
 
 #ifdef CLUBB_SGS
 
-   !-----------------------------------------------------------------------------------------------!
-   !       MAIN COMPUTATION BEGINS HERE                                                            !
-   !-----------------------------------------------------------------------------------------------!
-
    !--------------------------------------------------------------------------------
    !  Copy the state to state1 array to use in this routine;
    !  Determine number of columns and which chunk computation is to be performed on
@@ -1515,9 +1511,9 @@ end subroutine clubb_init_cnst
      call physics_ptend_init(ptend_all, state1%psetcols, 'clubb_ice4')
    endif
 
-   ! ------------------------------------------------- !
-   ! Begin module to compute turbulent mountain stress !
-   ! ------------------------------------------------- !
+   !---------------------------
+   ! Turbulent mountain stress
+   !---------------------------
     if ( do_tms) then
        call t_startf('compute_tms')
        call compute_tms( pcols,        pver,      ncol,                   &! in
@@ -1528,68 +1524,11 @@ end subroutine clubb_init_cnst
        call t_stopf('compute_tms')
     endif
 
-   ! ------------------------------------------------- !
-   ! ------------------------------------------------- !
-   ! invrs_gravit = 1._r8 / gravit
-
-
-   !  Define forcings from CAM to CLUBB as zero for momentum and thermo,
-   !  forcings already applied through CAM
-   thlm_forcing(1:pverp) = 0._core_rknd
-   rtm_forcing(1:pverp)  = 0._core_rknd
-   um_forcing(1:pverp)   = 0._core_rknd
-   vm_forcing(1:pverp)   = 0._core_rknd
-
-   wprtp_forcing(1:pverp)   = 0._core_rknd
-   wpthlp_forcing(1:pverp)  = 0._core_rknd
-   rtp2_forcing(1:pverp)    = 0._core_rknd
-   thlp2_forcing(1:pverp)   = 0._core_rknd
-   rtpthlp_forcing(1:pverp) = 0._core_rknd
-
-   ! rtp3_in and thlp3_in are not currently used in CLUBB's default code.
-   rtp3_in(:)  = 0.0_core_rknd
-   thlp3_in(:) = 0.0_core_rknd
-
-   !  Define surface sources for transported variables for diffusion, will
-   !  be zero as these tendencies are done in clubb_surface
-   do ixind=1,edsclr_dim
-      wpedsclrp_sfc(ixind) = 0._core_rknd
-   enddo
-
-   ice_supersat_frac(1:pverp) = 0._core_rknd
-
-   !  Higher order scalar inputs, set to zero
-   wpsclrp_sfc(:)      = 0._core_rknd
-   hydromet(:,:)       = 0._core_rknd
-   wphydrometp(:,:)    = 0._core_rknd
-   wp2hmp(:,:)         = 0._core_rknd
-   rtphmp_zt(:,:)      = 0._core_rknd
-   thlphmp_zt(:,:)     = 0._core_rknd
-
-   !  Initialize forcings for transported scalars to zero
-   sclrm_forcing(:,:)   = 0._core_rknd
-   edsclrm_forcing(:,:) = 0._core_rknd
-
-   !  Determine Coriolis force at given latitude.  This is never used
-   !  when CLUBB is implemented in a host model, therefore just set
-   !  to zero.
-   fcor = 0._core_rknd
-
- !  Get indicees for cloud and ice mass and cloud and ice number
-
-   call cnst_get_ind('Q',ixq)
-   call cnst_get_ind('CLDLIQ',ixcldliq)
-   call cnst_get_ind('CLDICE',ixcldice)
-   call cnst_get_ind('NUMLIQ',ixnumliq)
-   call cnst_get_ind('NUMICE',ixnumice)
-
-
-
-   ! constituents are all treated as wet mmr by clubb
-   ! don't convert co2 tracers to wet mixing ratios
-   cnst_type_loc(:) = cnst_type(:)
-   call co2_cycle_set_cnst_type(cnst_type_loc, 'wet')
-   call set_dry_to_wet(state1, cnst_type_loc)
+ ! ! constituents are all treated as wet mmr by clubb
+ ! ! don't convert co2 tracers to wet mixing ratios
+ ! cnst_type_loc(:) = cnst_type(:)
+ ! call co2_cycle_set_cnst_type(cnst_type_loc, 'wet')
+ ! call set_dry_to_wet(state1, cnst_type_loc)
 
 
    !  Determine time step of physics buffer
@@ -1661,9 +1600,9 @@ end subroutine clubb_init_cnst
    end if
 
 
-   !-----------------------------------------------------
+   !============================================
    ! Ice Saturation Adjustment; update state1
-   !-----------------------------------------------------
+   !============================================
    if (micro_do_icesupersat) then  ! This is .false. in default EAM
      ! Init a ptend_loc with the label "iceadj"; call ice_macro_tend;
      ! then call physics_update for state1; add ptend_loc to ptend_all
@@ -1671,27 +1610,30 @@ end subroutine clubb_init_cnst
      ! Later, before do_tms and before the column loops for calling advance_clubb_core, there is
      ! a call physics_ptend_init with the label 'clubb_ice3' that is used to store CLUBB's tend.
    endif
-   !-----------------------------------------
 
    !==========================
    ! CLUBB
    !==========================
+   ! Load input (initial and boundary conditions) from host model's data structures
 
-!-----------------------------------------
+!-------------------------------------------------------------
 #include "clubb_stepsize.inc"
 ! input: clubb_timestep, hdtime, core_rknd
 ! output: dtime, nadv
-!-----------------------------------------
-
+!-------------------------------------------------------------
 #include "clubb_timestep_init_mean_state.inc"
-
+! input: u, v, qv, ql, t, pmid
+! output: um, vm, thlm, rtm (and exner_clubb; why rcm also?)
+!-------------------------------------------------------------
 #include "clubb_timestep_init_moments.inc"
+! input: state or pbuf
+! output: 9 moments
+!-------------------------------------------------------------
+#include "clubb_timestep_init_forcing_and_boundary.inc"
 
-
-
-   !-----------------
-   ! ptend for CLUBB
-   !-----------------
+   !-------------------------------
+   ! Initialize ptend for CLUBB
+   !-------------------------------
    if (micro_do_icesupersat) then
      call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_ice3', ls=.true., lu=.true., lv=.true., lq=lq)
    else
@@ -1722,7 +1664,6 @@ end subroutine clubb_init_cnst
 
 #include "clubb_ptend_cal.inc"
 
-
    enddo  ! end column loop
    call t_stopf('adv_clubb_core_col_loop')
 
@@ -1748,35 +1689,29 @@ end subroutine clubb_init_cnst
    call physics_update(state1,ptend_loc,hdtime)
 
    ! ------------------------------------------------------------ !
-   ! ------------------------------------------------------------ !
-   ! ------------------------------------------------------------ !
    ! The rest of the code deals with diagnosing variables         !
    ! for microphysics/radiation computation and macrophysics      !
    ! ------------------------------------------------------------ !
-   ! ------------------------------------------------------------ !
-   ! ------------------------------------------------------------ !
-   call t_startf('clubb_tend_cam_diag')
-
-   ! ------------------------------------------------- !
+   !------
    ! TKE
-   ! ------------------------------------------------- !
+   !------
    call pbuf_get_field(pbuf, tke_idx,     tke)
    tke(1:ncol,1:pverp) = 0.5_r8*(up2(:ncol,:pverp)+vp2(:ncol,:pverp)+wp2(:ncol,:pverp))  !  turbulent kinetic energy
 
-   ! ------------------------------------------------- !
+   !--------------------------------
    ! relative liquid water variance
-   ! ------------------------------------------------- !
+   !--------------------------------
 #include "relvar.inc"
    ! input: rcm, qcvar, cloud_frac
    ! output:  relvar (in pbuf), relvarc (outfld)
-   ! ------------------------------------------------- !
-   ! Optional Accretion enhancement factor             !
-   ! ------------------------------------------------- !
+   !----------------------------------------
+   ! Optional Accretion enhancement factor
+   !----------------------------------------
     accre_enhan(:ncol,:pver) = micro_mg_accre_enhan_fac !default is 1._r8
 
-
-
-
+   !============================================
+   ! Detrainment of condensate from deep Cu
+   !============================================
 #include "detrain.inc"
 
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
@@ -1791,14 +1726,17 @@ end subroutine clubb_init_cnst
    end do
 
 
-
-
+   !======================================================================================
+   ! Some diagnostics from CLUBB
+   ! NOTE: a few variables diagnosed here are multiplied by rho which is calculated with
+   ! the updated T after detrainment, so moving the related lines would result in nonBFB
+   ! history output (although model integration should still be BFB).
+   !======================================================================================
 #include "clubb_misc_diag_and_outfld.inc"
 
-   call t_stopf('clubb_tend_cam_diag')
-
-   ! ------------------------------------------------------------ !
-   ! Diagnose various cloud fractions.
+   !===================================
+   ! Diagnose various cloud fractions
+   !===================================
    ! ATTENTION:
    !  - before this block of code, the variable cloud_frac
    !    contained the cloud fraction calculated by CLUBB;
@@ -1811,14 +1749,20 @@ end subroutine clubb_init_cnst
    ! ------------------------------------------------------------ !
 #include "cloud_frac_diags.inc"
 
-   ! ------------------------------------------------------------ !
+   !======================
    ! Diagnose PBL height          
-   ! ------------------------------------------------------------ !
+   !======================
 #include "pblh_diag.inc"
 
 
+   !============
+   ! Gustiness
+   !============
 #include "vmag_gust.inc"
 
+   !============================
+   ! Linearization of PBL winds
+   !============================
    if (linearize_pbl_winds .and. macmic_it == cld_macmic_num_steps) then
       do i = 1, ncol
          wsresp(i) = sfc_v_diff_tau(i) / pert_tau
@@ -1832,6 +1776,9 @@ end subroutine clubb_init_cnst
       end do
    end if
 
+   !=========
+   ! Output
+   !=========
 #include "clubb_outfld.inc"
 #include "clubb_stats_output.inc"
 
