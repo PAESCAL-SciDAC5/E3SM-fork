@@ -5,6 +5,9 @@
    ! --------------------------------------------------------------------------------- !
    invrs_gravit = 1._r8 / gravit
 
+   det_s(:)   = 0.0_r8
+   det_ice(:) = 0.0_r8
+
    !  Initialize the shallow convective detrainment rate, will always be zero
    dlf2(:,:) = 0.0_r8
 

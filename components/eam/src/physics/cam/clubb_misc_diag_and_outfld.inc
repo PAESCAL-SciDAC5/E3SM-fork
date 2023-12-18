@@ -1,3 +1,31 @@
+   call outfld( 'WP2_CLUBB',        wp2,                     pcols, lchnk )
+   call outfld( 'UP2_CLUBB',        up2,                     pcols, lchnk )
+   call outfld( 'VP2_CLUBB',        vp2,                     pcols, lchnk )
+
+   call outfld( 'UPWP_CLUBB',       upwp,                    pcols, lchnk )
+   call outfld( 'VPWP_CLUBB',       vpwp,                    pcols, lchnk )
+
+   tmp_array = rtp2(:ncol,:)*1000._r8
+   call outfld( 'RTP2_CLUBB',       tmp_array,               ncol,  lchnk )
+   call outfld( 'THLP2_CLUBB',      thlp2,                   pcols, lchnk )
+
+   tmp_array = rcm(:ncol,:)*1000._r8
+   call outfld( 'RCM_CLUBB',        tmp_array,               ncol,  lchnk )
+
+   tmp_array = wprcp(:ncol,:)*latvap
+   call outfld( 'WPRCP_CLUBB',      tmp_array,               ncol,  lchnk )
+
+   tmp_array = rcm_in_layer(:ncol,:)*1000._r8
+   call outfld( 'RCMINLAYER_CLUBB', tmp_array,               ncol,  lchnk )
+
+   tmp_array = 1._r8*zt_out(:ncol,:)
+   call outfld( 'ZT_CLUBB',         tmp_array,               ncol,  lchnk )
+
+   tmp_array = 1._r8*zi_out(:ncol,:)
+   call outfld( 'ZM_CLUBB',         tmp_array,               ncol,  lchnk )
+
+   call outfld( 'UM_CLUBB',         um,                      pcols, lchnk )
+   call outfld( 'VM_CLUBB',         vm,                      pcols, lchnk )
 
    ! ------------------------------------------------- !
    ! Diagnose some output variables                    !
@@ -6,6 +34,19 @@
    rho(:ncol,1:pver) = state1%pmid(:ncol,1:pver)/(rair*state1%t(:ncol,1:pver))
    rho(:ncol,pverp)  = state1%ps(:ncol)/(rair*state1%t(:ncol,pver))
    call outfld( 'RHO_CLUBB',        rho,                     pcols, lchnk )
+
+   ! ------------------------------------------------------------ !
+   ! Add constant to ghost point so that output is not corrupted
+   ! (Note that this is only done to k = pverp.)
+   ! ------------------------------------------------------------ !
+   if (clubb_do_adv) then
+      if (macmic_it .eq. cld_macmic_num_steps) then
+         wp3(:,pverp) = wp3(:,pverp) + wp3_const
+         rtpthlp(:,pverp) = rtpthlp(:,pverp) + rtpthlp_const
+         wpthlp(:,pverp) = wpthlp(:,pverp) + wpthlp_const
+         wprtp(:,pverp) = wprtp(:,pverp) + wprtp_const
+      endif
+   endif
 
    !-------------
    ! k = 1,pver
