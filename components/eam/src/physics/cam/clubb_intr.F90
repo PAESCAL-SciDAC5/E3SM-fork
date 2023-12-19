@@ -1329,7 +1329,7 @@ end subroutine clubb_init_cnst
    real(r8) :: pdf_zm_mixt_frac_inout(pverp)    ! work array for pdf_params_zm%mixt_frac
 
    ! Variables below are needed to compute energy integrals for conservation
-   real(r8) :: se_b, ke_b, wv_b, wl_b, te_b
+   real(r8) :: te_b
    real(r8) :: se_a, ke_a, wv_a, wl_a, te_a
    real(r8) :: enthalpy, se_dis, clubb_s(pver)
 
@@ -1587,7 +1587,11 @@ end subroutine clubb_init_cnst
    !----------------------------------------------------------
    do i=1,ncol   ! loop over columns
 
-#include "clubb_efix_bef.inc"
+      ! Calculate column total energy before CLUBB. The value is saved
+      ! for the energy fixer at the end of the column loop.
+ 
+      call column_total_energy( state1, cam_in, i, hdtime, &! in
+                                te_b                       )! out, scalar
 
       ! CLUBB can be substepped with respect to the host model's timestep hdtime.
       ! Determine the substepsize and number of substeps for CLUBB.
@@ -1600,16 +1604,12 @@ end subroutine clubb_init_cnst
 
 #include "clubb_tend_cam_1column.inc"
 
-#include "clubb_efix_aft.inc"
-         !------------------------------------------------------
-         ! input: thlm(i,:),rcm(i,:),enxner_clubb(i,:)
-         !        state1%zm(i,:), state1%phis(i),state1%pdel(i,:)
-         !        rtm(i,:), rcm(i,:) um(i,:), vm(i,:)
-         ! params: invrs_gravit, gravit
-         !
-         ! output: clubb_s(:)
-         !------------------------------------------------------
+      ! After advancing CLUBB in time, apply a total energy fixer by adjusting the
+      ! ending s (dry static energy).
 
+      call column_total_energy_fixer( te_b, thlm, rtm, rcm, exner_clubb, &! in
+                                      um, vm, wp2, state1, i,            &! in
+                                      clubb_s                            )! out
 #include "clubb_ptend_cal.inc"
 
    enddo  ! end column loop
@@ -2874,6 +2874,120 @@ end function diag_ustar
 
  end subroutine determine_clubb_dtime
 
+ subroutine column_total_energy( state1, cam_in, i, hdtime, te_b)
+
+   use physics_types, only: physics_state
+   use camsrfexch,    only: cam_in_t
+   use constituents,  only: cnst_get_ind
+
+   type(physics_state),intent(in) :: state1
+   type(cam_in_t),     intent(in) :: cam_in
+
+   integer, intent(in) :: i
+   real(r8),intent(in) :: hdtime
+
+   real(r8),intent(out) :: te_b
+
+   integer :: ixq, ixcldliq
+   integer :: k
+
+   real(r8) :: invrs_gravit, se_b, ke_b, wv_b, wl_b
+
+   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   ! Compute integrals of static energy, kinetic energy, water vapor, and liquid water
+   ! for the computation of total energy before CLUBB is called.  This is for an
+   ! effort to conserve energy since liquid water potential temperature (which CLUBB
+   ! conserves) and static energy (which CAM conserves) are not exactly equal.
+
+   call cnst_get_ind('Q',ixq)
+   call cnst_get_ind('CLDLIQ',ixcldliq)
+
+   invrs_gravit = 1._r8 / gravit
+
+   se_b = 0._r8  ! initialize vertical integrals
+   ke_b = 0._r8
+   wv_b = 0._r8
+   wl_b = 0._r8
+
+   do k=1,pver ! vertical integral
+      ! use s=c_pT+g*z, total energy needs term c_pT but not gz
+      se_b = se_b + (state1%s(i,k) - gravit*state1%zm(i,k) - state1%phis(i)) &
+                   *  state1%pdel(i,k)*invrs_gravit
+      ke_b = ke_b + 0.5_r8*(state1%u(i,k)**2+state1%v(i,k)**2)*state1%pdel(i,k)*invrs_gravit
+      wv_b = wv_b + state1%q(i,k,ixq)*state1%pdel(i,k)*invrs_gravit
+      wl_b = wl_b + state1%q(i,k,ixcldliq)*state1%pdel(i,k)*invrs_gravit
+   enddo
+
+   ! Total energy: sum up the components and also take into account the surface fluxes of heat and moisture
+   te_b = se_b + ke_b + (latvap+latice)*wv_b + latice*wl_b
+   te_b = te_b +(cam_in%shf(i)+(cam_in%cflx(i,1))*(latvap+latice))*hdtime
+   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  end subroutine column_total_energy
+
+  subroutine column_total_energy_fixer( te_b, thlm, rtm, rcm, exner_clubb, &! in
+                                        um, vm, wp2, state1, i,            &! in
+                                        clubb_s                            )! out
+
+   use physics_types, only: physics_state
+   type(physics_state),intent(in) :: state1
+   integer, intent(in)  :: i
+   real(r8),intent(in)  :: te_b
+   real(r8),intent(in)  :: thlm(:,:), rtm(:,:), rcm(:,:)
+   real(r8),intent(in)  :: exner_clubb(:,:), wp2(:,:)
+   real(r8),intent(in)  :: um(:,:), vm(:,:) 
+   real(r8),intent(out) :: clubb_s(pver)
+
+   real(r8) :: invrs_gravit, se_a, ke_a, wv_a, wl_a, enthalpy, te_a, se_dis
+
+   integer :: k, clubbtop
+    
+
+      invrs_gravit = 1._r8 / gravit
+
+      ! Compute integrals for static energy, kinetic energy, water vapor, and liquid water
+      ! after CLUBB is called.  This is for energy conservation purposes.
+
+
+      se_a = 0._r8
+      ke_a = 0._r8
+      wv_a = 0._r8
+      wl_a = 0._r8
+
+      do k=1,pver
+         enthalpy = cpair*((thlm(i,k)+(latvap/cpair)*rcm(i,k))/exner_clubb(i,k))
+         clubb_s(k) = enthalpy + gravit*state1%zm(i,k)+state1%phis(i)
+        !se_a = se_a + clubb_s(k)*state1%pdel(i,k)*invrs_gravit
+         se_a = se_a + enthalpy * state1%pdel(i,k)*invrs_gravit
+         ke_a = ke_a + 0.5_r8*(um(i,k)**2+vm(i,k)**2)*state1%pdel(i,k)*invrs_gravit
+         wv_a = wv_a + (rtm(i,k)-rcm(i,k))*state1%pdel(i,k)*invrs_gravit
+         wl_a = wl_a + (rcm(i,k))*state1%pdel(i,k)*invrs_gravit
+      enddo
+
+      ! Based on these integrals, compute the total energy before and after CLUBB call
+      ! TE as in Williamson2015, E= \int_{whole domain} (K+c_p*T) +
+      ! \int_{surface} p_s\phi_s (up to water forms), but we ignore surface term
+      ! under assumption that CLUBB does not change surface pressure
+      te_a = se_a + ke_a + (latvap+latice)*wv_a + latice*wl_a
+
+      ! Limit the energy fixer to find highest layer where CLUBB is active
+      ! Find first level where wp2 is higher than lowest threshold
+      clubbtop = 1
+      do while (wp2(i,clubbtop) .eq. w_tol_sqd .and. clubbtop .lt. pver-1)
+         clubbtop = clubbtop + 1
+      enddo
+
+      ! Compute the disbalance of total energy, over depth where CLUBB is active
+      se_dis = (te_a - te_b)/(state1%pint(i,pverp)-state1%pint(i,clubbtop))
+
+      ! Apply this fixer throughout the column evenly, but only at layers where
+      ! CLUBB is active.
+      do k=clubbtop,pver
+         clubb_s(k) = clubb_s(k) - se_dis*gravit
+      enddo
+
+ end subroutine column_total_energy_fixer
 
 #endif
+
 end module clubb_intr
