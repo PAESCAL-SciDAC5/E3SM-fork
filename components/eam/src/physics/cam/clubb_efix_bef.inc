@@ -5,6 +5,8 @@
       ! effort to conserve energy since liquid water potential temperature (which CLUBB
       ! conserves) and static energy (which CAM conserves) are not exactly equal.
 
+      invrs_gravit = 1._r8 / gravit
+
       se_b = 0._r8  ! initialize vertical integrals
       ke_b = 0._r8
       wv_b = 0._r8

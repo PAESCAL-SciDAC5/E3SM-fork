@@ -29,6 +29,7 @@ module clubb_intr
   use pbl_utils,     only: calc_ustar, calc_obklen
   use perf_mod,      only: t_startf, t_stopf
   use mpishorthand
+  use cam_abortutils,  only: endrun
   use cam_history_support, only: fillvalue
 #ifdef CLUBB_SGS
   use clubb_api_module, only: pdf_parameter, clubb_fatal_error, fstderr
@@ -1174,7 +1175,7 @@ end subroutine clubb_init_cnst
    type(physics_state) :: state1                ! Local copy of state variable
    type(physics_ptend) :: ptend_loc             ! Local tendency from processes, added up to return as ptend_all
 
-   integer :: i, j, k, t, ixind, nadv
+   integer :: i, j, k, t, ixind
    integer :: ixcldice, ixcldliq, ixnumliq, ixnumice, ixq
    integer :: itim_old
    integer :: ncol, lchnk                       ! # of columns, and chunk identifier
@@ -1182,6 +1183,8 @@ end subroutine clubb_init_cnst
    integer :: icnt, clubbtop
 
    real(r8) :: frac_limit, ic_limit
+
+   integer :: n_clubb_core_step
 
   !=====================================================================================
   ! The variables defined as core_rknd is required by the advance_clubb_core_api()
@@ -1285,7 +1288,7 @@ end subroutine clubb_init_cnst
    real(core_rknd), dimension(sclr_dim) :: sclr_tol     ! Tolerance on passive scalar       [units vary]
 
    real(core_rknd) :: dum_core_rknd                    ! dummy variable  [units vary]
-   real(core_rknd) :: hdtime_core_rknd                  ! host model time step in core_rknd
+   real(core_rknd) :: hdtime_core_rknd                 ! host model's cloud macmic timestep in core_rknd
 
    real(core_rknd), pointer :: upwp_sfc_pert    ! u'w' at surface                               [m^2/s^2]
    real(core_rknd), pointer :: vpwp_sfc_pert    ! v'w' at surface                               [m^2/s^2]
@@ -1559,12 +1562,12 @@ end subroutine clubb_init_cnst
    !==========================
    ! CLUBB
    !==========================
-   ! Load input (initial and boundary conditions) from host model's data structures
+   ! Initialize ptend for CLUBB
 
-!-------------------------------------------------------------
-#include "clubb_stepsize.inc"
-! input: clubb_timestep, hdtime, core_rknd
-! output: dtime, nadv
+   call physics_ptend_init(ptend_loc, state1%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
+
+
+! Load input (initial and boundary conditions) from host model's data structures
 !-------------------------------------------------------------
 #include "clubb_timestep_init_mean_state.inc"
 ! input: u, v, qv, ql, t, pmid
@@ -1577,10 +1580,6 @@ end subroutine clubb_init_cnst
 #include "clubb_timestep_init_forcing_and_boundary.inc"
 #include "clubb_misc_inout_fields.inc"
 
-   !-------------------------------
-   ! Initialize ptend for CLUBB
-   !-------------------------------
-   call physics_ptend_init(ptend_loc, state1%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
 
    call t_startf('adv_clubb_core_col_loop')
    !----------------------------------------------------------
@@ -1588,10 +1587,19 @@ end subroutine clubb_init_cnst
    !----------------------------------------------------------
    do i=1,ncol   ! loop over columns
 
-      invrs_gravit = 1._r8 / gravit
-
 #include "clubb_efix_bef.inc"
+
+      ! CLUBB can be substepped with respect to the host model's timestep hdtime.
+      ! Determine the substepsize and number of substeps for CLUBB.
+      ! Note that in the standard EAM which uses the same vertical grid for all processes,
+      ! this call only needs to be done once at the beginning of an integration.
+      ! But we place the call here (meaning repeating the calculation every timestep and
+      ! in each grid column), as we are preparing for the implementation of AMR.
+
+      call determine_clubb_dtime( hdtime, clubb_timestep, hdtime_core_rknd, dtime, n_clubb_core_step ) ! 2xin, 3xout
+
 #include "clubb_tend_cam_1column.inc"
+
 #include "clubb_efix_aft.inc"
          !------------------------------------------------------
          ! input: thlm(i,:),rcm(i,:),enxner_clubb(i,:)
@@ -2810,6 +2818,62 @@ end function diag_ustar
 
   end subroutine stats_avg
 
-#endif
 
+  subroutine determine_clubb_dtime( hdtime, clubb_timestep_in, hdtime_core_rknd, dtime_core_rknd, n_clubb_core_step)
+
+   real(r8),intent(in) :: hdtime              ! host model's cloud macmic timestep
+   real(r8),intent(in) :: clubb_timestep_in   ! clubb timestep specified via namelist
+
+   real(core_rknd),intent(out) :: hdtime_core_rknd   ! host model's cloud macmic timestep in core_rknd
+   real(core_rknd),intent(out) :: dtime_core_rknd    ! clubb timestep after adjustments (if needed), in core_rknd
+   integer,        intent(out) :: n_clubb_core_step  ! number of clubb timesteps per host model's cloud macmic timestep
+
+
+   !  Determine CLUBB time step and make it sub-step friendly
+   !  For now we want CLUBB time step to be 5 min since that is
+   !  what has been scientifically validated.  However, there are certain
+   !  instances when a 5 min time step will not be possible (based on
+   !  host model time step or on macro-micro sub-stepping
+
+    dtime_core_rknd = clubb_timestep_in
+   hdtime_core_rknd = real(hdtime, kind = core_rknd)
+
+   !  Now check to see if dtime is greater than the host model
+   !    (or sub stepped) time step.  If it is, then simply
+   !    set it equal to the host (or sub step) time step.
+   !    This section is mostly to deal with small host model
+   !    time steps (or small sub-steps)
+
+   if (dtime_core_rknd .gt. hdtime_core_rknd) then
+     dtime_core_rknd = hdtime_core_rknd
+   endif
+
+   !  Now check to see if CLUBB time step divides evenly into
+   !    the host model time step.  If not, force it to divide evenly.
+   !    We also want it to be 5 minutes or less.  This section is
+   !    mainly for host model time steps that are not evenly divisible
+   !    by 5 minutes
+
+   if (mod(hdtime_core_rknd,dtime_core_rknd) .ne. 0) then
+     dtime_core_rknd = hdtime_core_rknd/2._core_rknd
+     do while (dtime_core_rknd .gt. 300._core_rknd)
+       dtime_core_rknd = dtime_core_rknd/2._core_rknd
+     end do
+   endif
+
+   !  If resulting host model time step and CLUBB time step do not divide evenly
+   !    into each other, have model throw a fit.
+
+   if (mod(hdtime_core_rknd,dtime_core_rknd) .ne. 0) then
+     call endrun('clubb_tend_cam:  CLUBB time step and HOST time step NOT compatible'//errmsg(__FILE__,__LINE__))
+   endif
+
+   !  determine number of timesteps CLUBB core should be advanced,
+   !  host time step divided by CLUBB time step
+   n_clubb_core_step = max(hdtime_core_rknd/dtime_core_rknd,1._core_rknd)
+
+ end subroutine determine_clubb_dtime
+
+
+#endif
 end module clubb_intr

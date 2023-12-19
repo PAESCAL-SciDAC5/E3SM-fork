@@ -1,4 +1,5 @@
-
+      invrs_gravit = 1._r8 / gravit
+ 
       !------------------------------------------------------------------------------
       !  Set time_elapsed to host model time step, this is for CLUBB's budget stats
       !------------------------------------------------------------------------------
@@ -358,7 +359,7 @@
       end if
 
       call t_startf('adv_clubb_core_ts_loop')
-      do t=1,nadv    ! do needed number of "sub" timesteps for each CAM step
+      do t=1,n_clubb_core_step    ! do needed number of "sub" timesteps for each CAM step
 
          !  Increment the statistics then being stats timestep
          if (l_stats) then

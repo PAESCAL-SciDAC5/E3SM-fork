@@ -2,6 +2,8 @@
       ! Compute integrals for static energy, kinetic energy, water vapor, and liquid water
       ! after CLUBB is called.  This is for energy conservation purposes.
 
+      invrs_gravit = 1._r8 / gravit
+
       se_a = 0._r8
       ke_a = 0._r8
       wv_a = 0._r8
