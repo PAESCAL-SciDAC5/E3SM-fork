@@ -130,7 +130,6 @@ module clubb_intr
   logical            :: do_tms
   logical            :: linearize_pbl_winds
   logical            :: lq(pcnst)
-  logical            :: lq2(pcnst)
   logical            :: prog_modal_aero
   logical            :: do_rainturb
   logical            :: do_expldiff
@@ -1101,7 +1100,8 @@ end subroutine clubb_init_cnst
    use cldfrc2m,                  only: aist_vector
    use cam_history,               only: outfld
    use trb_mtn_stress,            only: compute_tms
-   use macrop_driver,             only: ice_macro_tend
+  !use macrop_driver,             only: ice_macro_tend
+   use macrop_driver_with_clubb,  only: ice_supersat_adj_tend
 
    use parameters_tunable,        only: mu
    use clubb_api_module, only: &
@@ -1358,9 +1358,11 @@ end subroutine clubb_init_cnst
    real(r8) :: dummy2(pcols)                    ! dummy variable                                [units vary]
    real(r8) :: dummy3(pcols)                    ! dummy variable                                [units vary]
    real(r8) :: kinheat(pcols)                   ! Kinematic Surface heat flux                   [K m/s]
+
    real(r8) :: ksrftms(pcols)                   ! Turbulent mountain stress surface drag        [kg/s/m2]
    real(r8) :: tautmsx(pcols)                   ! U component of turbulent mountain stress      [N/m2]
    real(r8) :: tautmsy(pcols)                   ! V component of turbulent mountain stress      [N/m2]
+
    real(r8) :: rrho                             ! Inverse of air density                        [1/kg/m^3]
    real(r8) :: kinwat(pcols)                    ! Kinematic water vapor flux                    [m/s]
    real(r8) :: latsub
@@ -1444,17 +1446,13 @@ end subroutine clubb_init_cnst
    type(pdf_parameter), pointer :: pdf_params    ! PDF parameters (thermo. levs.) [units vary]
    type(pdf_parameter), pointer :: pdf_params_zm ! PDF parameters on momentum levs. [units vary]
 
-   real(r8), pointer, dimension(:,:) :: naai
+  !real(r8), pointer, dimension(:,:) :: naai
    real(r8), pointer, dimension(:,:) :: prer_evap
    real(r8), pointer, dimension(:,:) :: qrl
    real(r8), pointer, dimension(:,:) :: radf_clubb
 !PMA
    real(r8)  relvarc(pcols,pver)
-   real(r8)  stend(pcols,pver)
-   real(r8)  qvtend(pcols,pver)
-   real(r8)  qitend(pcols,pver)
-   real(r8)  initend(pcols,pver)
-   logical            :: lqice(pcnst)
+   logical :: lqice(pcnst)  ! det
    integer :: ktopi(pcols)
 
    integer :: ixorg
@@ -1493,48 +1491,62 @@ end subroutine clubb_init_cnst
 
 #ifdef CLUBB_SGS
 
-   !--------------------------------------------------------------------------------
+   !===================================
+   ! Initialize derived-type variables 
+   !===================================
    !  Copy the state to state1 array to use in this routine;
    !  Determine number of columns and which chunk computation is to be performed on
-   !--------------------------------------------------------------------------------
+
    call physics_state_copy(state,state1)
 
     ncol = state1%ncol
    lchnk = state1%lchnk
 
-   !-----------------------------------------------------
    ! Initialize physics tendency arrays for "all"
-   !-----------------------------------------------------
-   if (micro_do_icesupersat) then ! This is .false. in default EAM
-     call physics_ptend_init(ptend_all, state1%psetcols, 'clubb_ice2')
-   else
-     call physics_ptend_init(ptend_all, state1%psetcols, 'clubb_ice4')
-   endif
 
-   !---------------------------
-   ! Turbulent mountain stress
-   !---------------------------
-    if ( do_tms) then
-       call t_startf('compute_tms')
-       call compute_tms( pcols,        pver,      ncol,                   &! in
-                         state1%u,     state1%v,  state1%t,  state1%pmid, &! in
-                         state1%exner, state1%zm, sgh30,                  &! in
-                         ksrftms,      tautmsx,   tautmsy,                &! out
-                         cam_in%landfrac                                  )! in
-       call t_stopf('compute_tms')
-    endif
+   call physics_ptend_init(ptend_all, state1%psetcols, 'macrop_driver_with_clubb')
 
    !  Determine time step of physics buffer
 
    itim_old = pbuf_old_tim_idx()
 
-   !  Establish associations between pointers and physics buffer fields
+   !===========================
+   ! Ice Saturation Adjustment
+   !===========================
+   if (micro_do_icesupersat) then  ! This is .false. in default EAM
+      call ice_supersat_adj_tend(state1,pbuf,hdtime,ptend_loc)  ! in, in, in, out
+      call physics_ptend_sum(ptend_loc, ptend_all, ncol)        ! Add the ice tendency to the output tendency
+      call physics_update(state1, ptend_loc, hdtime)            ! Update state1. ptend_loc is reset to zero by this call
+   endif
 
+   !===========================
+   ! Turbulent mountain stress
+   !===========================
+    if ( do_tms) then
+       call t_startf('compute_tms')
+       call compute_tms( pcols,        pver,      ncol,     &! in
+                         state1%u,     state1%v,  state1%t, &! in
+                         state1%pmid,  state1%exner,        &! in 
+                         state1%zm,    sgh30,               &! in
+                         ksrftms,                           &! out. Used below for deriving input to CLUBB
+                         tautmsx,   tautmsy,                &! out. Used below for outfld
+                         cam_in%landfrac                    )! in
+       call t_stopf('compute_tms')
+
+      !Hui Wan note 2023-12: the following lines should be added? I don't see the outfld calls elsewhere.
+      !call outfld( 'TAUTMSX'  , tautmsx, pcols, lchnk )
+      !call outfld( 'TAUTMSY'  , tautmsy, pcols, lchnk )
+    endif
+
+
+   !===========================
    if (linearize_pbl_winds) then
       call pbuf_get_field(pbuf, um_pert_idx, um_pert, start=(/1,1/),          kount=(/pcols,pverp/))
       call pbuf_get_field(pbuf, vm_pert_idx, vm_pert, start=(/1,1/),          kount=(/pcols,pverp/))
       call pbuf_get_field(pbuf, upwp_pert_idx,upwp_pert,start=(/1,1/),        kount=(/pcols,pverp/))
       call pbuf_get_field(pbuf, vpwp_pert_idx,vpwp_pert,start=(/1,1/),        kount=(/pcols,pverp/))
+      call pbuf_get_field(pbuf, wsresp_idx, wsresp)
+      call pbuf_get_field(pbuf, tau_est_idx, tau_est)
    else
       nullify(um_pert)
       nullify(vm_pert)
@@ -1543,23 +1555,6 @@ end subroutine clubb_init_cnst
    end if
 
    call pbuf_get_field(pbuf, cloud_frac_idx, cloud_frac, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-
-   if (linearize_pbl_winds) then
-      call pbuf_get_field(pbuf, wsresp_idx, wsresp)
-      call pbuf_get_field(pbuf, tau_est_idx, tau_est)
-   end if
-
-
-   !============================================
-   ! Ice Saturation Adjustment; update state1
-   !============================================
-   if (micro_do_icesupersat) then  ! This is .false. in default EAM
-     ! Init a ptend_loc with the label "iceadj"; call ice_macro_tend;
-     ! then call physics_update for state1; add ptend_loc to ptend_all
-#include "ice_macro.inc"
-     ! Later, before do_tms and before the column loops for calling advance_clubb_core, there is
-     ! a call physics_ptend_init with the label 'clubb_ice3' that is used to store CLUBB's tend.
-   endif
 
    !==========================
    ! CLUBB
@@ -1585,11 +1580,7 @@ end subroutine clubb_init_cnst
    !-------------------------------
    ! Initialize ptend for CLUBB
    !-------------------------------
-   if (micro_do_icesupersat) then
-     call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_ice3', ls=.true., lu=.true., lv=.true., lq=lq)
-   else
-     call physics_ptend_init(ptend_loc, state1%psetcols, 'clubb_ice1', ls=.true., lu=.true., lv=.true., lq=lq)
-   endif
+   call physics_ptend_init(ptend_loc, state1%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
 
    call t_startf('adv_clubb_core_col_loop')
    !----------------------------------------------------------
@@ -1600,9 +1591,7 @@ end subroutine clubb_init_cnst
       invrs_gravit = 1._r8 / gravit
 
 #include "clubb_efix_bef.inc"
-
 #include "clubb_tend_cam_1column.inc"
-
 #include "clubb_efix_aft.inc"
          !------------------------------------------------------
          ! input: thlm(i,:),rcm(i,:),enxner_clubb(i,:)
