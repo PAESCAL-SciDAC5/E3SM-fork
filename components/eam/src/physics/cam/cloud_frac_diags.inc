@@ -128,6 +128,7 @@
          cloud_frac(i,k) = min(ast(i,k)+deepcu(i,k),1.0_r8)
       enddo
    enddo
+   call outfld( 'CLOUDCOVER_CLUBB', cloud_frac, pcols, lchnk )
 
    ! Assign the first pver levels of cloud_frac back to cld
 

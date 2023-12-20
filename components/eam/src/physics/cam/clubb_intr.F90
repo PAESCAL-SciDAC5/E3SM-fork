@@ -1732,7 +1732,6 @@ end subroutine clubb_init_cnst
    !=========
    ! Output
    !=========
-#include "clubb_outfld.inc"
 #include "clubb_stats_output.inc"
 
    return

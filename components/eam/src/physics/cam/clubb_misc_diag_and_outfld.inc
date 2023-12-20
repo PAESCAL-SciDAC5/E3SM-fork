@@ -1,3 +1,5 @@
+   call outfld( 'CLOUDFRAC_CLUBB',  cloud_frac,              pcols, lchnk )
+
    call outfld( 'WP2_CLUBB',        wp2,                     pcols, lchnk )
    call outfld( 'UP2_CLUBB',        up2,                     pcols, lchnk )
    call outfld( 'VP2_CLUBB',        vp2,                     pcols, lchnk )
