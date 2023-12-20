@@ -1095,14 +1095,14 @@ end subroutine clubb_init_cnst
    use micro_mg_cam,   only: micro_mg_version
 
 #ifdef CLUBB_SGS
-   use hb_diff,                   only: pblintd
+
    use scamMOD,                   only: single_column,scm_clubb_iop_name
    use phys_grid,                 only: get_gcol_p
    use cldfrc2m,                  only: aist_vector
    use cam_history,               only: outfld
    use trb_mtn_stress,            only: compute_tms
-  !use macrop_driver,             only: ice_macro_tend
    use macrop_driver_with_clubb,  only: ice_supersat_adj_tend
+   use macrop_driver_with_clubb,  only: pblh_diag
 
    use parameters_tunable,        only: mu
    use clubb_api_module, only: &
@@ -1330,8 +1330,7 @@ end subroutine clubb_init_cnst
 
    ! Variables below are needed to compute energy integrals for conservation
    real(r8) :: te_b
-   real(r8) :: se_a, ke_a, wv_a, wl_a, te_a
-   real(r8) :: enthalpy, se_dis, clubb_s(pver)
+   real(r8) :: clubb_s(pver)
 
    real(r8) :: exner_clubb(pcols,pverp)         ! Exner function consistent with CLUBB          [-]
    real(r8) :: wpthlp_output(pcols,pverp)       ! Heat flux output variable                     [W/m2]
@@ -1341,7 +1340,6 @@ end subroutine clubb_init_cnst
    real(r8) :: qt_output(pcols,pver)            ! Total water mixing ratio for output           [kg/kg]
    real(r8) :: thetal_output(pcols,pver)        ! Liquid water potential temperature output     [K]
    real(r8) :: sl_output(pcols,pver)            ! Liquid water static energy                    [J/kg]
-   real(r8) :: ustar2(pcols)                    ! Surface stress for PBL height                 [m2/s2]
    real(r8) :: rho(pcols,pverp)                 ! Midpoint density in CAM                       [kg/m^3]
    real(r8) :: thv(pcols,pver)                        ! virtual potential temperature                 [K]
    real(r8) :: thv1d(pver)
@@ -1355,19 +1353,11 @@ end subroutine clubb_init_cnst
    real(r8) :: dlf2(pcols,pver)                 ! Detraining cld H20 from shallow convection    [kg/kg/day]
    real(r8) :: eps                              ! Rv/Rd                                         [-]
    real(r8) :: dum1                             ! dummy variable                                [units vary]
-   real(r8) :: obklen(pcols)                    ! Obukov length                                 [m]
-   real(r8) :: kbfs(pcols)                      ! Kinematic Surface heat flux                   [K m/s]
-   real(r8) :: th(pcols,pver)                   ! potential temperature                         [K]
-   real(r8) :: dummy2(pcols)                    ! dummy variable                                [units vary]
-   real(r8) :: dummy3(pcols)                    ! dummy variable                                [units vary]
-   real(r8) :: kinheat(pcols)                   ! Kinematic Surface heat flux                   [K m/s]
 
    real(r8) :: ksrftms(pcols)                   ! Turbulent mountain stress surface drag        [kg/s/m2]
    real(r8) :: tautmsx(pcols)                   ! U component of turbulent mountain stress      [N/m2]
    real(r8) :: tautmsy(pcols)                   ! V component of turbulent mountain stress      [N/m2]
 
-   real(r8) :: rrho                             ! Inverse of air density                        [1/kg/m^3]
-   real(r8) :: kinwat(pcols)                    ! Kinematic water vapor flux                    [m/s]
    real(r8) :: latsub
 
    integer  :: ktop(pcols,pver)
@@ -1700,11 +1690,13 @@ end subroutine clubb_init_cnst
 #include "cloud_frac_diags.inc"
 
    !======================
-   ! Diagnose PBL height          
+   ! Diagnose PBL height
    !======================
+   call t_startf('pbl_depth_diag')
    call pbuf_get_field(pbuf, pblh_idx,    pblh)
-
-#include "pblh_diag.inc"
+   call pblh_diag( state1, cam_in, cloud_frac, dz_g(pver), use_sgv, pblh ) ! 5xin, 1xout
+   call outfld('PBLH', pblh, pcols, lchnk)
+   call t_stopf('pbl_depth_diag')
 
    !============
    ! Gustiness

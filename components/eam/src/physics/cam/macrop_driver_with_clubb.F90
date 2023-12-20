@@ -6,8 +6,12 @@ module macrop_driver_with_clubb
   use ppgrid,        only: pver, pcols
   use constituents,  only: pcnst
 
+  implicit none
+
   private
   public :: ice_supersat_adj_tend
+  public :: pblh_diag
+
 
 contains
 
@@ -20,7 +24,7 @@ contains
                               physics_state_copy, physics_ptend_init
     use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
     use constituents,   only: cnst_get_ind
-    use physconst,      only: latvap, latice
+    use physconst,      only: latvap, latice, cpair
     use ref_pres,       only: top_lev => trop_cloud_top_lev
     use macrop_driver,  only: ice_macro_tend
 
@@ -32,7 +36,7 @@ contains
 
     integer :: ncol, lchnk
     logical :: lq2(pcnst)
-    integer :: ixcldice, ixnumliq
+    integer :: ixcldice, ixnumice
     real(r8) :: latsub
 
     real(r8)  stend(pcols,pver)
@@ -46,7 +50,7 @@ contains
      lchnk = state1%lchnk
 
      call cnst_get_ind('CLDICE',ixcldice)
-     call cnst_get_ind('NUMLIQ',ixnumliq)
+     call cnst_get_ind('NUMICE',ixnumice)
 
      lq2(:)  = .FALSE.
      lq2(1)  = .TRUE.
@@ -86,5 +90,86 @@ contains
      call outfld( 'NITENDICE', initend, pcols, lchnk )
 
   end subroutine ice_supersat_adj_tend
+
+
+  subroutine pblh_diag( state1, cam_in, cloud_frac, dz_g_bot, use_sgv, pblh )
+
+   use physconst,      only: gravit,zvir
+   use physics_types,  only: physics_state
+   use camsrfexch,     only: cam_in_t
+   use constituents,   only: cnst_get_ind
+
+   use pbl_utils,      only: calc_ustar, calc_obklen
+   use hb_diff,        only: pblintd 
+
+   type(physics_state),intent(in)  :: state1
+   type(cam_in_t),     intent(in)  :: cam_in
+   real(r8),           intent(in)  :: cloud_frac(:,:)
+   real(r8),           intent(in)  :: dz_g_bot
+   logical,            intent(in)  :: use_sgv
+   real(r8),           intent(out) :: pblh(:)
+
+   real(r8) :: th(pcols,pver)   ! potential temperature                         [K]
+   real(r8) :: thv(pcols,pver)  ! virtual potential temperature                 [K]
+   real(r8) :: ustar2(pcols)    ! Surface stress for PBL height                 [m2/s2]
+
+   real(r8) :: invrs_gravit
+   real(r8) :: rrho             ! Inverse of air density                        [1/kg/m^3]
+
+   real(r8) :: kinheat(pcols)   ! Kinematic Surface heat flux                   [K m/s]
+   real(r8) ::  kinwat(pcols)   ! Kinematic water vapor flux                    [m/s]
+   real(r8) ::    kbfs(pcols)   ! Kinematic Surface heat flux                   [K m/s]
+   real(r8) ::  obklen(pcols)   ! Obukov length                                 [m]
+   real(r8) ::  dummy2(pcols)   ! dummy variable
+   real(r8) ::  dummy3(pcols)   ! dummy variable
+
+   integer :: ixcldliq, ixq
+   integer :: i,k, ncol
+   
+   call cnst_get_ind('Q',ixq)
+   call cnst_get_ind('CLDLIQ',ixcldliq)
+
+   ncol = state1%ncol
+ 
+   ! --------------------------------------------------------------------------------- !
+   !  DIAGNOSE THE PBL DEPTH                                                           !
+   !  this is needed for aerosol code                                                  !
+   ! --------------------------------------------------------------------------------- !
+
+   do i=1,ncol
+      do k=1,pver
+         th(i,k) = state1%t(i,k)*state1%exner(i,k)
+         if (use_sgv) then
+           thv(i,k) = th(i,k)*(1.0_r8+zvir*state1%q(i,k,ixq) &
+                    - state1%q(i,k,ixcldliq))  !PMA corrects thv formula
+         else
+           thv(i,k) = th(i,k)*(1.0_r8+zvir*state1%q(i,k,ixq))
+         end if
+      enddo
+   enddo
+
+   ! diagnose surface friction and obukhov length (inputs to diagnose PBL depth)
+
+   invrs_gravit = 1._r8 / gravit
+
+   do i=1,ncol
+      rrho = invrs_gravit*(state1%pdel(i,pver)/dz_g_bot)
+      call calc_ustar( state1%t(i,pver), state1%pmid(i,pver), cam_in%wsx(i), cam_in%wsy(i), &
+                       rrho, ustar2(i) )
+      call calc_obklen( th(i,pver), thv(i,pver), cam_in%cflx(i,1), cam_in%shf(i), rrho, ustar2(i), &
+                        kinheat(i), kinwat(i), kbfs(i), obklen(i) )
+   enddo
+
+   dummy2(:) = 0._r8
+   dummy3(:) = 0._r8
+
+   where (kbfs .eq. -0.0_r8) kbfs = 0.0_r8
+
+   !  Compute PBL depth according to Holtslag-Boville Scheme
+   call pblintd(ncol, thv, state1%zm, state1%u, state1%v, &
+                ustar2, obklen, kbfs, pblh, dummy2, &
+                state1%zi, cloud_frac(:,1:pver), 1._r8-cam_in%landfrac, dummy3)
+
+  end subroutine pblh_diag
 
 end module macrop_driver_with_clubb
