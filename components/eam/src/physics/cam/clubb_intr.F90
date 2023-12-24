@@ -1535,22 +1535,6 @@ end subroutine clubb_init_cnst
       !call outfld( 'TAUTMSY'  , tautmsy, pcols, lchnk )
     endif
 
-
-   !===========================
-   if (linearize_pbl_winds) then
-      call pbuf_get_field(pbuf, um_pert_idx, um_pert, start=(/1,1/),          kount=(/pcols,pverp/))
-      call pbuf_get_field(pbuf, vm_pert_idx, vm_pert, start=(/1,1/),          kount=(/pcols,pverp/))
-      call pbuf_get_field(pbuf, upwp_pert_idx,upwp_pert,start=(/1,1/),        kount=(/pcols,pverp/))
-      call pbuf_get_field(pbuf, vpwp_pert_idx,vpwp_pert,start=(/1,1/),        kount=(/pcols,pverp/))
-      call pbuf_get_field(pbuf, wsresp_idx, wsresp)
-      call pbuf_get_field(pbuf, tau_est_idx, tau_est)
-   else
-      nullify(um_pert)
-      nullify(vm_pert)
-      nullify(upwp_pert)
-      nullify(vpwp_pert)
-   end if
-
    call pbuf_get_field(pbuf, cloud_frac_idx, cloud_frac, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
 
    !==========================
@@ -1559,7 +1543,6 @@ end subroutine clubb_init_cnst
    ! Initialize ptend for CLUBB
 
    call physics_ptend_init(ptend_loc, state1%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
-
 
 ! Load input (initial and boundary conditions) from host model's data structures
 !-------------------------------------------------------------
@@ -1609,6 +1592,40 @@ end subroutine clubb_init_cnst
    enddo  ! end column loop
    call t_stopf('adv_clubb_core_col_loop')
 
+   ! ------------------------------------------------------------ !
+   ! Add constant to ghost point so that output is not corrupted
+   ! (Note that this is only done to k = pverp.)
+   ! ------------------------------------------------------------ !
+   if (clubb_do_adv) then
+      if (macmic_it .eq. cld_macmic_num_steps) then
+         wp3(:,pverp) = wp3(:,pverp) + wp3_const
+         rtpthlp(:,pverp) = rtpthlp(:,pverp) + rtpthlp_const
+         wpthlp(:,pverp) = wpthlp(:,pverp) + wpthlp_const
+         wprtp(:,pverp) = wprtp(:,pverp) + wprtp_const
+      endif
+   endif
+
+   !============================
+   ! Linearization of PBL winds
+   !============================
+   if (linearize_pbl_winds .and. macmic_it == cld_macmic_num_steps) then
+      do i = 1, ncol
+         wsresp(i) = sfc_v_diff_tau(i) / pert_tau
+         ! Estimated tau in balance with wind is the tau we just used.
+         if (cam_in%wsx(i) == 0._r8 .or. cam_in%wsy(i) == 0._r8) then
+            ! Work around an odd FPE issue with intel compiler.
+            tau_est(i) = abs(cam_in%wsx(i)) + abs(cam_in%wsy(i))
+         else
+            tau_est(i) = hypot(cam_in%wsx(i), cam_in%wsy(i))
+         end if
+      end do
+   end if
+
+   !=========
+   ! Output
+   !=========
+#include "clubb_stats_output.inc"
+
    ! ------------------------------------------------- !
    ! End column computation of CLUBB, begin to apply   !
    ! and compute output, etc                           !
@@ -1635,24 +1652,6 @@ end subroutine clubb_init_cnst
    ! The rest of the code deals with diagnosing variables         !
    ! for microphysics/radiation computation and macrophysics      !
    ! ------------------------------------------------------------ !
-   !------
-   ! TKE
-   !------
-   call pbuf_get_field(pbuf, tke_idx,     tke)
-   tke(1:ncol,1:pverp) = 0.5_r8*(up2(:ncol,:pverp)+vp2(:ncol,:pverp)+wp2(:ncol,:pverp))  !  turbulent kinetic energy
-
-   !--------------------------------
-   ! relative liquid water variance
-   !--------------------------------
-#include "relvar.inc"
-   ! input: rcm, qcvar, cloud_frac
-   ! output:  relvar (in pbuf), relvarc (outfld)
-   !----------------------------------------
-   ! Optional Accretion enhancement factor
-   !----------------------------------------
-   call pbuf_get_field(pbuf, accre_enhan_idx, accre_enhan)
-    accre_enhan(:ncol,:pver) = micro_mg_accre_enhan_fac !default is 1._r8
-
    !============================================
    ! Detrainment of condensate from deep Cu
    !============================================
@@ -1676,6 +1675,7 @@ end subroutine clubb_init_cnst
    ! the updated T after detrainment, so moving the related lines would result in nonBFB
    ! history output (although model integration should still be BFB).
    !======================================================================================
+
 #include "clubb_misc_diag_and_outfld.inc"
 
    !===================================
@@ -1705,39 +1705,18 @@ end subroutine clubb_init_cnst
    !============
    ! Gustiness
    !============
-!#include "vmag_gust.inc"
-
    call pbuf_get_field(pbuf, prec_dp_idx,   prec_dp)
    call pbuf_get_field(pbuf, snow_dp_idx,   snow_dp)
    call pbuf_get_field(pbuf, vmag_gust_idx, vmag_gust)
    call pbuf_get_field(pbuf, tpert_idx,     tpert)
 
-   call gustiness( use_sgv, state1, cam_in, up2(:,pver), vp2(:,pver), prec_dp, snow_dp, pblh, thlp2, &!in
-                   vmag_gust, tpert )! out
-
-   !============================
-   ! Linearization of PBL winds
-   !============================
-   if (linearize_pbl_winds .and. macmic_it == cld_macmic_num_steps) then
-      do i = 1, ncol
-         wsresp(i) = sfc_v_diff_tau(i) / pert_tau
-         ! Estimated tau in balance with wind is the tau we just used.
-         if (cam_in%wsx(i) == 0._r8 .or. cam_in%wsy(i) == 0._r8) then
-            ! Work around an odd FPE issue with intel compiler.
-            tau_est(i) = abs(cam_in%wsx(i)) + abs(cam_in%wsy(i))
-         else
-            tau_est(i) = hypot(cam_in%wsx(i), cam_in%wsy(i))
-         end if
-      end do
-   end if
-
-   !=========
-   ! Output
-   !=========
-#include "clubb_stats_output.inc"
+   call gustiness( use_sgv, state1, cam_in, up2(:,pver), vp2(:,pver), &! in
+                   prec_dp, snow_dp, pblh, thlp2,                     &! in
+                   vmag_gust, tpert                                   )! out
 
    return
 #endif
+
   end subroutine clubb_tend_cam
 
   ! =============================================================================== !

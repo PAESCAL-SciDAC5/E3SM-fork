@@ -1,5 +1,25 @@
-   call outfld( 'CLOUDFRAC_CLUBB',  cloud_frac,              pcols, lchnk )
+   !------
+   ! TKE
+   !------
+   call pbuf_get_field(pbuf, tke_idx,     tke)
+   tke(1:ncol,1:pverp) = 0.5_r8*(up2(:ncol,:pverp)+vp2(:ncol,:pverp)+wp2(:ncol,:pverp))  !  turbulent kinetic energy
 
+   !--------------------------------
+   ! relative liquid water variance
+   !--------------------------------
+#include "relvar.inc"
+   ! input: rcm, qcvar, cloud_frac
+   ! output:  relvar (in pbuf), relvarc (outfld)
+   !----------------------------------------
+   ! Optional Accretion enhancement factor
+   !----------------------------------------
+   call pbuf_get_field(pbuf, accre_enhan_idx, accre_enhan)
+    accre_enhan(:ncol,:pver) = micro_mg_accre_enhan_fac !default is 1._r8
+
+
+
+
+   call outfld( 'CLOUDFRAC_CLUBB',  cloud_frac,              pcols, lchnk )
    call outfld( 'WP2_CLUBB',        wp2,                     pcols, lchnk )
    call outfld( 'UP2_CLUBB',        up2,                     pcols, lchnk )
    call outfld( 'VP2_CLUBB',        vp2,                     pcols, lchnk )
@@ -36,19 +56,6 @@
    rho(:ncol,1:pver) = state1%pmid(:ncol,1:pver)/(rair*state1%t(:ncol,1:pver))
    rho(:ncol,pverp)  = state1%ps(:ncol)/(rair*state1%t(:ncol,pver))
    call outfld( 'RHO_CLUBB',        rho,                     pcols, lchnk )
-
-   ! ------------------------------------------------------------ !
-   ! Add constant to ghost point so that output is not corrupted
-   ! (Note that this is only done to k = pverp.)
-   ! ------------------------------------------------------------ !
-   if (clubb_do_adv) then
-      if (macmic_it .eq. cld_macmic_num_steps) then
-         wp3(:,pverp) = wp3(:,pverp) + wp3_const
-         rtpthlp(:,pverp) = rtpthlp(:,pverp) + rtpthlp_const
-         wpthlp(:,pverp) = wpthlp(:,pverp) + wpthlp_const
-         wprtp(:,pverp) = wprtp(:,pverp) + wprtp_const
-      endif
-   endif
 
    !-------------
    ! k = 1,pver
