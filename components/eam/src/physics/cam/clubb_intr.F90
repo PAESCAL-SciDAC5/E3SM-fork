@@ -1103,6 +1103,7 @@ end subroutine clubb_init_cnst
    use trb_mtn_stress,            only: compute_tms
    use macrop_driver_with_clubb,  only: ice_supersat_adj_tend
    use macrop_driver_with_clubb,  only: pblh_diag
+   use macrop_driver_with_clubb,  only: gustiness
 
    use parameters_tunable,        only: mu
    use clubb_api_module, only: &
@@ -1446,39 +1447,42 @@ end subroutine clubb_init_cnst
 !PMA
    real(r8)  relvarc(pcols,pver)
    logical :: lqice(pcnst)  ! det
-   integer :: ktopi(pcols)
+  !integer :: ktopi(pcols)
 
    integer :: ixorg
 
    intrinsic :: selected_real_kind, max
 
+  ! for linearize_pbl_winds 
+   real(r8), pointer :: wsresp(:)
+   real(r8), pointer :: tau_est(:)
+
 !PMA adds gustiness and tpert
    real(r8), pointer :: prec_dp(:)                 ! total precipitation from ZM convection
    real(r8), pointer :: snow_dp(:)                 ! snow precipitation from ZM convection
    real(r8), pointer :: vmag_gust(:)
-   real(r8), pointer :: wsresp(:)
-   real(r8), pointer :: tau_est(:)
    real(r8), pointer :: tpert(:)
 
-   real(r8) :: ugust  ! function: gustiness as a function of convective rainfall
-   real(r8) :: gfac
-   real(r8) :: gprec
-   real(r8) :: prec_gust(pcols)
-   real(r8) :: vmag_gust_dp(pcols),vmag_gust_cl(pcols)
-   real(r8) :: vmag(pcols)
-   real(r8) :: gust_fac(pcols)
-   real(r8) :: umb(pcols), vmb(pcols),up2b(pcols),vp2b(pcols)
-   real(r8),parameter :: gust_facl = 1.2_r8 !gust fac for land
-   real(r8),parameter :: gust_faco = 0.9_r8 !gust fac for ocean
-   real(r8),parameter :: gust_facc = 1.5_r8 !gust fac for clubb
+  !real(r8) :: ugust  ! function: gustiness as a function of convective rainfall
+  !real(r8) :: gfac
+  !real(r8) :: gprec
+  !real(r8) :: prec_gust(pcols)
+  !real(r8) :: vmag_gust_dp(pcols),vmag_gust_cl(pcols)
+  !real(r8) :: vmag(pcols)
+  !real(r8) :: gust_fac(pcols)
+  !real(r8) :: umb(pcols), vmb(pcols),up2b(pcols),vp2b(pcols)
+
+  !real(r8),parameter :: gust_facl = 1.2_r8 !gust fac for land
+  !real(r8),parameter :: gust_faco = 0.9_r8 !gust fac for ocean
+  !real(r8),parameter :: gust_facc = 1.5_r8 !gust fac for clubb
 
    real(r8) :: sfc_v_diff_tau(pcols) ! Response to tau perturbation, m/s
    real(r8), parameter :: pert_tau = 0.1_r8 ! tau perturbation, Pa
 
-! ZM gustiness equation below from Redelsperger et al. (2000)
-! numbers are coefficients of the empirical equation
-
-   ugust(gprec,gfac) = gfac*log(1._R8+57801.6_R8*gprec-3.55332096e7_R8*(gprec**2.0_R8))
+!! ZM gustiness equation below from Redelsperger et al. (2000)
+!! numbers are coefficients of the empirical equation
+!
+!   ugust(gprec,gfac) = gfac*log(1._R8+57801.6_R8*gprec-3.55332096e7_R8*(gprec**2.0_R8))
 
 #endif
 
@@ -1701,9 +1705,15 @@ end subroutine clubb_init_cnst
    !============
    ! Gustiness
    !============
-   ! Note: the calculation uses pblh.
-   !----------------------------------
-#include "vmag_gust.inc"
+!#include "vmag_gust.inc"
+
+   call pbuf_get_field(pbuf, prec_dp_idx,   prec_dp)
+   call pbuf_get_field(pbuf, snow_dp_idx,   snow_dp)
+   call pbuf_get_field(pbuf, vmag_gust_idx, vmag_gust)
+   call pbuf_get_field(pbuf, tpert_idx,     tpert)
+
+   call gustiness( use_sgv, state1, cam_in, up2(:,pver), vp2(:,pver), prec_dp, snow_dp, pblh, thlp2, &!in
+                   vmag_gust, tpert )! out
 
    !============================
    ! Linearization of PBL winds

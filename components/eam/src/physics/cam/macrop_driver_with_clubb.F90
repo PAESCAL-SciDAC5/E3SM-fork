@@ -11,7 +11,7 @@ module macrop_driver_with_clubb
   private
   public :: ice_supersat_adj_tend
   public :: pblh_diag
-
+  public :: gustiness
 
 contains
 
@@ -171,5 +171,103 @@ contains
                 state1%zi, cloud_frac(:,1:pver), 1._r8-cam_in%landfrac, dummy3)
 
   end subroutine pblh_diag
+  !------------------------
+
+  subroutine gustiness( use_sgv, state1, cam_in, up2b, vp2b, prec_dp, snow_dp, pblh, thlp2, &! in
+                        vmag_gust, tpert )
+
+    use physics_types,  only: physics_state
+    use camsrfexch,     only: cam_in_t
+    use constituents,   only: cnst_get_ind
+    use physconst,      only: latvap, cpair
+
+    logical,            intent(in)  :: use_sgv
+    type(physics_state),intent(in)  :: state1
+    type(cam_in_t),     intent(in)  :: cam_in
+    real(r8),           intent(in)  :: up2b(:), vp2b(:)
+    real(r8),           intent(in)  :: thlp2(:,:)
+    real(r8),           intent(in)  :: prec_dp(:), snow_dp(:)
+    real(r8),           intent(in)  :: pblh(:)
+    real(r8),           intent(out) :: vmag_gust(:)
+    real(r8),           intent(out) :: tpert(:)
+
+    integer  :: ktopi(pcols)
+    real(r8) :: umb(pcols), vmb(pcols)
+    real(r8) :: prec_gust(pcols)
+    real(r8) :: gust_fac(pcols)
+    real(r8) :: vmag_gust_dp(pcols),vmag_gust_cl(pcols)
+    real(r8) :: vmag(pcols)
+    integer :: ixcldliq
+    integer :: ncol, lchnk, i,k
+
+    real(r8),parameter :: gust_facl = 1.2_r8 !gust fac for land
+    real(r8),parameter :: gust_faco = 0.9_r8 !gust fac for ocean
+    real(r8),parameter :: gust_facc = 1.5_r8 !gust fac for clubb
+
+!PMA adds gustiness and tpert
+
+    ncol  = state1%ncol
+    lchnk = state1%lchnk
+
+    call cnst_get_ind('CLDLIQ',ixcldliq)
+
+    vmag_gust(:)    = 0._r8
+
+    vmag_gust_dp(:) = 0._r8
+    vmag_gust_cl(:) = 0._r8
+    ktopi(:)        = pver
+
+    if (use_sgv) then
+       do i=1,ncol
+          !up2b(i)          = up2(i,pver)
+          !vp2b(i)          = vp2(i,pver)
+           umb(i)           = state1%u(i,pver)
+           vmb(i)           = state1%v(i,pver)
+           prec_gust(i)     = max(0._r8,prec_dp(i)-snow_dp(i))*1.e3_r8
+           if (cam_in%landfrac(i).gt.0.95_r8) then
+             gust_fac(i)   = gust_facl
+           else
+             gust_fac(i)   = gust_faco
+           endif
+           vmag(i)         = max(1.e-5_r8,sqrt( umb(i)**2._r8 + vmb(i)**2._r8))
+           vmag_gust_dp(i) = ugust(min(prec_gust(i),6.94444e-4_r8),gust_fac(i)) ! Limit for the ZM gustiness equation set in Redelsperger et al. (2000)
+           vmag_gust_dp(i) = max(0._r8, vmag_gust_dp(i) )!/ vmag(i))
+           vmag_gust_cl(i) = gust_facc*(sqrt(max(0._r8,up2b(i)+vp2b(i))+vmag(i)**2._r8)-vmag(i))
+           vmag_gust_cl(i) = max(0._r8, vmag_gust_cl(i) )!/ vmag(i))
+           vmag_gust(i)    = vmag_gust_cl(i) + vmag_gust_dp(i)
+
+          do k=1,pver
+             if (state1%zi(i,k)>pblh(i).and.state1%zi(i,k+1)<=pblh(i)) then
+                ktopi(i) = k
+                exit
+             end if
+          end do
+
+          tpert(i) = min(2._r8,(sqrt(thlp2(i,ktopi(i)))+(latvap/cpair)*state1%q(i,ktopi(i),ixcldliq)) &
+                    /max(state1%exner(i,ktopi(i)),1.e-3_r8)) !proxy for tpert
+       end do
+    end if
+
+   call outfld('VMAGDP', vmag_gust_dp, pcols, lchnk)
+   call outfld('VMAGCL', vmag_gust_cl, pcols, lchnk)
+   call outfld('VMAGGUST', vmag_gust, pcols, lchnk)
+   call outfld('TPERTBLT', tpert, pcols, lchnk)
+
+   contains
+
+     ! ZM gustiness equation below from Redelsperger et al. (2000)
+     ! numbers are coefficients of the empirical equation.
+     function ugust(gprec,gfac)
+
+       real(r8) :: ugust  ! function: gustiness as a function of convective rainfall
+       real(r8) :: gfac
+       real(r8) :: gprec 
+           
+       ugust = gfac*log(1._R8+57801.6_R8*gprec-3.55332096e7_R8*(gprec**2.0_R8))
+
+     end function
+
+  end subroutine gustiness
+  !------------------------
 
 end module macrop_driver_with_clubb
