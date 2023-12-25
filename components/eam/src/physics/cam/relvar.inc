@@ -31,17 +31,17 @@
 
    if (deep_scheme .ne. 'CLUBB_SGS') then
       if (relvar_fix) then
-         where (rcm(:ncol,:pver) > qsmall .and. qclvar(:ncol,:pver) /= 0._r8)  &
-              relvar(:ncol,:pver) = min(relvarmax,max(relvarmin,rcm(:ncol,:pver)**2/max(qsmall,  &
+         where ( host_mean%rcm(:ncol,:pver) > qsmall .and. qclvar(:ncol,:pver) /= 0._r8)  &
+              relvar(:ncol,:pver) = min(relvarmax,max(relvarmin, host_mean%rcm(:ncol,:pver)**2/max(qsmall,  &
               cloud_frac(:ncol,:pver)*qclvar(:ncol,:pver)-  &
-              (1._r8-cloud_frac(:ncol,:pver))*rcm(:ncol,:pver)**2)))
-              relvarc(:ncol,:pver) = min(relvarmax,max(relvarmin,rcm(:ncol,:pver)**2/max(qsmall,  &
+              (1._r8-cloud_frac(:ncol,:pver))* host_mean%rcm(:ncol,:pver)**2)))
+              relvarc(:ncol,:pver) = min(relvarmax,max(relvarmin, host_mean%rcm(:ncol,:pver)**2/max(qsmall,  &
               cloud_frac(:ncol,:pver)*qclvar(:ncol,:pver)-  &
-              (1._r8-cloud_frac(:ncol,:pver))*rcm(:ncol,:pver)**2)))
+              (1._r8-cloud_frac(:ncol,:pver))* host_mean%rcm(:ncol,:pver)**2)))
       else
 
-         where (rcm(:ncol,:pver) /= 0 .and. qclvar(:ncol,:pver) /= 0) &
-              relvar(:ncol,:pver) = min(relvarmax,max(0.001_r8,rcm(:ncol,:pver)**2/qclvar(:ncol,:pver)))
+         where ( host_mean%rcm(:ncol,:pver) /= 0 .and. qclvar(:ncol,:pver) /= 0) &
+              relvar(:ncol,:pver) = min(relvarmax,max(0.001_r8, host_mean%rcm(:ncol,:pver)**2/qclvar(:ncol,:pver)))
       endif
    endif
    call outfld( 'RELVAR',           relvar,                  pcols, lchnk )

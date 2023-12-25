@@ -31,7 +31,7 @@
    call outfld( 'RTP2_CLUBB',       tmp_array,               ncol,  lchnk )
    call outfld( 'THLP2_CLUBB',      thlp2,                   pcols, lchnk )
 
-   tmp_array = rcm(:ncol,:)*1000._r8
+   tmp_array = host_mean%rcm(:ncol,:)*1000._r8
    call outfld( 'RCM_CLUBB',        tmp_array,               ncol,  lchnk )
 
    tmp_array = wprcp(:ncol,:)*latvap

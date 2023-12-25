@@ -15,14 +15,14 @@
    host_mean%vm(:ncol,:pver) = state1%v(:ncol,:pver)
 
    !---------------------------
-   call pbuf_get_field(pbuf, thlm_idx,    thlm,    start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, rtm_idx,     rtm,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, rcm_idx,     rcm,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+   call pbuf_get_field(pbuf, thlm_idx, host_mean%thlm, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+   call pbuf_get_field(pbuf,  rtm_idx, host_mean%rtm,  start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+   call pbuf_get_field(pbuf,  rcm_idx, host_mean%rcm,  start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
 
    call cnst_get_ind('Q',ixq)
    call cnst_get_ind('CLDLIQ',ixcldliq)
 
-   rtm(:ncol,:pver) = state1%q(:ncol,:pver,ixq)+state1%q(:ncol,:pver,ixcldliq)
+   host_mean%rtm(:ncol,:pver) = state1%q(:ncol,:pver,ixq)+state1%q(:ncol,:pver,ixcldliq)
    rvm(:ncol,:pver) = state1%q(:ncol,:pver,ixq)
 
    !  Compute exner function consistent with CLUBB's definition, which uses a constant
@@ -31,7 +31,7 @@
    !  (such as thlm), use "exner_clubb" other wise use the exner in state
 
     exner_clubb(:ncol,:pver) = (real(p0_clubb, kind = r8 )/state1%pmid(:ncol,:pver))**(rair/cpair)
-           thlm(:ncol,:pver) = state1%t(:ncol,:pver)*exner_clubb(:ncol,:pver)-(latvap/cpair)*state1%q(:ncol,:pver,ixcldliq)
+    host_mean%thlm(:ncol,:pver) = state1%t(:ncol,:pver)*exner_clubb(:ncol,:pver)-(latvap/cpair)*state1%q(:ncol,:pver,ixcldliq)
 
    !---------------------------------
    ! Assign value to ghost level
@@ -40,8 +40,8 @@
    host_mean%um(1:ncol,pverp) = host_mean%um(1:ncol,pver)
    host_mean%vm(1:ncol,pverp) = host_mean%vm(1:ncol,pver)
 
-   rtm(1:ncol,pverp)  = rtm(1:ncol,pver)
-   thlm(1:ncol,pverp) = thlm(1:ncol,pver)
+   host_mean%rtm(1:ncol,pverp)  = host_mean%rtm(1:ncol,pver)
+   host_mean%thlm(1:ncol,pverp) = host_mean%thlm(1:ncol,pver)
 
    !=====================================================
    ! Passive tracers:

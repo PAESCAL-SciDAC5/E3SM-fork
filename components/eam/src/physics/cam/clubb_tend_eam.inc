@@ -43,7 +43,7 @@
       ! After advancing CLUBB in time, apply a total energy fixer by adjusting the
       ! ending s (dry static energy).
 
-      call column_total_energy_fixer( te_b, thlm, rtm, rcm, exner_clubb,          &! in
+      call column_total_energy_fixer( te_b, host_mean%thlm, host_mean%rtm, host_mean%rcm, exner_clubb,          &! in
                                       host_mean%um, host_mean%vm, wp2, state1, i, &! in
                                       clubb_s                                     )! out
 #include "clubb_ptend_cal.inc"

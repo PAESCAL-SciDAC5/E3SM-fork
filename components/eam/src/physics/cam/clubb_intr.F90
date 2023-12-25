@@ -1333,7 +1333,10 @@ end subroutine clubb_init_cnst
    real(r8) :: te_b
    real(r8) :: clubb_s(pver)
 
+   real(r8) :: rvm(pcols,pverp)
    real(r8) :: exner_clubb(pcols,pverp)         ! Exner function consistent with CLUBB          [-]
+
+
    real(r8) :: wpthlp_output(pcols,pverp)       ! Heat flux output variable                     [W/m2]
    real(r8) :: wprtp_output(pcols,pverp)        ! Total water flux output variable              [W/m2]
    real(r8) :: wp3_output(pcols,pverp)          ! wp3 output                                    [m^3/s^3]
@@ -1350,14 +1353,14 @@ end subroutine clubb_init_cnst
    real(r8) :: cloud_cover(pcols,pverp)         ! CLUBB in-cloud cloud fraction                 [fraction]
    real(r8) :: wprcp(pcols,pverp)               ! CLUBB liquid water flux                       [m/s kg/kg]
    real(r8) :: wpthvp_diag(pcols,pverp)              ! CLUBB buoyancy flux                           [W/m^2]
-   real(r8) :: rvm(pcols,pverp)
-   real(r8) :: dlf2(pcols,pver)                 ! Detraining cld H20 from shallow convection    [kg/kg/day]
    real(r8) :: eps                              ! Rv/Rd                                         [-]
    real(r8) :: dum1                             ! dummy variable                                [units vary]
 
    real(r8) :: ksrftms(pcols)                   ! Turbulent mountain stress surface drag        [kg/s/m2]
    real(r8) :: tautmsx(pcols)                   ! U component of turbulent mountain stress      [N/m2]
    real(r8) :: tautmsy(pcols)                   ! V component of turbulent mountain stress      [N/m2]
+
+   real(r8) :: dlf2(pcols,pver)                 ! Detraining cld H20 from shallow convection    [kg/kg/day]
 
    real(r8) :: latsub
 
@@ -1419,9 +1422,9 @@ end subroutine clubb_init_cnst
 
   !real(r8), pointer, dimension(:,:) :: um       ! mean east-west wind                          [m/s]
   !real(r8), pointer, dimension(:,:) :: vm       ! mean north-south wind                        [m/s]
-   real(r8), pointer, dimension(:,:) :: thlm     ! mean temperature                             [K]
-   real(r8), pointer, dimension(:,:) :: rtm      ! mean moisture mixing ratio                   [kg/kg]
-   real(r8), pointer, dimension(:,:) :: rcm        ! CLUBB cloud water mixing ratio               [kg/kg]
+  !real(r8), pointer, dimension(:,:) :: thlm     ! mean temperature                             [K]
+  !real(r8), pointer, dimension(:,:) :: rtm      ! mean moisture mixing ratio                   [kg/kg]
+  !real(r8), pointer, dimension(:,:) :: rcm        ! CLUBB cloud water mixing ratio               [kg/kg]
 
    real(r8), pointer, dimension(:,:) :: cloud_frac ! CLUBB cloud fraction                       [-]
 

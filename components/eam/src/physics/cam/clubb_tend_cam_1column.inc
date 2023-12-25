@@ -183,8 +183,8 @@
          wp3_in(k)     = real(wp3(i,pverp-k+1), kind = core_rknd)
          rtp2_in(k)    = real(rtp2(i,pverp-k+1), kind = core_rknd)
          thlp2_in(k)   = real(thlp2(i,pverp-k+1), kind = core_rknd)
-         thlm_in(k)    = real(thlm(i,pverp-k+1), kind = core_rknd)
-         rtm_in(k)     = real(rtm(i,pverp-k+1), kind = core_rknd)
+         thlm_in(k)    = real(host_mean%thlm(i,pverp-k+1), kind = core_rknd)
+         rtm_in(k)     = real(host_mean%rtm(i,pverp-k+1), kind = core_rknd)
          rvm_in(k)     = real(rvm(i,pverp-k+1), kind = core_rknd)
          wprtp_in(k)   = real(wprtp(i,pverp-k+1), kind = core_rknd)
          wpthlp_in(k)  = real(wpthlp(i,pverp-k+1), kind = core_rknd)
@@ -194,7 +194,7 @@
          wp2thvp_inout(k)    = real(wp2thvp(i,pverp-k+1), kind = core_rknd)
          rtpthvp_inout(k)    = real(rtpthvp(i,pverp-k+1), kind = core_rknd)
          thlpthvp_inout(k)   = real(thlpthvp(i,pverp-k+1), kind = core_rknd)
-         rcm_inout(k)        = real(rcm(i,pverp-k+1), kind = core_rknd)
+         rcm_inout(k)        = real(host_mean%rcm(i,pverp-k+1), kind = core_rknd)
          cloud_frac_inout(k) = real(cloud_frac(i,pverp-k+1), kind = core_rknd)
 
          ! also flip the arrays for the pdf_params_zm variables to have
@@ -304,8 +304,8 @@
 
       if (do_expldiff) then
         do k=1,pver
-          edsclr_in(k+1,icnt+1) = real(thlm(i,pver-k+1), kind = core_rknd)
-          edsclr_in(k+1,icnt+2) = real(rtm(i,pver-k+1), kind = core_rknd)
+          edsclr_in(k+1,icnt+1) = real(host_mean%thlm(i,pver-k+1), kind = core_rknd)
+          edsclr_in(k+1,icnt+2) = real(host_mean%rtm(i,pver-k+1), kind = core_rknd)
         enddo
 
         edsclr_in(1,icnt+1) = edsclr_in(2,icnt+1)
@@ -521,8 +521,8 @@
           thlpthvp(i,k)     = real(thlpthvp_inout(pverp-k+1), kind = r8)
           up2(i,k)          = real(up2_in(pverp-k+1), kind = r8)
           vp2(i,k)          = real(vp2_in(pverp-k+1), kind = r8)
-          thlm(i,k)         = real(thlm_in(pverp-k+1), kind = r8)
-          rtm(i,k)          = real(rtm_in(pverp-k+1), kind = r8)
+          host_mean%thlm(i,k) = real(thlm_in(pverp-k+1), kind = r8)
+          host_mean%rtm(i,k)  = real(rtm_in(pverp-k+1), kind = r8)
           wprtp(i,k)        = real(wprtp_in(pverp-k+1), kind = r8)
           wpthlp(i,k)       = real(wpthlp_in(pverp-k+1), kind = r8)
           wp2(i,k)          = real(wp2_in(pverp-k+1), kind = r8)
@@ -530,7 +530,7 @@
           rtp2(i,k)         = real(rtp2_in(pverp-k+1), kind = r8)
           thlp2(i,k)        = real(thlp2_in(pverp-k+1), kind = r8)
           rtpthlp(i,k)      = real(rtpthlp_in(pverp-k+1), kind = r8)
-          rcm(i,k)          = real(rcm_inout(pverp-k+1), kind = r8)
+          host_mean%rcm(i,k) = real(rcm_inout(pverp-k+1), kind = r8)
           wprcp(i,k)        = real(wprcp_out(pverp-k+1), kind = r8)
           cloud_frac(i,k)   = min(real(cloud_frac_inout(pverp-k+1), kind = r8),1._r8)
           rcm_in_layer(i,k) = real(rcm_in_layer_out(pverp-k+1), kind = r8)
