@@ -1133,6 +1133,7 @@ end subroutine clubb_init_cnst
         zt2zm_api, zm2zt_api
    use model_flags, only: ipdf_call_placement
    use advance_clubb_core_module, only: ipdf_post_advance_fields
+   use clubb_intr_types
 #endif
 
    implicit none
@@ -1385,6 +1386,9 @@ end subroutine clubb_init_cnst
    ! Pointers        !
    ! --------------- !
 
+   type(clubb_mean_2d_t) :: host_mean
+   type(clubb_mnts_2d_t) :: host_mnts
+
    real(r8), pointer, dimension(:,:) :: wp2      ! vertical velocity variance                   [m^2/s^2]
    real(r8), pointer, dimension(:,:) :: wp3      ! third moment of vertical velocity            [m^3/s^3]
    real(r8), pointer, dimension(:,:) :: wpthlp   ! turbulent flux of thetal                     [m/s K]
@@ -1399,8 +1403,7 @@ end subroutine clubb_init_cnst
    real(r8), pointer, dimension(:,:) :: wp2thvp    ! < w'^2 th_v' > (thermodynamic levels)        [m^2/s^2 K]
    real(r8), pointer, dimension(:,:) :: rtpthvp    ! < r_t'th_v' > (momentum levels)              [kg/kg K]
    real(r8), pointer, dimension(:,:) :: thlpthvp   ! < th_l'th_v' > (momentum levels)             [K^2]
-   real(r8), pointer, dimension(:,:) :: rcm        ! CLUBB cloud water mixing ratio               [kg/kg]
-   real(r8), pointer, dimension(:,:) :: cloud_frac ! CLUBB cloud fraction                       [-]
+
    real(r8), pointer, dimension(:,:) :: pdf_zm_w_1(:,:)        !work pointer for pdf_params_zm
    real(r8), pointer, dimension(:,:) :: pdf_zm_w_2(:,:)        !work pointer for pdf_params_zm
    real(r8), pointer, dimension(:,:) :: pdf_zm_varnce_w_1(:,:) !work pointer for pdf_params_zm
@@ -1413,10 +1416,14 @@ end subroutine clubb_init_cnst
    real(r8), pointer, dimension(:,:) :: vm_pert  ! perturbed zonal wind                         [m/s]
    real(r8), pointer, dimension(:,:) :: upwp_pert! perturbed meridional wind flux               [m^2/s^2]
    real(r8), pointer, dimension(:,:) :: vpwp_pert! perturbed zonal wind flux                    [m^2/s^2]
+
+  !real(r8), pointer, dimension(:,:) :: um       ! mean east-west wind                          [m/s]
+  !real(r8), pointer, dimension(:,:) :: vm       ! mean north-south wind                        [m/s]
    real(r8), pointer, dimension(:,:) :: thlm     ! mean temperature                             [K]
    real(r8), pointer, dimension(:,:) :: rtm      ! mean moisture mixing ratio                   [kg/kg]
-   real(r8), pointer, dimension(:,:) :: um       ! mean east-west wind                          [m/s]
-   real(r8), pointer, dimension(:,:) :: vm       ! mean north-south wind                        [m/s]
+   real(r8), pointer, dimension(:,:) :: rcm        ! CLUBB cloud water mixing ratio               [kg/kg]
+
+   real(r8), pointer, dimension(:,:) :: cloud_frac ! CLUBB cloud fraction                       [-]
 
    real(r8), pointer, dimension(:,:) :: khzt     ! eddy diffusivity on thermo levels            [m^2/s]
    real(r8), pointer, dimension(:,:) :: khzm     ! eddy diffusivity on momentum levels          [m^2/s]

@@ -1,0 +1,52 @@
+module clubb_intr_types
+
+  use shr_kind_mod, only: r8 => shr_kind_r8 
+
+  implicit none
+
+  public
+
+  type clubb_mean_2d_t
+
+   real(r8), pointer, dimension(:,:) :: um       ! mean east-west wind                          [m/s]
+   real(r8), pointer, dimension(:,:) :: vm       ! mean north-south wind                        [m/s]
+
+   real(r8), pointer, dimension(:,:) :: thlm     ! mean liquid water potential temperature      [K]
+   real(r8), pointer, dimension(:,:) :: rtm      ! mean total water (vapor+liquid) mixing ratio [kg/kg]
+
+   real(r8), pointer, dimension(:,:) :: rcm      ! mean cloud (liquid) water mixing ratio       [kg/kg]
+   real(r8), pointer, dimension(:,:) :: cldf     ! cloud fraction                               [-]
+
+   real(r8), pointer, dimension(:,:) :: exnr     ! CLUBB's exner function                       [-]
+   real(r8), pointer, dimension(:,:) :: pmid     ! air pressure                                 [Pa]
+
+  end type clubb_mean_2d_t
+
+  type clubb_mnts_2d_t
+
+   real(r8), pointer, dimension(:,:) :: wp2      ! vertical velocity variance                   [m^2/s^2]
+   real(r8), pointer, dimension(:,:) :: wp3      ! third moment of vertical velocity            [m^3/s^3]
+   real(r8), pointer, dimension(:,:) :: wpthlp   ! turbulent flux of thetal                     [m/s K]
+   real(r8), pointer, dimension(:,:) :: wprtp    ! turbulent flux of moisture                   [m/s kg/kg]
+   real(r8), pointer, dimension(:,:) :: rtpthlp  ! covariance of thetal and qt                  [kg/kg K]
+   real(r8), pointer, dimension(:,:) :: rtp2     ! moisture variance                            [kg^2/kg^2]
+   real(r8), pointer, dimension(:,:) :: thlp2    ! temperature variance                         [K^2]
+   real(r8), pointer, dimension(:,:) :: up2      ! east-west wind variance                      [m^2/s^2]
+   real(r8), pointer, dimension(:,:) :: vp2      ! north-south wind variance                    [m^2/s^2]
+
+   real(r8), pointer, dimension(:,:) :: wpthvp     ! < w'th_v' > (momentum levels)                [m/s K]
+   real(r8), pointer, dimension(:,:) :: wp2thvp    ! < w'^2 th_v' > (thermodynamic levels)        [m^2/s^2 K]
+   real(r8), pointer, dimension(:,:) :: rtpthvp    ! < r_t'th_v' > (momentum levels)              [kg/kg K]
+   real(r8), pointer, dimension(:,:) :: thlpthvp   ! < th_l'th_v' > (momentum levels)             [K^2]
+
+   real(r8), pointer, dimension(:,:) :: upwp     ! east-west momentum flux                      [m^2/s^2]
+   real(r8), pointer, dimension(:,:) :: vpwp     ! north-south momentum flux                    [m^2/s^2]
+   real(r8), pointer, dimension(:,:) :: um_pert  ! perturbed meridional wind                    [m/s]
+   real(r8), pointer, dimension(:,:) :: vm_pert  ! perturbed zonal wind                         [m/s]
+   real(r8), pointer, dimension(:,:) :: upwp_pert! perturbed meridional wind flux               [m^2/s^2]
+   real(r8), pointer, dimension(:,:) :: vpwp_pert! perturbed zonal wind flux                    [m^2/s^2]
+
+  end type clubb_mnts_2d_t
+
+
+end module clubb_intr_types

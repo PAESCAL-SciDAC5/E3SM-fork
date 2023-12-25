@@ -46,8 +46,8 @@
    tmp_array = 1._r8*zi_out(:ncol,:)
    call outfld( 'ZM_CLUBB',         tmp_array,               ncol,  lchnk )
 
-   call outfld( 'UM_CLUBB',         um,                      pcols, lchnk )
-   call outfld( 'VM_CLUBB',         vm,                      pcols, lchnk )
+   call outfld( 'UM_CLUBB',         host_mean%um,            pcols, lchnk )
+   call outfld( 'VM_CLUBB',         host_mean%vm,            pcols, lchnk )
 
    ! ------------------------------------------------- !
    ! Diagnose some output variables                    !

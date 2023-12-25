@@ -7,8 +7,8 @@
 
       do k=1,pver
 
-         ptend_loc%u(i,k)   = (um(i,k)-state1%u(i,k))*invrs_hdtime                  ! east-west wind
-         ptend_loc%v(i,k)   = (vm(i,k)-state1%v(i,k))*invrs_hdtime                  ! north-south wind
+         ptend_loc%u(i,k)   = ( host_mean%um(i,k) - state1%u(i,k) )*invrs_hdtime    ! east-west wind
+         ptend_loc%v(i,k)   = ( host_mean%vm(i,k) - state1%v(i,k) )*invrs_hdtime    ! north-south wind
          ptend_loc%q(i,k,ixq) = (rtm(i,k)-rcm(i,k)-state1%q(i,k,ixq))*invrs_hdtime  ! water vapor
          ptend_loc%q(i,k,ixcldliq) = (rcm(i,k)-state1%q(i,k,ixcldliq))*invrs_hdtime ! Tendency of liquid water
          ptend_loc%s(i,k)   = (clubb_s(k)-state1%s(i,k))*invrs_hdtime               ! Tendency of static energy

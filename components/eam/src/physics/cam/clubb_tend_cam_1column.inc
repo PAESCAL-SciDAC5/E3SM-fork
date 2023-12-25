@@ -93,7 +93,7 @@
         endif
 
         !  Compute surface wind (ubar)
-        ubar = sqrt(um(i,pver)**2+vm(i,pver)**2)
+        ubar = sqrt(host_mean%um(i,pver)**2+host_mean%vm(i,pver)**2)
         if (ubar .lt. 0.25_r8) ubar = 0.25_r8
 
         !  Below denotes case specifics for surface momentum
@@ -124,8 +124,8 @@
         endif
 
         !  Compute the surface momentum fluxes, if this is a SCAM simulation
-        upwp_sfc = -real((um(i,pver)*ustar**2/ubar), kind = core_rknd)
-        vpwp_sfc = -real((vm(i,pver)*ustar**2/ubar), kind = core_rknd)
+        upwp_sfc = -real((host_mean%um(i,pver)*ustar**2/ubar), kind = core_rknd)
+        vpwp_sfc = -real((host_mean%vm(i,pver)*ustar**2/ubar), kind = core_rknd)
 
       endif
 
@@ -173,8 +173,8 @@
 
       !  Need to flip arrays around for CLUBB core
       do k=1,pverp
-         um_in(k)      = real(um(i,pverp-k+1), kind = core_rknd)
-         vm_in(k)      = real(vm(i,pverp-k+1), kind = core_rknd)
+         um_in(k)      = real(host_mean%um(i,pverp-k+1), kind = core_rknd)
+         vm_in(k)      = real(host_mean%vm(i,pverp-k+1), kind = core_rknd)
          upwp_in(k)    = real(upwp(i,pverp-k+1), kind = core_rknd)
          vpwp_in(k)    = real(vpwp(i,pverp-k+1), kind = core_rknd)
          up2_in(k)     = real(up2(i,pverp-k+1), kind = core_rknd)
@@ -511,8 +511,8 @@
       !  Arrays need to be "flipped" to CAM grid
       do k=1,pverp
 
-          um(i,k)           = real(um_in(pverp-k+1), kind = r8)
-          vm(i,k)           = real(vm_in(pverp-k+1), kind = r8)
+          host_mean%um(i,k) = real(um_in(pverp-k+1), kind = r8)
+          host_mean%vm(i,k) = real(vm_in(pverp-k+1), kind = r8)
           upwp(i,k)         = real(upwp_in(pverp-k+1), kind = r8)
           vpwp(i,k)         = real(vpwp_in(pverp-k+1), kind = r8)
           wpthvp(i,k)       = real(wpthvp_inout(pverp-k+1), kind = r8)

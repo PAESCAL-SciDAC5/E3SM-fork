@@ -7,11 +7,12 @@
    ! From host model: u,  v;  qv, ql, t, pmid
    ! To CLUBB:        um, vm; rtm, thlm (why rvm also?)
    !--------------------------------------------------------
-   call pbuf_get_field(pbuf, um_idx,      um,      start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
-   call pbuf_get_field(pbuf, vm_idx,      vm,      start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
 
-   um(:ncol,:pver) = state1%u(:ncol,:pver)
-   vm(:ncol,:pver) = state1%v(:ncol,:pver)
+   call pbuf_get_field(pbuf, um_idx, host_mean%um, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+   call pbuf_get_field(pbuf, vm_idx, host_mean%vm, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+
+   host_mean%um(:ncol,:pver) = state1%u(:ncol,:pver)
+   host_mean%vm(:ncol,:pver) = state1%v(:ncol,:pver)
 
    !---------------------------
    call pbuf_get_field(pbuf, thlm_idx,    thlm,    start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
@@ -36,8 +37,9 @@
    ! Assign value to ghost level
    !---------------------------------
 
-   um(1:ncol,pverp)   = state1%u(1:ncol,pver)
-   vm(1:ncol,pverp)   = state1%v(1:ncol,pver)
+   host_mean%um(1:ncol,pverp) = host_mean%um(1:ncol,pver)
+   host_mean%vm(1:ncol,pverp) = host_mean%vm(1:ncol,pver)
+
    rtm(1:ncol,pverp)  = rtm(1:ncol,pver)
    thlm(1:ncol,pverp) = thlm(1:ncol,pver)
 
