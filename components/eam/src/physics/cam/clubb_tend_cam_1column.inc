@@ -185,7 +185,6 @@
          thlp2_in(k)   = real(thlp2(i,pverp-k+1), kind = core_rknd)
          thlm_in(k)    = real(host_mean%thlm(i,pverp-k+1), kind = core_rknd)
          rtm_in(k)     = real(host_mean%rtm(i,pverp-k+1), kind = core_rknd)
-         rvm_in(k)     = real(rvm(i,pverp-k+1), kind = core_rknd)
          wprtp_in(k)   = real(wprtp(i,pverp-k+1), kind = core_rknd)
          wpthlp_in(k)  = real(wpthlp(i,pverp-k+1), kind = core_rknd)
          rtpthlp_in(k) = real(rtpthlp(i,pverp-k+1), kind = core_rknd)

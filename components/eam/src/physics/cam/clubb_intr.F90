@@ -1333,9 +1333,7 @@ end subroutine clubb_init_cnst
    real(r8) :: te_b
    real(r8) :: clubb_s(pver)
 
-   real(r8) :: rvm(pcols,pverp)
    real(r8) :: exner_clubb(pcols,pverp)         ! Exner function consistent with CLUBB          [-]
-
 
    real(r8) :: wpthlp_output(pcols,pverp)       ! Heat flux output variable                     [W/m2]
    real(r8) :: wprtp_output(pcols,pverp)        ! Total water flux output variable              [W/m2]

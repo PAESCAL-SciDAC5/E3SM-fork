@@ -23,7 +23,6 @@
    call cnst_get_ind('CLDLIQ',ixcldliq)
 
    host_mean%rtm(:ncol,:pver) = state1%q(:ncol,:pver,ixq)+state1%q(:ncol,:pver,ixcldliq)
-   rvm(:ncol,:pver) = state1%q(:ncol,:pver,ixq)
 
    !  Compute exner function consistent with CLUBB's definition, which uses a constant
    !  surface pressure.  CAM's exner (in state does not).  Therefore, for consistent
