@@ -31,6 +31,7 @@ module clubb_intr
   use mpishorthand
   use cam_abortutils,  only: endrun
   use cam_history_support, only: fillvalue
+  use cam_history,   only: outfld
 #ifdef CLUBB_SGS
   use clubb_api_module, only: pdf_parameter, clubb_fatal_error, fstderr
   use clubb_precision,  only: core_rknd
@@ -1183,7 +1184,6 @@ end subroutine clubb_init_cnst
    integer :: err_code                          ! Diagnostic, for if some calculation goes amiss.
    integer :: icnt, clubbtop
 
-   real(r8) :: frac_limit, ic_limit
 
    integer :: n_clubb_core_step
 
@@ -1316,7 +1316,6 @@ end subroutine clubb_init_cnst
    real(r8) :: dz_g(pver)                       ! thickness of layer                            [m]
    real(r8) :: minqn                            ! minimum total cloud liquid + ice threshold    [kg/kg]
    real(r8) :: tempqn                           ! temporary total cloud liquid + ice            [kg/kg]
-   real(r8) :: cldthresh                        ! threshold to determin cloud fraction          [kg/kg]
    real(r8) :: relvarmax,relvarmin
    real(r8) :: qmin
    real(r8) :: varmu(pcols)
@@ -1418,24 +1417,14 @@ end subroutine clubb_init_cnst
    real(r8), pointer, dimension(:,:) :: rtm      ! mean moisture mixing ratio                   [kg/kg]
    real(r8), pointer, dimension(:,:) :: um       ! mean east-west wind                          [m/s]
    real(r8), pointer, dimension(:,:) :: vm       ! mean north-south wind                        [m/s]
-   real(r8), pointer, dimension(:,:) :: cld      ! cloud fraction                               [fraction]
-   real(r8), pointer, dimension(:,:) :: concld   ! convective cloud fraction                    [fraction]
-   real(r8), pointer, dimension(:,:) :: ast      ! stratiform cloud fraction                    [fraction]
-   real(r8), pointer, dimension(:,:) :: alst     ! liquid stratiform cloud fraction             [fraction]
-   real(r8), pointer, dimension(:,:) :: aist     ! ice stratiform cloud fraction                [fraction]
-   real(r8), pointer, dimension(:,:) :: qlst     ! Physical in-stratus LWC                      [kg/kg]
-   real(r8), pointer, dimension(:,:) :: qist     ! Physical in-stratus IWC                      [kg/kg]
-   real(r8), pointer, dimension(:,:) :: deepcu   ! deep convection cloud fraction               [fraction]
-   real(r8), pointer, dimension(:,:) :: shalcu   ! shallow convection cloud fraction            [fraction]
+
    real(r8), pointer, dimension(:,:) :: khzt     ! eddy diffusivity on thermo levels            [m^2/s]
    real(r8), pointer, dimension(:,:) :: khzm     ! eddy diffusivity on momentum levels          [m^2/s]
    real(r8), pointer, dimension(:) :: pblh     ! planetary boundary layer height                [m]
    real(r8), pointer, dimension(:,:) :: tke      ! turbulent kinetic energy                     [m^2/s^2]
-   real(r8), pointer, dimension(:,:) :: dp_icwmr ! deep convection in cloud mixing ratio        [kg/kg]
    real(r8), pointer, dimension(:,:) :: relvar   ! relative cloud water variance                [-]
    real(r8), pointer, dimension(:,:) :: accre_enhan ! accretion enhancement factor              [-]
    real(r8), pointer, dimension(:,:) :: cmeliq
-   real(r8), pointer, dimension(:,:) :: cmfmc_sh ! Shallow convective mass flux--m subc (pcols,pverp) [kg/m2/s/]
 
    type(pdf_parameter), pointer :: pdf_params    ! PDF parameters (thermo. levs.) [units vary]
    type(pdf_parameter), pointer :: pdf_params_zm ! PDF parameters on momentum levs. [units vary]
@@ -1447,13 +1436,14 @@ end subroutine clubb_init_cnst
 !PMA
    real(r8)  relvarc(pcols,pver)
    logical :: lqice(pcnst)  ! det
-  !integer :: ktopi(pcols)
 
    integer :: ixorg
 
    intrinsic :: selected_real_kind, max
 
   ! for linearize_pbl_winds 
+   real(r8) :: sfc_v_diff_tau(pcols) ! Response to tau perturbation, m/s
+   real(r8), parameter :: pert_tau = 0.1_r8 ! tau perturbation, Pa
    real(r8), pointer :: wsresp(:)
    real(r8), pointer :: tau_est(:)
 
@@ -1462,27 +1452,6 @@ end subroutine clubb_init_cnst
    real(r8), pointer :: snow_dp(:)                 ! snow precipitation from ZM convection
    real(r8), pointer :: vmag_gust(:)
    real(r8), pointer :: tpert(:)
-
-  !real(r8) :: ugust  ! function: gustiness as a function of convective rainfall
-  !real(r8) :: gfac
-  !real(r8) :: gprec
-  !real(r8) :: prec_gust(pcols)
-  !real(r8) :: vmag_gust_dp(pcols),vmag_gust_cl(pcols)
-  !real(r8) :: vmag(pcols)
-  !real(r8) :: gust_fac(pcols)
-  !real(r8) :: umb(pcols), vmb(pcols),up2b(pcols),vp2b(pcols)
-
-  !real(r8),parameter :: gust_facl = 1.2_r8 !gust fac for land
-  !real(r8),parameter :: gust_faco = 0.9_r8 !gust fac for ocean
-  !real(r8),parameter :: gust_facc = 1.5_r8 !gust fac for clubb
-
-   real(r8) :: sfc_v_diff_tau(pcols) ! Response to tau perturbation, m/s
-   real(r8), parameter :: pert_tau = 0.1_r8 ! tau perturbation, Pa
-
-!! ZM gustiness equation below from Redelsperger et al. (2000)
-!! numbers are coefficients of the empirical equation
-!
-!   ugust(gprec,gfac) = gfac*log(1._R8+57801.6_R8*gprec-3.55332096e7_R8*(gprec**2.0_R8))
 
 #endif
 
@@ -1644,14 +1613,9 @@ end subroutine clubb_init_cnst
 
    if (clubb_do_deep) call outfld( 'MU_CLUBB',      varmu      ,pcols, lchnk)
 
-   !  Update physics tendencies
-   call physics_ptend_sum(ptend_loc,ptend_all,ncol)
-   call physics_update(state1,ptend_loc,hdtime)
+   call physics_ptend_sum(ptend_loc,ptend_all,ncol)   !  Accumulate tendencies for output
+   call physics_update(state1,ptend_loc,hdtime)       !  Update the tmp state - state1; ptend_loc is reset to zero after the call
 
-   ! ------------------------------------------------------------ !
-   ! The rest of the code deals with diagnosing variables         !
-   ! for microphysics/radiation computation and macrophysics      !
-   ! ------------------------------------------------------------ !
    !============================================
    ! Detrainment of condensate from deep Cu
    !============================================
@@ -1668,30 +1632,20 @@ end subroutine clubb_init_cnst
       end if
    end do
 
-
    !======================================================================================
    ! Some diagnostics from CLUBB
    ! NOTE: a few variables diagnosed here are multiplied by rho which is calculated with
    ! the updated T after detrainment, so moving the related lines would result in nonBFB
    ! history output (although model integration should still be BFB).
    !======================================================================================
-
 #include "clubb_misc_diag_and_outfld.inc"
 
    !===================================
    ! Diagnose various cloud fractions
    !===================================
-   ! ATTENTION:
-   !  - before this block of code, the variable cloud_frac
-   !    contained the cloud fraction calculated by CLUBB;
-   !  - at the end of this block of code, cloud_frac becomes
-   !    max(alst, aist) + deepcu
-   !  - note that the diagnosis of PBL height uses cloud_frac.
-   !    Need to check if there is a real dependency and if the
-   !    the current code is intended. In any case, be careful
-   !    when moving PBLH diagnosis relative to this block.
-   ! ------------------------------------------------------------ !
-#include "cloud_frac_diags.inc"
+   call cloudfrac_diags( state1, cam_in, cmfmc, itim_old, liqcf_fix, &! in
+                         pbuf, cloud_frac,            &! inout
+                         alst_o                       )! out 
 
    !======================
    ! Diagnose PBL height
@@ -2968,6 +2922,10 @@ end function diag_ustar
 
  end subroutine column_total_energy_fixer
 
+
 #endif
+
+#include "cloud_frac_diags.inc"
+
 
 end module clubb_intr

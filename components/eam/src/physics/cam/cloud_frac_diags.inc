@@ -1,4 +1,56 @@
 
+ subroutine cloudfrac_diags(state1, cam_in, cmfmc, itim_old, liqcf_fix, pbuf, cloud_frac, alst_o)
+
+   use physics_types,  only: physics_state
+   use camsrfexch,     only: cam_in_t
+   use physics_buffer, only: physics_buffer_desc, pbuf_get_field
+   use time_manager,   only: is_first_step
+   use cldfrc2m,       only: aist_vector
+   use ppgrid,         only: pver, pverp, pcols
+   use constituents,   only: cnst_get_ind
+   use scamMOD,        only: single_column,scm_clubb_iop_name
+
+   type(physics_state),intent(in) :: state1
+   type(cam_in_t),     intent(in) :: cam_in
+   real(r8),           intent(in) :: cmfmc(pcols,pverp)       ! convective mass flux--m sub c           [kg/m2/s]
+   integer,            intent(in) :: itim_old
+   logical,            intent(in) :: liqcf_fix
+
+   type(physics_buffer_desc), pointer :: pbuf(:)
+   real(r8),intent(inout) :: cloud_frac(:,:)
+
+   real(r8), intent(out) :: alst_o(pcols,pver)  ! H. Wang: for old liquid status fraction
+
+   real(r8), pointer, dimension(:,:) :: cld      ! cloud fraction                               [fraction]
+   real(r8), pointer, dimension(:,:) :: concld   ! convective cloud fraction                    [fraction]
+   real(r8), pointer, dimension(:,:) :: ast      ! stratiform cloud fraction                    [fraction]
+   real(r8), pointer, dimension(:,:) :: alst     ! liquid stratiform cloud fraction             [fraction]
+   real(r8), pointer, dimension(:,:) :: aist     ! ice stratiform cloud fraction                [fraction]
+   real(r8), pointer, dimension(:,:) :: qlst     ! Physical in-stratus LWC                      [kg/kg]
+   real(r8), pointer, dimension(:,:) :: qist     ! Physical in-stratus IWC                      [kg/kg]
+   real(r8), pointer, dimension(:,:) :: deepcu   ! deep convection cloud fraction               [fraction]
+   real(r8), pointer, dimension(:,:) :: shalcu   ! shallow convection cloud fraction            [fraction]
+
+   real(r8), pointer, dimension(:,:) :: dp_icwmr ! deep convection in cloud mixing ratio        [kg/kg]
+   real(r8), pointer, dimension(:,:) :: cmfmc_sh ! Shallow convective mass flux--m subc (pcols,pverp) [kg/m2/s/]
+
+
+   real(r8), pointer, dimension(:,:) :: rcm        ! CLUBB cloud water mixing ratio               [kg/kg]
+
+
+   real(r8) :: frac_limit, ic_limit
+   real(r8) :: cldthresh                        ! threshold to determin cloud fraction          [kg/kg]
+
+   integer :: ncol, lchnk
+   integer :: i,k
+   integer :: ixq, ixcldice, ixnumice
+
+   ncol  = state1%ncol
+   lchnk = state1%lchnk
+
+   call cnst_get_ind('Q',ixq)
+   call cnst_get_ind('CLDICE',ixcldice)
+   call cnst_get_ind('NUMICE',ixnumice)
 
    ! --------------------------------------------------------------------------------- !
    !  Diagnose some quantities that are computed in macrop_tend here.                  !
@@ -8,6 +60,8 @@
    ! --------------------------------------------------------------------------------- !
    call pbuf_get_field(pbuf, alst_idx,    alst,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call pbuf_get_field(pbuf, qlst_idx,    qlst,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+   call pbuf_get_field(pbuf, rcm_idx,     rcm,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+
 
   ! HW: set alst to alst_o before getting updated
   if(liqcf_fix) then
@@ -135,3 +189,4 @@
    call pbuf_get_field(pbuf, cld_idx,     cld,     start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    cld(:,1:pver) = cloud_frac(:,1:pver)
 
+ end subroutine cloudfrac_diags
