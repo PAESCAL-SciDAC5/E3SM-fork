@@ -19,20 +19,20 @@
                ! Here add a constant to moments which can be either positive or
                !  negative.  This is to prevent clipping when dynamics tries to
                !  make all constituents positive
-               wp3(i,k) = wp3(i,k) + wp3_const
-               rtpthlp(i,k) = rtpthlp(i,k) + rtpthlp_const
-               wpthlp(i,k) = wpthlp(i,k) + wpthlp_const
-               wprtp(i,k) = wprtp(i,k) + wprtp_const
+               host_mnts%     wp3(i,k) = host_mnts%     wp3(i,k) +     wp3_const
+               host_mnts% rtpthlp(i,k) = host_mnts% rtpthlp(i,k) + rtpthlp_const
+               host_mnts%  wpthlp(i,k) = host_mnts%  wpthlp(i,k) +  wpthlp_const
+               host_mnts%   wprtp(i,k) = host_mnts%   wprtp(i,k) +   wprtp_const
 
-               ptend_loc%q(i,k,ixthlp2)=(thlp2(i,k)-state1%q(i,k,ixthlp2))*invrs_hdtime         ! THLP Variance
-               ptend_loc%q(i,k,ixrtp2)=(rtp2(i,k)-state1%q(i,k,ixrtp2))*invrs_hdtime            ! RTP Variance
-               ptend_loc%q(i,k,ixrtpthlp)=(rtpthlp(i,k)-state1%q(i,k,ixrtpthlp))*invrs_hdtime   ! RTP THLP covariance
-               ptend_loc%q(i,k,ixwpthlp)=(wpthlp(i,k)-state1%q(i,k,ixwpthlp))*invrs_hdtime      ! WPTHLP
-               ptend_loc%q(i,k,ixwprtp)=(wprtp(i,k)-state1%q(i,k,ixwprtp))*invrs_hdtime         ! WPRTP
-               ptend_loc%q(i,k,ixwp2)=(wp2(i,k)-state1%q(i,k,ixwp2))*invrs_hdtime               ! WP2
-               ptend_loc%q(i,k,ixwp3)=(wp3(i,k)-state1%q(i,k,ixwp3))*invrs_hdtime               ! WP3
-               ptend_loc%q(i,k,ixup2)=(up2(i,k)-state1%q(i,k,ixup2))*invrs_hdtime               ! UP2
-               ptend_loc%q(i,k,ixvp2)=(vp2(i,k)-state1%q(i,k,ixvp2))*invrs_hdtime               ! VP2
+               ptend_loc%q(i,k,ixthlp2)   = (host_mnts%  thlp2(i,k)-state1%q(i,k,ixthlp2  ))*invrs_hdtime   ! THLP Variance
+               ptend_loc%q(i,k,ixrtp2)    = (host_mnts%   rtp2(i,k)-state1%q(i,k,ixrtp2   ))*invrs_hdtime   ! RTP Variance
+               ptend_loc%q(i,k,ixrtpthlp) = (host_mnts%rtpthlp(i,k)-state1%q(i,k,ixrtpthlp))*invrs_hdtime   ! RTP THLP covariance
+               ptend_loc%q(i,k,ixwpthlp)  = (host_mnts% wpthlp(i,k)-state1%q(i,k,ixwpthlp ))*invrs_hdtime   ! WPTHLP
+               ptend_loc%q(i,k,ixwprtp)   = (host_mnts%  wprtp(i,k)-state1%q(i,k,ixwprtp  ))*invrs_hdtime   ! WPRTP
+               ptend_loc%q(i,k,ixwp2)     = (host_mnts%    wp2(i,k)-state1%q(i,k,ixwp2    ))*invrs_hdtime   ! WP2
+               ptend_loc%q(i,k,ixwp3)     = (host_mnts%    wp3(i,k)-state1%q(i,k,ixwp3    ))*invrs_hdtime   ! WP3
+               ptend_loc%q(i,k,ixup2)     = (host_mnts%    up2(i,k)-state1%q(i,k,ixup2    ))*invrs_hdtime   ! UP2
+               ptend_loc%q(i,k,ixvp2)     = (host_mnts%    vp2(i,k)-state1%q(i,k,ixvp2    ))*invrs_hdtime   ! VP2
             else
                ptend_loc%q(i,k,ixthlp2)=0._r8
                ptend_loc%q(i,k,ixrtp2)=0._r8

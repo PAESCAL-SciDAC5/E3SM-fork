@@ -2,7 +2,9 @@
    ! TKE
    !------
    call pbuf_get_field(pbuf, tke_idx,     tke)
-   tke(1:ncol,1:pverp) = 0.5_r8*(up2(:ncol,:pverp)+vp2(:ncol,:pverp)+wp2(:ncol,:pverp))  !  turbulent kinetic energy
+   tke(1:ncol,1:pverp) = 0.5_r8*( host_mnts% up2(:ncol,:pverp) &
+                                 +host_mnts% vp2(:ncol,:pverp) &
+                                 +host_mnts% wp2(:ncol,:pverp) )  !  turbulent kinetic energy
 
    !--------------------------------
    ! relative liquid water variance
@@ -14,22 +16,26 @@
    ! Optional Accretion enhancement factor
    !----------------------------------------
    call pbuf_get_field(pbuf, accre_enhan_idx, accre_enhan)
-    accre_enhan(:ncol,:pver) = micro_mg_accre_enhan_fac !default is 1._r8
+   accre_enhan(:ncol,:pver) = micro_mg_accre_enhan_fac !default is 1._r8
 
 
+   !----------------------------------------
+   !----------------------------------------
+   call outfld( 'UM_CLUBB',         host_mean%um,            pcols, lchnk )
+   call outfld( 'VM_CLUBB',         host_mean%vm,            pcols, lchnk )
 
+   call outfld( 'THLP2_CLUBB',      host_mnts% thlp2,        pcols, lchnk )
+   call outfld( 'WP2_CLUBB',        host_mnts% wp2,          pcols, lchnk )
+   call outfld( 'UP2_CLUBB',        host_mnts% up2,          pcols, lchnk )
+   call outfld( 'VP2_CLUBB',        host_mnts% vp2,          pcols, lchnk )
+
+   call outfld( 'UPWP_CLUBB',       host_mnts% upwp,         pcols, lchnk )
+   call outfld( 'VPWP_CLUBB',       host_mnts% vpwp,         pcols, lchnk )
 
    call outfld( 'CLOUDFRAC_CLUBB',  cloud_frac,              pcols, lchnk )
-   call outfld( 'WP2_CLUBB',        wp2,                     pcols, lchnk )
-   call outfld( 'UP2_CLUBB',        up2,                     pcols, lchnk )
-   call outfld( 'VP2_CLUBB',        vp2,                     pcols, lchnk )
 
-   call outfld( 'UPWP_CLUBB',       upwp,                    pcols, lchnk )
-   call outfld( 'VPWP_CLUBB',       vpwp,                    pcols, lchnk )
-
-   tmp_array = rtp2(:ncol,:)*1000._r8
+   tmp_array = host_mnts%rtp2(:ncol,:)*1000._r8
    call outfld( 'RTP2_CLUBB',       tmp_array,               ncol,  lchnk )
-   call outfld( 'THLP2_CLUBB',      thlp2,                   pcols, lchnk )
 
    tmp_array = host_mean%rcm(:ncol,:)*1000._r8
    call outfld( 'RCM_CLUBB',        tmp_array,               ncol,  lchnk )
@@ -46,9 +52,6 @@
    tmp_array = 1._r8*zi_out(:ncol,:)
    call outfld( 'ZM_CLUBB',         tmp_array,               ncol,  lchnk )
 
-   call outfld( 'UM_CLUBB',         host_mean%um,            pcols, lchnk )
-   call outfld( 'VM_CLUBB',         host_mean%vm,            pcols, lchnk )
-
    ! ------------------------------------------------- !
    ! Diagnose some output variables                    !
    ! ------------------------------------------------- !
@@ -64,9 +67,11 @@
    eps = rair/rh2o
 
    wpthvp_diag(:,:) = 0.0_r8
-   wpthvp_diag(:ncol,:pver) = (wpthlp(:ncol,:pver)-(apply_const*wpthlp_const))+((1._r8-eps)/eps)*real(theta0, kind = r8)* &
-                               (wprtp(:ncol,:pver)-(apply_const*wprtp_const))+((latvap/cpair)* &
-                         state1%exner(:ncol,:pver)-(1._r8/eps)*real(theta0, kind = r8))*wprcp(:ncol,:pver)
+   wpthvp_diag(:ncol,:pver) = ( host_mnts% wpthlp(:ncol,:pver)-(apply_const*wpthlp_const) ) &
+                             +  ((1._r8-eps)/eps)*real(theta0, kind = r8)                   &
+                               *(host_mnts% wprtp(:ncol,:pver)-(apply_const*wprtp_const))   &
+                             +  ((latvap/cpair)*state1%exner(:ncol,:pver)-(1._r8/eps)*real(theta0, kind = r8)) &
+                               *wprcp(:ncol,:pver)
    tmp_array = wpthvp_diag(:ncol,:)*cpair
    call outfld( 'WPTHVP_CLUBB',     tmp_array,               ncol,  lchnk )
 
@@ -87,20 +92,20 @@
    !-------------
 
    ! liquid water potential temperature flux
-   wpthlp_output(:ncol,:pverp)  = (wpthlp(:ncol,:pverp)-(apply_const*wpthlp_const))*rho(:ncol,:pverp)*cpair
+   wpthlp_output(:ncol,:pverp)  = (host_mnts%wpthlp(:ncol,:pverp)-(apply_const*wpthlp_const))*rho(:ncol,:pverp)*cpair
    call outfld( 'WPTHLP_CLUBB',     wpthlp_output,           pcols, lchnk )
  
    ! wp3 output
-   wp3_output(:ncol,:pverp) = wp3(:ncol,:pverp) - (apply_const*wp3_const)
+   wp3_output(:ncol,:pverp) = host_mnts%wp3(:ncol,:pverp) - (apply_const*wp3_const)
    call outfld( 'WP3_CLUBB',        wp3_output,              pcols, lchnk )
 
    ! rtpthlp output
-   rtpthlp_output(:ncol,:pverp) = rtpthlp(:ncol,:pverp)-(apply_const*rtpthlp_const)
+   rtpthlp_output(:ncol,:pverp) = host_mnts%rtpthlp(:ncol,:pverp)-(apply_const*rtpthlp_const)
    tmp_array = rtpthlp_output(:ncol,:)*1000._r8
    call outfld( 'RTPTHLP_CLUBB',    tmp_array,               ncol,  lchnk )
 
    ! total water mixig ratio flux
-   wprtp_output(:ncol,:pverp) = (wprtp(:ncol,:pverp)-(apply_const*wprtp_const))*rho(:ncol,:pverp)*latvap
+   wprtp_output(:ncol,:pverp) = (host_mnts%wprtp(:ncol,:pverp)-(apply_const*wprtp_const))*rho(:ncol,:pverp)*latvap
    call outfld( 'WPRTP_CLUBB',      wprtp_output,            pcols, lchnk )
 
 

@@ -1390,20 +1390,20 @@ end subroutine clubb_init_cnst
    type(clubb_mean_2d_t) :: host_mean
    type(clubb_mnts_2d_t) :: host_mnts
 
-   real(r8), pointer, dimension(:,:) :: wp2      ! vertical velocity variance                   [m^2/s^2]
-   real(r8), pointer, dimension(:,:) :: wp3      ! third moment of vertical velocity            [m^3/s^3]
-   real(r8), pointer, dimension(:,:) :: wpthlp   ! turbulent flux of thetal                     [m/s K]
-   real(r8), pointer, dimension(:,:) :: wprtp    ! turbulent flux of moisture                   [m/s kg/kg]
-   real(r8), pointer, dimension(:,:) :: rtpthlp  ! covariance of thetal and qt                  [kg/kg K]
-   real(r8), pointer, dimension(:,:) :: rtp2     ! moisture variance                            [kg^2/kg^2]
-   real(r8), pointer, dimension(:,:) :: thlp2    ! temperature variance                         [K^2]
-   real(r8), pointer, dimension(:,:) :: up2      ! east-west wind variance                      [m^2/s^2]
-   real(r8), pointer, dimension(:,:) :: vp2      ! north-south wind variance                    [m^2/s^2]
+  !real(r8), pointer, dimension(:,:) :: wp2      ! vertical velocity variance                   [m^2/s^2]
+  !real(r8), pointer, dimension(:,:) :: wp3      ! third moment of vertical velocity            [m^3/s^3]
+  !real(r8), pointer, dimension(:,:) :: wpthlp   ! turbulent flux of thetal                     [m/s K]
+  !real(r8), pointer, dimension(:,:) :: wprtp    ! turbulent flux of moisture                   [m/s kg/kg]
+  !real(r8), pointer, dimension(:,:) :: rtpthlp  ! covariance of thetal and qt                  [kg/kg K]
+  !real(r8), pointer, dimension(:,:) :: rtp2     ! moisture variance                            [kg^2/kg^2]
+  !real(r8), pointer, dimension(:,:) :: thlp2    ! temperature variance                         [K^2]
+  !real(r8), pointer, dimension(:,:) :: up2      ! east-west wind variance                      [m^2/s^2]
+  !real(r8), pointer, dimension(:,:) :: vp2      ! north-south wind variance                    [m^2/s^2]
 
-   real(r8), pointer, dimension(:,:) :: wpthvp     ! < w'th_v' > (momentum levels)                [m/s K]
-   real(r8), pointer, dimension(:,:) :: wp2thvp    ! < w'^2 th_v' > (thermodynamic levels)        [m^2/s^2 K]
-   real(r8), pointer, dimension(:,:) :: rtpthvp    ! < r_t'th_v' > (momentum levels)              [kg/kg K]
-   real(r8), pointer, dimension(:,:) :: thlpthvp   ! < th_l'th_v' > (momentum levels)             [K^2]
+  !real(r8), pointer, dimension(:,:) :: wpthvp     ! < w'th_v' > (momentum levels)                [m/s K]
+  !real(r8), pointer, dimension(:,:) :: wp2thvp    ! < w'^2 th_v' > (thermodynamic levels)        [m^2/s^2 K]
+  !real(r8), pointer, dimension(:,:) :: rtpthvp    ! < r_t'th_v' > (momentum levels)              [kg/kg K]
+  !real(r8), pointer, dimension(:,:) :: thlpthvp   ! < th_l'th_v' > (momentum levels)             [K^2]
 
    real(r8), pointer, dimension(:,:) :: pdf_zm_w_1(:,:)        !work pointer for pdf_params_zm
    real(r8), pointer, dimension(:,:) :: pdf_zm_w_2(:,:)        !work pointer for pdf_params_zm
@@ -1411,8 +1411,8 @@ end subroutine clubb_init_cnst
    real(r8), pointer, dimension(:,:) :: pdf_zm_varnce_w_2(:,:) !work pointer for pdf_params_zm
    real(r8), pointer, dimension(:,:) :: pdf_zm_mixt_frac(:,:)  !work pointer for pdf_params_zm
 
-   real(r8), pointer, dimension(:,:) :: upwp     ! east-west momentum flux                      [m^2/s^2]
-   real(r8), pointer, dimension(:,:) :: vpwp     ! north-south momentum flux                    [m^2/s^2]
+  !real(r8), pointer, dimension(:,:) :: upwp     ! east-west momentum flux                      [m^2/s^2]
+  !real(r8), pointer, dimension(:,:) :: vpwp     ! north-south momentum flux                    [m^2/s^2]
    real(r8), pointer, dimension(:,:) :: um_pert  ! perturbed meridional wind                    [m/s]
    real(r8), pointer, dimension(:,:) :: vm_pert  ! perturbed zonal wind                         [m/s]
    real(r8), pointer, dimension(:,:) :: upwp_pert! perturbed meridional wind flux               [m^2/s^2]
@@ -1570,8 +1570,8 @@ end subroutine clubb_init_cnst
    call pbuf_get_field(pbuf, vmag_gust_idx, vmag_gust)
    call pbuf_get_field(pbuf, tpert_idx,     tpert)
 
-   call gustiness( use_sgv, state1, cam_in, up2(:,pver), vp2(:,pver), &! in
-                   prec_dp, snow_dp, pblh, thlp2,                     &! in
+   call gustiness( use_sgv, state1, cam_in, host_mnts%up2(:,pver), host_mnts%vp2(:,pver), &! in
+                   prec_dp, snow_dp, pblh, host_mnts%thlp2,                     &! in
                    vmag_gust, tpert                                   )! out
 
    return

@@ -43,9 +43,8 @@
       ! After advancing CLUBB in time, apply a total energy fixer by adjusting the
       ! ending s (dry static energy).
 
-      call column_total_energy_fixer( te_b, host_mean%thlm, host_mean%rtm, host_mean%rcm, &
-                                      host_mean%exner_clubb,          &! in
-                                      host_mean%um, host_mean%vm, wp2, state1, i, &! in
+      call column_total_energy_fixer( te_b, host_mean%thlm, host_mean%rtm, host_mean%rcm, host_mean%exner_clubb, &! in
+                                      host_mean%um, host_mean%vm, host_mnts%wp2, state1, i,                      &! in
                                       clubb_s                                     )! out
 #include "clubb_ptend_cal.inc"
 
@@ -59,10 +58,10 @@
    ! ------------------------------------------------------------ !
    if (clubb_do_adv) then
       if (macmic_it .eq. cld_macmic_num_steps) then
-         wp3(:,pverp) = wp3(:,pverp) + wp3_const
-         rtpthlp(:,pverp) = rtpthlp(:,pverp) + rtpthlp_const
-         wpthlp(:,pverp) = wpthlp(:,pverp) + wpthlp_const
-         wprtp(:,pverp) = wprtp(:,pverp) + wprtp_const
+         host_mnts%     wp3(:,pverp) = host_mnts%     wp3(:,pverp) +     wp3_const
+         host_mnts% rtpthlp(:,pverp) = host_mnts% rtpthlp(:,pverp) + rtpthlp_const
+         host_mnts%  wpthlp(:,pverp) = host_mnts%  wpthlp(:,pverp) +  wpthlp_const
+         host_mnts%   wprtp(:,pverp) = host_mnts%   wprtp(:,pverp) +   wprtp_const
       endif
    endif
 
