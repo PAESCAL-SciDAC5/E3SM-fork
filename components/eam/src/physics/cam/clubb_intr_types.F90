@@ -17,8 +17,8 @@ module clubb_intr_types
    real(r8), pointer, dimension(:,:) :: rcm      ! mean cloud (liquid) water mixing ratio       [kg/kg]
    real(r8), pointer, dimension(:,:) :: cldf     ! cloud fraction                               [-]
 
-   real(r8), pointer, dimension(:,:) :: exnr     ! CLUBB's exner function                       [-]
-   real(r8), pointer, dimension(:,:) :: pmid     ! air pressure                                 [Pa]
+   real(r8), pointer, dimension(:,:) :: exner_clubb  ! CLUBB's exner function                       [-]
+   real(r8), pointer, dimension(:,:) :: pmid         ! air pressure                                 [Pa]
 
   end type clubb_mean_2d_t
 

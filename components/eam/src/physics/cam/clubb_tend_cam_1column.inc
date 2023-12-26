@@ -35,7 +35,7 @@
       call cnst_get_ind('CLDICE',ixcldice)
 
       do k=1,pver
-         thv1d(k) = state1%t(i,k)*exner_clubb(i,k)*(1._r8+zvir*state1%q(i,k,ixq)&
+         thv1d(k) = state1%t(i,k)*host_mean%exner_clubb(i,k)*(1._r8+zvir*state1%q(i,k,ixq)&
                    -state1%q(i,k,ixcldliq))
       enddo
 
@@ -43,7 +43,7 @@
       !  Inputs for the momentum levels are set below setup_clubb core
       do k=1,pver
          p_in_Pa(k+1)         = real(state1%pmid(i,pver-k+1), kind = core_rknd)             ! Pressure profile
-         exner(k+1)           = 1._core_rknd/real(exner_clubb(i,pver-k+1), kind = core_rknd)
+         exner(k+1)           = 1._core_rknd/real(host_mean%exner_clubb(i,pver-k+1), kind = core_rknd)
          rho(i,k+1)           = invrs_gravit*state1%pdel(i,pver-k+1)/dz_g(pver-k+1)
          rho_ds_zt(k+1)       = real(rho(i,k+1), kind = core_rknd)
          invrs_rho_ds_zt(k+1) = 1._core_rknd/(rho_ds_zt(k+1))                               ! Inverse ds rho at thermo

@@ -7,7 +7,7 @@
 !-------------------------------------------------------------
 #include "clubb_timestep_init_mean_state.inc"
 ! input: u, v, qv, ql, t, pmid
-! output: um, vm, thlm, rtm (and exner_clubb; why rcm also?)
+! output: um, vm, thlm, rtm, rcm (and exner_clubb)
 !-------------------------------------------------------------
 #include "clubb_timestep_init_moments.inc"
 ! input: state or pbuf
@@ -43,7 +43,8 @@
       ! After advancing CLUBB in time, apply a total energy fixer by adjusting the
       ! ending s (dry static energy).
 
-      call column_total_energy_fixer( te_b, host_mean%thlm, host_mean%rtm, host_mean%rcm, exner_clubb,          &! in
+      call column_total_energy_fixer( te_b, host_mean%thlm, host_mean%rtm, host_mean%rcm, &
+                                      host_mean%exner_clubb,          &! in
                                       host_mean%um, host_mean%vm, wp2, state1, i, &! in
                                       clubb_s                                     )! out
 #include "clubb_ptend_cal.inc"
@@ -51,6 +52,7 @@
    enddo  ! end column loop
    call t_stopf('adv_clubb_core_col_loop')
 
+   deallocate( host_mean%exner_clubb )
    ! ------------------------------------------------------------ !
    ! Add constant to ghost point so that output is not corrupted
    ! (Note that this is only done to k = pverp.)

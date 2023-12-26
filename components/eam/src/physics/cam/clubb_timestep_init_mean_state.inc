@@ -1,11 +1,11 @@
 
 
 
-   !===========================================================================================
-   !  At each CLUBB call, initialize mean momentum  and thermo CLUBB state from the CAM state
-   !===========================================================================================
+   !===================================================================================================
+   !  At each CLUBB call, initialize mean momentum  and thermo CLUBB state from the host model's state
+   !===================================================================================================
    ! From host model: u,  v;  qv, ql, t, pmid
-   ! To CLUBB:        um, vm; rtm, thlm (why rvm also?)
+   ! To CLUBB:        um, vm; rtm, thlm, rcm 
    !--------------------------------------------------------
 
    call pbuf_get_field(pbuf, um_idx, host_mean%um, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
@@ -27,10 +27,12 @@
    !  Compute exner function consistent with CLUBB's definition, which uses a constant
    !  surface pressure.  CAM's exner (in state does not).  Therefore, for consistent
    !  treatment with CLUBB code, anytime exner is needed to treat CLUBB variables
-   !  (such as thlm), use "exner_clubb" other wise use the exner in state
+   !  (such as thlm), use host_mean%exner_clubb; otherwise use the exner in state
 
-    exner_clubb(:ncol,:pver) = (real(p0_clubb, kind = r8 )/state1%pmid(:ncol,:pver))**(rair/cpair)
-    host_mean%thlm(:ncol,:pver) = state1%t(:ncol,:pver)*exner_clubb(:ncol,:pver)-(latvap/cpair)*state1%q(:ncol,:pver,ixcldliq)
+   allocate( host_mean%exner_clubb(pcols,pverp) )
+   host_mean%exner_clubb(:ncol,:pver) = (real(p0_clubb, kind = r8 )/state1%pmid(:ncol,:pver))**(rair/cpair)
+   host_mean%thlm(:ncol,:pver) = state1%t(:ncol,:pver)*host_mean%exner_clubb(:ncol,:pver) &
+                                 -(latvap/cpair)*state1%q(:ncol,:pver,ixcldliq)
 
    !---------------------------------
    ! Assign value to ghost level
