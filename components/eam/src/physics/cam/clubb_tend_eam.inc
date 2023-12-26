@@ -1,14 +1,14 @@
 
+   !-----------------------------
    ! Initialize ptend for CLUBB
-
+   !-----------------------------
    call physics_ptend_init(ptend_loc, state1%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
 
-! Load input (initial and boundary conditions) from host model's data structures
-!-------------------------------------------------------------
-#include "clubb_timestep_init_mean_state.inc"
-! input: u, v, qv, ql, t, pmid
-! output: um, vm, thlm, rtm, rcm (and exner_clubb)
-!-------------------------------------------------------------
+   !-------------------------------------------------------------
+   ! Load input (initial and boundary conditions) from host model's data structures
+   !-------------------------------------------------------------
+   call  gather_mean_fields( state1, itim_old, pbuf, host_mean ) !in, in, inout, out
+
 #include "clubb_timestep_init_moments.inc"
 ! input: state or pbuf
 ! output: 9 moments

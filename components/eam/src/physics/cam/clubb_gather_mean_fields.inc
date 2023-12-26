@@ -1,5 +1,27 @@
 
+  subroutine gather_mean_fields( state1, itim_old, pbuf, host_mean )
 
+   use constituents,    only: cnst_get_ind
+   use physics_types,   only: physics_state
+   use physics_buffer,  only: physics_buffer_desc, pbuf_get_field
+   use clubb_intr_types,only: clubb_mean_2d_t
+
+   use constituents,    only: pcnst, cnst_type
+   use co2_cycle,       only: co2_cycle_set_cnst_type
+   use physics_types,   only: set_dry_to_wet
+   
+   type(physics_state),target         :: state1
+   type(physics_buffer_desc), pointer :: pbuf(:)
+   type(clubb_mean_2d_t)              :: host_mean
+
+   integer,intent(in) :: itim_old
+
+   integer :: ncol
+   integer :: ixq, ixcldliq
+   character(len=3), dimension(pcnst) :: cnst_type_loc ! local override option for constituents cnst_type
+
+   ncol           = state1%ncol
+   host_mean%ncol = state1%ncol
 
    !===================================================================================================
    !  At each CLUBB call, initialize mean momentum and thermo CLUBB state from the host model's state
@@ -35,7 +57,7 @@
                                  -(latvap/cpair)*state1%q(:ncol,:pver,ixcldliq)
 
    !---------------------------------
-   ! Assign value to ghost level
+   ! Assign value to ghost level - this can be done later?
    !---------------------------------
 
    host_mean%um(1:ncol,pverp) = host_mean%um(1:ncol,pver)
@@ -67,3 +89,4 @@
    call co2_cycle_set_cnst_type(cnst_type_loc, 'wet')
    call set_dry_to_wet(state1, cnst_type_loc)
 
+  end subroutine gather_mean_fields

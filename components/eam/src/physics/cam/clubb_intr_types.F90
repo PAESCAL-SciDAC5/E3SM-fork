@@ -8,6 +8,8 @@ module clubb_intr_types
 
   type clubb_mean_2d_t
 
+   integer :: ncol
+
    real(r8), pointer, dimension(:,:) :: um       ! mean east-west wind                          [m/s]
    real(r8), pointer, dimension(:,:) :: vm       ! mean north-south wind                        [m/s]
 

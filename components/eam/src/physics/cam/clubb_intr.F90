@@ -19,7 +19,7 @@ module clubb_intr
   !-----------------------------------------------------------------------------------------------------
   use shr_kind_mod,  only: r8=>shr_kind_r8
   use shr_log_mod ,  only: errMsg => shr_log_errMsg
-  use ppgrid,        only: pver, pverp
+  use ppgrid,        only: pcols, pver, pverp
   use phys_control,  only: phys_getopts
   use physconst,     only: rair, cpair, gravit, latvap, latice, zvir, rh2o, karman, &
                            tms_orocnst, tms_z0fac, pi
@@ -1078,7 +1078,7 @@ end subroutine clubb_init_cnst
 
    use physics_types,  only: physics_state, physics_ptend, &
                              physics_state_copy, physics_ptend_init, &
-                             physics_ptend_sum, set_dry_to_wet
+                             physics_ptend_sum !, set_dry_to_wet
 
    use physics_update_mod, only: physics_update
 
@@ -1087,7 +1087,7 @@ end subroutine clubb_init_cnst
 
    use ppgrid,         only: pver, pverp, pcols
    use constituents,   only: cnst_get_ind, cnst_type
-   use co2_cycle,      only: co2_cycle_set_cnst_type
+  !use co2_cycle,      only: co2_cycle_set_cnst_type
    use camsrfexch,     only: cam_in_t
    use ref_pres,       only: top_lev => trop_cloud_top_lev
    use time_manager,   only: is_first_step, is_first_restart_step, get_nstep
@@ -1380,7 +1380,7 @@ end subroutine clubb_init_cnst
    integer                               :: time_elapsed                ! time keep track of stats          [s]
    character(len=200)                    :: temp1, sub                  ! Strings needed for CLUBB output
    logical                               :: l_Lscale_plume_centered, l_use_ice_latent
-   character(len=3), dimension(pcnst)    :: cnst_type_loc               ! local override option for constituents cnst_type
+  !character(len=3), dimension(pcnst)    :: cnst_type_loc               ! local override option for constituents cnst_type
 
 
    ! --------------- !
@@ -2830,6 +2830,9 @@ end function diag_ustar
 
 
 #endif
+
+
+#include "clubb_gather_mean_fields.inc"
 
 #include "cloud_frac_diags.inc"
 
