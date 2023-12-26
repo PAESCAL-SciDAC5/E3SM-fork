@@ -7,11 +7,12 @@
    !-------------------------------------------------------------
    ! Load input (initial and boundary conditions) from host model's data structures
    !-------------------------------------------------------------
-   call  gather_host_fields( cld_macmic_num_steps, macmic_it, itim_old, state1, &! in
-                             pbuf, host_mean, host_mnts, apply_const            )! inout, out
+   call gather_host_fields( cld_macmic_num_steps, macmic_it, itim_old, state1, &! in
+                            pbuf, host_mean, host_mnts, apply_const            )! inout, out
+
+   call setup_clubb_to_host_fields( pbuf, c2h )
 
 #include "clubb_misc_inout_fields.inc"
-
 
    call t_startf('adv_clubb_core_col_loop')
    !----------------------------------------------------------

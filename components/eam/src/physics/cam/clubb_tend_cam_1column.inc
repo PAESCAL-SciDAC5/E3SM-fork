@@ -540,8 +540,10 @@
           cloud_cover(i,k)  = min(real(cloud_cover_out(pverp-k+1), kind = r8),1._r8)
           zt_out(i,k)       = real(zt_g(pverp-k+1), kind = r8)
           zi_out(i,k)       = real(zi_g(pverp-k+1), kind = r8)
-          khzm(i,k)         = real(khzm_out(pverp-k+1), kind = r8)
-          khzt(i,k)         = real(khzt_out(pverp-k+1), kind = r8)
+
+          c2h%khzm(i,k)     = real(khzm_out(pverp-k+1), kind = r8)
+          c2h%khzt(i,k)     = real(khzt_out(pverp-k+1), kind = r8)
+
           qclvar(i,k)       = min(1._r8,real(qclvar_out(pverp-k+1), kind = r8))
           sclrpthvp(i,k,:)  = real(sclrpthvp_inout(pverp-k+1,:), kind = r8)
           pdf_zm_w_1(i,k) = pdf_zm_w_1_inout(pverp-k+1)

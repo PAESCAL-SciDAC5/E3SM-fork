@@ -1389,6 +1389,7 @@ end subroutine clubb_init_cnst
 
    type(clubb_mean_2d_t) :: host_mean
    type(clubb_mnts_2d_t) :: host_mnts
+   type(clubb_to_host_t) :: c2h
 
   !real(r8), pointer, dimension(:,:) :: wp2      ! vertical velocity variance                   [m^2/s^2]
   !real(r8), pointer, dimension(:,:) :: wp3      ! third moment of vertical velocity            [m^3/s^3]
@@ -1426,8 +1427,6 @@ end subroutine clubb_init_cnst
 
    real(r8), pointer, dimension(:,:) :: cloud_frac ! CLUBB cloud fraction                       [-]
 
-   real(r8), pointer, dimension(:,:) :: khzt     ! eddy diffusivity on thermo levels            [m^2/s]
-   real(r8), pointer, dimension(:,:) :: khzm     ! eddy diffusivity on momentum levels          [m^2/s]
    real(r8), pointer, dimension(:) :: pblh     ! planetary boundary layer height                [m]
    real(r8), pointer, dimension(:,:) :: tke      ! turbulent kinetic energy                     [m^2/s^2]
    real(r8), pointer, dimension(:,:) :: relvar   ! relative cloud water variance                [-]

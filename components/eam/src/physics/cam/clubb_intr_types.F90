@@ -59,5 +59,12 @@ module clubb_intr_types
 
   end type clubb_mnts_2d_t
 
+  !----------------------------------
+  type clubb_to_host_t
+
+    real(r8), pointer, dimension(:,:) ::  khzt    ! eddy diffusivity on thermo levels [m^2/s]
+    real(r8), pointer, dimension(:,:) ::  khzm    ! eddy diffusivity on thermo levels [m^2/s]
+
+  end type clubb_to_host_t
 
 end module clubb_intr_types

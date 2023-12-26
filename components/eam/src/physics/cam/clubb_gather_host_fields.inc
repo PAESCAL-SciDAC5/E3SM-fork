@@ -1,4 +1,7 @@
 
+  !===============================================================================
+  !
+  !===============================================================================
   subroutine gather_host_fields( cld_macmic_num_steps, macmic_it, itim_old,      &
                                  state1, pbuf, host_mean, host_mnts, apply_const )
 
@@ -183,3 +186,18 @@
 
    !=====================
   end subroutine gather_host_fields
+
+  !===============================================================================
+  !===============================================================================
+  subroutine setup_clubb_to_host_fields( pbuf, c2h )
+
+   use physics_buffer,  only: physics_buffer_desc, pbuf_get_field
+   use clubb_intr_types,only: clubb_to_host_t
+
+   type(physics_buffer_desc), pointer :: pbuf(:)
+   type(clubb_to_host_t)              :: c2h
+
+   call pbuf_get_field( pbuf, kvm_idx, c2h%khzt )
+   call pbuf_get_field( pbuf, kvh_idx, c2h%khzm )
+
+  end subroutine setup_clubb_to_host_fields

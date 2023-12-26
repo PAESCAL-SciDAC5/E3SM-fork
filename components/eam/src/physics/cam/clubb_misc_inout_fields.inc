@@ -9,9 +9,6 @@
    call pbuf_get_field(pbuf, radf_idx,     radf_clubb)
    call pbuf_get_field(pbuf, prer_evap_idx,prer_evap)
 
-   call pbuf_get_field(pbuf, kvm_idx,     khzt)
-   call pbuf_get_field(pbuf, kvh_idx,     khzm) 
-
    !===========================
    if (linearize_pbl_winds) then
       call pbuf_get_field(pbuf, um_pert_idx, um_pert, start=(/1,1/),          kount=(/pcols,pverp/))
