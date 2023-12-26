@@ -357,6 +357,7 @@
          pdf_params_zm%mixt_frac = pdf_zm_mixt_frac_inout
       end if
 
+
       call t_startf('adv_clubb_core_ts_loop')
       do t=1,n_clubb_core_step    ! do needed number of "sub" timesteps for each CAM step
 
@@ -365,6 +366,8 @@
             time_elapsed = time_elapsed+dtime
             call stats_begin_timestep_api(time_elapsed, 1, 1)
          endif
+
+#include "clubb_timestep_init_forcing_and_boundary.inc"
 
          !  Advance CLUBB CORE one timestep in the future
          call t_startf('advance_clubb_core')

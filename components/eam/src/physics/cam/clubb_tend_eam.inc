@@ -10,7 +10,6 @@
    call  gather_host_fields( cld_macmic_num_steps, macmic_it, itim_old, state1, &! in
                              pbuf, host_mean, host_mnts, apply_const            )! inout, out
 
-#include "clubb_timestep_init_forcing_and_boundary.inc"
 #include "clubb_misc_inout_fields.inc"
 
 
