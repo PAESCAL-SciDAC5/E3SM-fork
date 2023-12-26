@@ -19,6 +19,15 @@ module clubb_intr_types
 
    real(r8), pointer, dimension(:,:) :: exner_clubb  ! CLUBB's exner function                       [-]
    real(r8), pointer, dimension(:,:) :: pmid         ! air pressure                                 [Pa]
+   real(r8), pointer, dimension(:,:) :: pdel         ! layer thickness in pressure coordinate       [Pa]
+   real(r8), pointer, dimension(:,:) :: t            ! air temperature                              [K]
+   real(r8), pointer, dimension(:,:) :: zi           ! geopotential height at layer interface       [m]
+   real(r8), pointer, dimension(:,:) :: zm           ! geopotential height at layer midpoint        [m]
+   real(r8), pointer, dimension(:,:) :: omega        ! vertical velocity in pressure coordinate [Pa/s]
+   real(r8), pointer, dimension(:)   :: lat          ! latitude  [rad]
+   real(r8), pointer, dimension(:)   :: lon          ! longitude [rad]
+
+   real(r8), pointer, dimension(:,:,:) :: q          ! tracer mixing ratio  [-]
 
   end type clubb_mean_2d_t
 

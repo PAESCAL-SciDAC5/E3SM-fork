@@ -10,22 +10,22 @@
       !------------------------------------------------------------------------------
       !  Define the CLUBB momentum grid (in height, units of m)
       do k=1,pverp
-         dum1 = state1%zi(i,pverp-k+1)-state1%zi(i,pver+1)
+         dum1 = host_mean%zi(i,pverp-k+1)-host_mean%zi(i,pver+1)
          zi_g(k) = real(dum1, kind = core_rknd)
       enddo
 
       !  Define the CLUBB thermodynamic grid (in units of m)
       do k=1,pver
-         dum1 = state1%zm(i,pver-k+1)-state1%zi(i,pver+1)
+         dum1 = host_mean%zm(i,pver-k+1)-host_mean%zi(i,pver+1)
          zt_g(k+1) = real(dum1, kind = core_rknd)
-         dz_g(k) = state1%zi(i,k)-state1%zi(i,k+1)  ! compute thickness
+         dz_g(k) = host_mean%zi(i,k)-host_mean%zi(i,k+1)  ! compute thickness
       enddo
 
       !  Thermodynamic ghost point is below surface
       zt_g(1) = -1._core_rknd*zt_g(2)
 
       !  Set the elevation of the surface
-      sfc_elevation = real(state1%zi(i,pver+1), kind = core_rknd)
+      sfc_elevation = real(host_mean%zi(i,pver+1), kind = core_rknd)
 
       !------------------------------------------------------------------------------
       !  Compute virtual potential temperature, which is needed for CLUBB
@@ -35,24 +35,24 @@
       call cnst_get_ind('CLDICE',ixcldice)
 
       do k=1,pver
-         thv1d(k) = state1%t(i,k)*host_mean%exner_clubb(i,k)*(1._r8+zvir*state1%q(i,k,ixq)&
-                   -state1%q(i,k,ixcldliq))
+         thv1d(k) = host_mean%t(i,k)*host_mean%exner_clubb(i,k)*(1._r8+zvir*host_mean%q(i,k,ixq)&
+                   -host_mean%q(i,k,ixcldliq))
       enddo
 
       !  Compute thermodynamic stuff needed for CLUBB on thermo levels.
       !  Inputs for the momentum levels are set below setup_clubb core
       do k=1,pver
-         p_in_Pa(k+1)         = real(state1%pmid(i,pver-k+1), kind = core_rknd)             ! Pressure profile
+         p_in_Pa(k+1)         = real(host_mean%pmid(i,pver-k+1), kind = core_rknd)             ! Pressure profile
          exner(k+1)           = 1._core_rknd/real(host_mean%exner_clubb(i,pver-k+1), kind = core_rknd)
-         rho(i,k+1)           = invrs_gravit*state1%pdel(i,pver-k+1)/dz_g(pver-k+1)
+         rho(i,k+1)           = invrs_gravit*host_mean%pdel(i,pver-k+1)/dz_g(pver-k+1)
          rho_ds_zt(k+1)       = real(rho(i,k+1), kind = core_rknd)
          invrs_rho_ds_zt(k+1) = 1._core_rknd/(rho_ds_zt(k+1))                               ! Inverse ds rho at thermo
 
          thv_ds_zt(k+1)       = real(thv1d(pver-k+1), kind = core_rknd)                       ! thetav on thermo
 
-         rfrzm(k+1)           = real(state1%q(i,pver-k+1,ixcldice), kind = core_rknd)
+         rfrzm(k+1)           = real(host_mean%q(i,pver-k+1,ixcldice), kind = core_rknd)
          radf(k+1)            = real(radf_clubb(i,pver-k+1), kind = core_rknd)
-         dum1                 = qrl(i,pver-k+1)/(cpair*state1%pdel(i,pver-k+1))
+         dum1                 = qrl(i,pver-k+1)/(cpair*host_mean%pdel(i,pver-k+1))
          qrl_clubb(k+1)       = real(dum1, kind = core_rknd)
       enddo
 
@@ -72,7 +72,7 @@
       !  Compute mean w wind on thermo grid, convert from omega to w
       wm_zt(1) = 0._core_rknd
       do k=1,pver
-        dum1 = -1._r8*state1%omega(i,pver-k+1)*real(invrs_rho_ds_zt(k+1), kind = r8)*invrs_gravit
+        dum1 = -1._r8*host_mean%omega(i,pver-k+1)*real(invrs_rho_ds_zt(k+1), kind = r8)*invrs_gravit
         wm_zt(k+1) = real(dum1, kind = core_rknd)
       enddo
 
@@ -165,9 +165,9 @@
       ! Apply TMS                                         !
       ! ------------------------------------------------- !
        if ( do_tms ) then
-         dum_core_rknd = real((ksrftms(i)*state1%u(i,pver)), kind = core_rknd)
+         dum_core_rknd = real((ksrftms(i)*host_mean%um(i,pver)), kind = core_rknd)
          upwp_sfc      = upwp_sfc-(dum_core_rknd/rho_ds_zm(1))
-         dum_core_rknd = real((ksrftms(i)*state1%v(i,pver)), kind = core_rknd)
+         dum_core_rknd = real((ksrftms(i)*host_mean%vm(i,pver)), kind = core_rknd)
          vpwp_sfc      = vpwp_sfc-(dum_core_rknd/rho_ds_zm(1))
        endif
 
@@ -295,7 +295,7 @@
          if (lq(ixind))  then
             icnt=icnt+1
             do k=1,pver
-               edsclr_in(k+1,icnt) = real(state1%q(i,pver-k+1,ixind), kind = core_rknd)
+               edsclr_in(k+1,icnt) = real(host_mean%q(i,pver-k+1,ixind), kind = core_rknd)
             enddo
             edsclr_in(1,icnt) = edsclr_in(2,icnt)
          end if
@@ -325,8 +325,8 @@
 
          do k = 1, pver
            if (abs(prer_evap(i,k)) .gt. 0._r8) then
-             orgparam = orgparam + (abs(prer_evap(i,k)) * 1000._r8 * 1000._r8 * 2._r8 ) * state1%pdel(i,k)
-             delpavg = delpavg + state1%pdel(i,k)
+             orgparam = orgparam + (abs(prer_evap(i,k)) * 1000._r8 * 1000._r8 * 2._r8 ) * host_mean%pdel(i,k)
+             delpavg = delpavg + host_mean%pdel(i,k)
            endif
          enddo
 
@@ -408,10 +408,10 @@
 
          if ( err_code == clubb_fatal_error ) then
             write(fstderr,*) "Fatal error in CLUBB: at timestep ", get_nstep(), &
-                 "LAT (radians): ", state1%lat(i), &
-                 "LON (radians): ", state1%lon(i), &
-                 "LAT (degrees): ", rad_to_deg*state1%lat(i), &
-                 "LON (degrees): ", rad_to_deg*state1%lon(i), &
+                 "LAT (radians): ", host_mean%lat(i), &
+                 "LON (radians): ", host_mean%lon(i), &
+                 "LAT (degrees): ", rad_to_deg*host_mean%lat(i), &
+                 "LON (degrees): ", rad_to_deg*host_mean%lon(i), &
                  "Global Column Number: ", get_gcol_p(lchnk,i)
             call endrun('clubb_tend_cam:  Fatal error in CLUBB library'//errmsg(__FILE__,__LINE__))
          end if

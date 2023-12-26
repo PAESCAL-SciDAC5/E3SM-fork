@@ -2,7 +2,7 @@
 
 
    !===================================================================================================
-   !  At each CLUBB call, initialize mean momentum  and thermo CLUBB state from the host model's state
+   !  At each CLUBB call, initialize mean momentum and thermo CLUBB state from the host model's state
    !===================================================================================================
    ! From host model: u,  v;  qv, ql, t, pmid
    ! To CLUBB:        um, vm; rtm, thlm, rcm 
@@ -44,6 +44,20 @@
    host_mean%rtm(1:ncol,pverp)  = host_mean%rtm(1:ncol,pver)
    host_mean%thlm(1:ncol,pverp) = host_mean%thlm(1:ncol,pver)
 
+   !===================================================================================================
+   ! Associate pointers to additional variables in host model's state vector that are needed below
+   !===================================================================================================
+   host_mean%zi    => state1%zi
+   host_mean%zm    => state1%zm
+   host_mean%pmid  => state1%pmid
+   host_mean%pdel  => state1%pdel
+   host_mean%t     => state1%t
+   host_mean%omega => state1%omega
+   host_mean%q     => state1%q
+
+   host_mean%lat   => state1%lat
+   host_mean%lon   => state1%lon
+   
    !=====================================================
    ! Passive tracers:
    ! Constituents are all treated as wet mmr by clubb

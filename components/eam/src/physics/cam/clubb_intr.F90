@@ -1175,7 +1175,7 @@ end subroutine clubb_init_cnst
 
 #ifdef CLUBB_SGS
 
-   type(physics_state) :: state1                ! Local copy of state variable
+   type(physics_state),target :: state1                ! Local copy of state variable
    type(physics_ptend) :: ptend_loc             ! Local tendency from processes, added up to return as ptend_all
 
    integer :: i, j, k, t, ixind
