@@ -2832,7 +2832,7 @@ end function diag_ustar
 #endif
 
 
-#include "clubb_gather_mean_fields.inc"
+#include "clubb_gather_host_fields.inc"
 
 #include "cloud_frac_diags.inc"
 
