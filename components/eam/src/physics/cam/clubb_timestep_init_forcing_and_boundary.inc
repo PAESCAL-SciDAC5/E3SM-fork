@@ -16,6 +16,14 @@
    rtp3_in(:)  = 0.0_core_rknd
    thlp3_in(:) = 0.0_core_rknd
 
+   !  Higher order scalar inouts, set to zero
+   sclrpthvp_inout(1:pverp,:) = 0._core_rknd
+             sclrm(1:pverp,:) = 0._core_rknd
+           wpsclrp(1:pverp,:) = 0._core_rknd
+            sclrp2(1:pverp,:) = 0._core_rknd
+          sclrprtp(1:pverp,:) = 0._core_rknd
+         sclrpthlp(1:pverp,:) = 0._core_rknd
+
    !  Define surface sources for transported variables for diffusion, will
    !  be zero as these tendencies are done in clubb_surface
    do ixind=1,edsclr_dim

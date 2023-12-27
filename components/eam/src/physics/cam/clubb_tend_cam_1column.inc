@@ -206,19 +206,12 @@
          pdf_zm_varnce_w_2_inout(k) = pdf_zm_varnce_w_2(i,pverp-k+1)
          pdf_zm_mixt_frac_inout(k) =  pdf_zm_mixt_frac(i,pverp-k+1)
 
-         !  Higher order scalar inouts, set to zero
-         sclrpthvp_inout(k,:)= 0._core_rknd
-         sclrm(k,:)          = 0._core_rknd
-         wpsclrp(k,:)        = 0._core_rknd
-         sclrp2(k,:)         = 0._core_rknd
-         sclrprtp(k,:)       = 0._core_rknd
-         sclrpthlp(k,:)      = 0._core_rknd
-
          if (k .ne. 1) then
             pre_in(k)    = real(prer_evap(i,pverp-k+1), kind = core_rknd)
          endif
 
       enddo
+      pre_in(1) = pre_in(2)
 
       if (linearize_pbl_winds) then
          ! Each host model time step, reset the perturbed variables to be equal to
@@ -261,12 +254,6 @@
          nullify(vpwp_pert_col)
       end if
 
-      pre_in(1) = pre_in(2)
-
-      !  Initialize these to prevent crashing behavior
-      edsclr_in(:,:)      = 0._core_rknd
-      edsclr_out(:,:)     = 0._r8
-
 
       if (clubb_do_adv) then
         if (macmic_it .eq. 1) then
@@ -289,7 +276,12 @@
         endif
       endif
 
-      !  Do the same for tracers
+      !  Initialize these to prevent crashing behavior
+      edsclr_in(:,:)      = 0._core_rknd
+      edsclr_out(:,:)     = 0._r8
+
+      !  Get input values for tracers
+ 
       icnt=0
       do ixind=1,pcnst
          if (lq(ixind))  then
