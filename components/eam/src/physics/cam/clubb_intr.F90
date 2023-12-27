@@ -1110,10 +1110,6 @@ end subroutine clubb_init_cnst
    use parameters_tunable,        only: mu
    use clubb_api_module, only: &
         cleanup_clubb_core_api, &
-        nparams, &
-        read_parameters_api, &
-        setup_parameters_api, &
-        setup_grid_heights_api, &
         w_tol_sqd, &
         rt_tol, &
         thl_tol, &
@@ -1290,7 +1286,6 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: qrl_zm(pverp)
    real(core_rknd) :: thlp2_rad_out(pverp)
 
-   real(core_rknd), dimension(nparams)  :: clubb_params ! These adjustable CLUBB parameters (C1, C2 ...)
    real(core_rknd), dimension(sclr_dim) :: sclr_tol     ! Tolerance on passive scalar       [units vary]
 
    real(core_rknd) :: dum_core_rknd                    ! dummy variable  [units vary]
@@ -2840,11 +2835,12 @@ end function diag_ustar
 
  end subroutine column_total_energy_fixer
 
+#include "clubb_gather_host_fields.inc"
+#include "clubb_setup_zgrid_1col.inc"
 
 #endif
 
 
-#include "clubb_gather_host_fields.inc"
 
 #include "cloud_frac_diags.inc"
 

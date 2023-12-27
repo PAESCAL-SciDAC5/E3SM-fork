@@ -46,6 +46,11 @@
       stats_tout  = hdtime_core_rknd
 
       !------------------------------------------------------------------------------------
+      ! Setup CLUBB's z-grid for this column of the host model
+      !------------------------------------------------------------------------------------
+      call setup_clubb_zgrid_for_1column( pver, pverp, host_mean%zi(i,:), host_mean%zm(i,:), &
+                                          zt_bot, sfc_elevation, zt_out(i,:), zi_out(i,:)    )
+
 #include "clubb_tend_cam_1column.inc"
 
       !---------------------------------------------------------------------------------------------------------
