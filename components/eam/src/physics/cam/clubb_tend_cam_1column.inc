@@ -1,31 +1,37 @@
-      invrs_gravit = 1._r8 / gravit
- 
-      !------------------------------------------------------------------------------
-      !  Set time_elapsed to host model time step, this is for CLUBB's budget stats
-      !------------------------------------------------------------------------------
-      time_elapsed = hdtime_core_rknd
-
+      !=========================
       !------------------------------------------------------------------------------
       ! CLUBB's z-grid
       !------------------------------------------------------------------------------
       !  Define the CLUBB momentum grid (in height, units of m)
       do k=1,pverp
-         dum1 = host_mean%zi(i,pverp-k+1)-host_mean%zi(i,pver+1)
-         zi_g(k) = real(dum1, kind = core_rknd)
+         zi_g(k) = real( host_mean%zi(i,pverp-k+1)-host_mean%zi(i,pver+1), kind = core_rknd)
       enddo
 
       !  Define the CLUBB thermodynamic grid (in units of m)
       do k=1,pver
-         dum1 = host_mean%zm(i,pver-k+1)-host_mean%zi(i,pver+1)
-         zt_g(k+1) = real(dum1, kind = core_rknd)
-         dz_g(k) = host_mean%zi(i,k)-host_mean%zi(i,k+1)  ! compute thickness
+         zt_g(k+1) = real( host_mean%zm(i,pver-k+1)-host_mean%zi(i,pver+1), kind = core_rknd)
       enddo
+      zt_g(1) = -1._core_rknd*zt_g(2)  ! ghost point is below surface
 
-      !  Thermodynamic ghost point is below surface
-      zt_g(1) = -1._core_rknd*zt_g(2)
+      !  Read in parameters for CLUBB. Pack the default and updated (via nml) tunable parameters into clubb_params
+      call read_parameters_api( -99, "", clubb_params )
 
-      !  Set the elevation of the surface
-      sfc_elevation = real(host_mean%zi(i,pver+1), kind = core_rknd)
+      !  Setup CLUBB's z-grid because heights are given by the host model and hence can change
+
+      call setup_grid_heights_api(l_implemented, grid_type, zi_g(2), zi_g(1), zi_g, zt_g)
+      call setup_parameters_api(zi_g(2), clubb_params, pverp, grid_type, zi_g, zt_g, err_code)
+
+      !----------------------------------
+      !----------------------------------
+      zt_bot = zt_g(2)  ! lowst thermo level above ground. Used for specifying ustar in single column runs
+      sfc_elevation = real(host_mean%zi(i,pver+1), kind = core_rknd)  ! the elevation of the surface. Input to clubb_core
+
+      !----------------------------------
+      do k=1,pverp
+         zt_out(i,k) = real(zt_g(pverp-k+1), kind = r8)
+         zi_out(i,k) = real(zi_g(pverp-k+1), kind = r8)
+      enddo
+      !=========================
 
       !------------------------------------------------------------------------------
       !  Compute virtual potential temperature, which is needed for CLUBB
@@ -33,6 +39,13 @@
       do k=1,pver
          thv1d(k) = host_mean%t(i,k)*host_mean%exner_clubb(i,k)*(1._r8+zvir*host_mean%q(i,k,ixq)&
                    -host_mean%q(i,k,ixcldliq))
+      enddo
+
+      !------------------------------------------------------------------------------
+      invrs_gravit = 1._r8 / gravit
+
+      do k=1,pver
+         dz_g(k) = host_mean%zi(i,k)-host_mean%zi(i,k+1)  ! compute thickness
       enddo
 
       !  Compute thermodynamic stuff needed for CLUBB on thermo levels.
@@ -114,7 +127,7 @@
            trim(scm_clubb_iop_name) .eq. 'toga' .or. trim(scm_clubb_iop_name) .eq. 'mpace' .or. &
            trim(scm_clubb_iop_name) .eq. 'ARM_CC') then
 
-             dum1   = real(zt_g(2), kind = r8)
+             dum1   = real(zt_bot, kind = r8)
              bflx22 = (gravit/real(theta0, kind = r8))*real(wpthlp_sfc, kind = r8)
              ustar  = diag_ustar(dum1,bflx22,ubar,zo)
         endif
@@ -125,26 +138,10 @@
 
       endif
 
-      !  Set stats output and increment equal to CLUBB and host dt
-      stats_tsamp = dtime
-      stats_tout  = hdtime_core_rknd
 
-      !  Heights need to be set at each timestep.  Therefore, recall
-      !  setup_grid and setup_parameters for this.
+      !  Compute some inputs from the thermodynamic grid to the momentum grid
+      !  Note: this can only be done after "call setup_grid_heights_api"
 
-      !  Read in parameters for CLUBB.  Pack the default and updated (via nml)
-      !  tunable parameters into clubb_params
-      call read_parameters_api( -99, "", clubb_params )
-
-      !  Set-up CLUBB core at each CLUBB call because heights can change
-      call setup_grid_heights_api(l_implemented, grid_type, zi_g(2), &
-         zi_g(1), zi_g, zt_g)
-
-      call setup_parameters_api(zi_g(2), clubb_params, pverp, grid_type, &
-        zi_g, zt_g, err_code)
-
-      !  Compute some inputs from the thermodynamic grid
-      !  to the momentum grid
       rho_ds_zm       = zt2zm_api(rho_ds_zt)
       rho_zm          = zt2zm_api(rho_zt)
       invrs_rho_ds_zm = zt2zm_api(invrs_rho_ds_zt)
@@ -526,8 +523,7 @@
           cloud_frac(i,k)   = min(real(cloud_frac_inout(pverp-k+1), kind = r8),1._r8)
           rcm_in_layer(i,k) = real(rcm_in_layer_out(pverp-k+1), kind = r8)
           cloud_cover(i,k)  = min(real(cloud_cover_out(pverp-k+1), kind = r8),1._r8)
-          zt_out(i,k)       = real(zt_g(pverp-k+1), kind = r8)
-          zi_out(i,k)       = real(zi_g(pverp-k+1), kind = r8)
+
 
           c2h%khzm(i,k)     = real(khzm_out(pverp-k+1), kind = r8)
           c2h%khzt(i,k)     = real(khzt_out(pverp-k+1), kind = r8)

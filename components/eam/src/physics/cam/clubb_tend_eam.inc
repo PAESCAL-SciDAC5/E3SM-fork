@@ -20,26 +20,37 @@
    !----------------------------------------------------------
    do i=1,ncol   ! loop over columns
 
+      !-----------------------------------------------------------------
       ! Calculate column total energy before CLUBB. The value is saved
       ! for the energy fixer at the end of the column loop.
- 
+      !-----------------------------------------------------------------
       call column_total_energy( state1, cam_in, i, hdtime, &! in
                                 te_b                       )! out, scalar
 
+      !------------------------------------------------------------------------------------
       ! CLUBB can be substepped with respect to the host model's timestep hdtime.
       ! Determine the substepsize and number of substeps for CLUBB.
       ! Note that in the standard EAM which uses the same vertical grid for all processes,
       ! this call only needs to be done once at the beginning of an integration.
       ! But we place the call here (meaning repeating the calculation every timestep and
       ! in each grid column), as we are preparing for the implementation of AMR.
+      !------------------------------------------------------------------------------------
 
       call determine_clubb_dtime( hdtime, clubb_timestep, hdtime_core_rknd, dtime, n_clubb_core_step ) ! 2xin, 3xout
 
+      ! Set time_elapsed to host model time step, this is for CLUBB's budget stats
+      time_elapsed = hdtime_core_rknd
+
+      ! Set stats output and increment equal to CLUBB and host dt
+      stats_tsamp = dtime
+      stats_tout  = hdtime_core_rknd
+
+      !------------------------------------------------------------------------------------
 #include "clubb_tend_cam_1column.inc"
 
-      ! After advancing CLUBB in time, apply a total energy fixer by adjusting the
-      ! ending s (dry static energy).
-
+      !---------------------------------------------------------------------------------------------------------
+      ! After advancing CLUBB in time, apply a total energy fixer by adjusting the ending s (dry static energy)
+      !---------------------------------------------------------------------------------------------------------
       call column_total_energy_fixer( te_b, host_mean%thlm, host_mean%rtm, host_mean%rcm, host_mean%exner_clubb, &! in
                                       host_mean%um, host_mean%vm, host_mnts%wp2, state1, i,                      &! in
                                       clubb_s                                     )! out
