@@ -1105,6 +1105,7 @@ end subroutine clubb_init_cnst
    use macrop_driver_with_clubb,  only: ice_supersat_adj_tend
    use macrop_driver_with_clubb,  only: pblh_diag
    use macrop_driver_with_clubb,  only: gustiness
+   use macrop_driver_with_clubb,  only: deepcu_detrainment_tend
 
    use parameters_tunable,        only: mu
    use clubb_api_module, only: &
@@ -1358,9 +1359,8 @@ end subroutine clubb_init_cnst
    real(r8) :: tautmsx(pcols)                   ! U component of turbulent mountain stress      [N/m2]
    real(r8) :: tautmsy(pcols)                   ! V component of turbulent mountain stress      [N/m2]
 
-   real(r8) :: dlf2(pcols,pver)                 ! Detraining cld H20 from shallow convection    [kg/kg/day]
-
-   real(r8) :: latsub
+  !real(r8) :: dlf2(pcols,pver)                 ! Detraining cld H20 from shallow convection    [kg/kg/day]
+  !real(r8) :: latsub
 
    integer  :: ktop(pcols,pver)
    integer  :: ncvfin(pcols)
@@ -1442,7 +1442,7 @@ end subroutine clubb_init_cnst
    real(r8), pointer, dimension(:,:) :: radf_clubb
 !PMA
    real(r8)  relvarc(pcols,pver)
-   logical :: lqice(pcnst)  ! det
+  !logical :: lqice(pcnst)  ! det
 
    integer :: ixorg
 
@@ -1483,6 +1483,14 @@ end subroutine clubb_init_cnst
 
    itim_old = pbuf_old_tim_idx()
 
+   ! Some tracer indices
+
+   call cnst_get_ind('Q',ixq)
+   call cnst_get_ind('CLDLIQ',ixcldliq)
+   call cnst_get_ind('CLDICE',ixcldice)
+   call cnst_get_ind('NUMLIQ',ixnumliq)
+   call cnst_get_ind('NUMICE',ixnumice)
+
    !===========================
    ! Ice Saturation Adjustment
    !===========================
@@ -1521,10 +1529,12 @@ end subroutine clubb_init_cnst
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)   !  Accumulate tendencies for output
    call physics_update(state1,ptend_loc,hdtime)       !  Update the tmp state - state1; ptend_loc is reset to zero after the call
 
-   !============================================
-   ! Detrainment of condensate from deep Cu
-   !============================================
-#include "detrain.inc"
+   !===================================
+   ! Detrained condensate from deep Cu
+   !===================================
+   call deepcu_detrainment_tend( state1, ixcldliq, ixcldice, ixnumliq, ixnumice, dlf,                              &! in
+                                 clubb_tk1, clubb_tk2, clubb_liq_deep, clubb_liq_sh, clubb_ice_deep, clubb_ice_sh, &! in
+                                 ptend_loc, det_s, det_ice                                                         )! out
 
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
@@ -1540,7 +1550,7 @@ end subroutine clubb_init_cnst
    !======================================================================================
    ! Some diagnostics from CLUBB
    ! NOTE: a few variables diagnosed here are multiplied by rho which is calculated with
-   ! the updated T after detrainment, so moving the related lines would result in nonBFB
+   ! the updated T after detrainment, so moving the respective lines would result in nonBFB
    ! history output (although model integration should still be BFB).
    !======================================================================================
 #include "clubb_misc_diag_and_outfld.inc"
@@ -1570,8 +1580,8 @@ end subroutine clubb_init_cnst
    call pbuf_get_field(pbuf, tpert_idx,     tpert)
 
    call gustiness( use_sgv, state1, cam_in, host_mnts%up2(:,pver), host_mnts%vp2(:,pver), &! in
-                   prec_dp, snow_dp, pblh, host_mnts%thlp2,                     &! in
-                   vmag_gust, tpert                                   )! out
+                   prec_dp, snow_dp, pblh, host_mnts%thlp2,                               &! in
+                   vmag_gust, tpert                                                       )! out
 
    return
 #endif

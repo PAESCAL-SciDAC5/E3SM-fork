@@ -10,6 +10,7 @@ module macrop_driver_with_clubb
 
   private
   public :: ice_supersat_adj_tend
+  public :: deepcu_detrainment_tend
   public :: pblh_diag
   public :: gustiness
 
@@ -91,7 +92,108 @@ contains
 
   end subroutine ice_supersat_adj_tend
 
+  !---------------------------------------------------------------------------------
+  ! Detrainment of convective condensate into the environment or stratiform cloud   
+  !---------------------------------------------------------------------------------
+  subroutine deepcu_detrainment_tend( state1, ixcldliq, ixcldice, ixnumliq, ixnumice, &
+                                      dlf, clubb_tk1, clubb_tk2,    &
+                                      clubb_liq_deep, clubb_liq_sh, &
+                                      clubb_ice_deep, clubb_ice_sh, &
+                                      ptend_loc, det_s, det_ice )
 
+   use physconst,      only: cpair, gravit, latice
+   use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
+
+   type(physics_state),intent(in) :: state1
+   integer,  intent(in)  :: ixcldliq,ixcldice,ixnumliq,ixnumice
+   real(r8), intent(in)  :: dlf(pcols,pver)          ! Detraining cld H20 from deep convection [kg/ks/s]
+   real(r8), intent(in)  :: clubb_tk1, clubb_tk2
+   real(r8), intent(in)  :: clubb_liq_deep
+   real(r8), intent(in)  :: clubb_liq_sh
+   real(r8), intent(in)  :: clubb_ice_deep
+   real(r8), intent(in)  :: clubb_ice_sh
+
+   type(physics_ptend),intent(out) :: ptend_loc
+   real(r8), intent(out) :: det_s  (pcols)    ! Integral of detrained static energy from ice
+   real(r8), intent(out) :: det_ice(pcols)    ! Integral of detrained ice for energy check   
+
+   integer  :: ncol, lchnk
+   integer  :: i,k
+   real(r8) :: invrs_gravit
+   real(r8) :: dlf2(pcols,pver)  ! Detraining cld H20 from shallow convection    [kg/kg/day]
+   logical  :: lqice(pcnst)
+   real(r8) :: dum1
+
+   ncol  = state1%ncol
+   lchnk = state1%lchnk
+
+   invrs_gravit = 1._r8 / gravit
+
+   det_s(:)   = 0.0_r8
+   det_ice(:) = 0.0_r8
+
+   dlf2(:,:) = 0.0_r8  ! shallow convective detrainment rate is zero when CLUBB is used.
+
+   lqice(:)        = .false.
+   lqice(ixcldliq) = .true.
+   lqice(ixcldice) = .true.
+   lqice(ixnumliq) = .true.
+   lqice(ixnumice) = .true.
+
+   call physics_ptend_init(ptend_loc,state1%psetcols, 'clubb_det', ls=.true., lq=lqice)
+
+   call t_startf('ice_cloud_detrain_diag')
+   do k=1,pver
+      do i=1,ncol
+         if( state1%t(i,k) > clubb_tk1 ) then
+            dum1 = 0.0_r8
+         elseif ( state1%t(i,k) < clubb_tk2 ) then
+            dum1 = 1.0_r8
+         else
+            !Note: Denominator is changed from 30.0_r8 to (clubb_tk1 - clubb_tk2),
+            !(clubb_tk1 - clubb_tk2) is also 30.0 but it introduced a non-bfb change
+            dum1 = ( clubb_tk1 - state1%t(i,k) ) /(clubb_tk1 - clubb_tk2)
+         endif
+
+         ptend_loc%q(i,k,ixcldliq) = dlf(i,k) * ( 1._r8 - dum1 )
+         ptend_loc%q(i,k,ixcldice) = dlf(i,k) * dum1
+         ptend_loc%q(i,k,ixnumliq) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) * ( 1._r8 - dum1 ) ) &
+                                     / (4._r8*3.14_r8* clubb_liq_deep**3*997._r8) + & ! Deep    Convection
+                                     3._r8 * (                         dlf2(i,k)    * ( 1._r8 - dum1 ) ) &
+                                     / (4._r8*3.14_r8*clubb_liq_sh**3*997._r8)     ! Shallow Convection
+         ptend_loc%q(i,k,ixnumice) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) *  dum1 ) &
+                                     / (4._r8*3.14_r8*clubb_ice_deep**3*500._r8) + & ! Deep    Convection
+                                     3._r8 * (                         dlf2(i,k)    *  dum1 ) &
+                                     / (4._r8*3.14_r8*clubb_ice_sh**3*500._r8)     ! Shallow Convection
+         ptend_loc%s(i,k)          = dlf(i,k) * dum1 * latice
+
+         ! Only rliq is saved from deep convection, which is the reserved liquid.  We need to keep
+         !   track of the integrals of ice and static energy that is effected from conversion to ice
+         !   so that the energy checker doesn't complain.
+         det_s(i)                  = det_s(i) + ptend_loc%s(i,k)*state1%pdel(i,k)*invrs_gravit
+         det_ice(i)                = det_ice(i) - ptend_loc%q(i,k,ixcldice)*state1%pdel(i,k)*invrs_gravit
+
+      enddo
+   enddo
+
+   det_ice(:ncol) = det_ice(:ncol)/1000._r8  ! divide by density of water
+   call t_stopf('ice_cloud_detrain_diag')
+
+   call outfld( 'DPDLFLIQ', ptend_loc%q(:,:,ixcldliq), pcols, lchnk)
+   call outfld( 'DPDLFICE', ptend_loc%q(:,:,ixcldice), pcols, lchnk)
+   call outfld( 'DPDLFT',   ptend_loc%s(:,:)/cpair, pcols, lchnk)
+
+  end subroutine deepcu_detrainment_tend
+
+  !--------------------------------------------------------------------------
+  ! Diagnose PBL height
+  !--------------------------------------------------------------------------
+  ! Hui Wan's note from 2023-12:
+  !  This subroutine contains code lines separated from clubb_tend_cam.
+  !  There seems to be a bug in the original code: the variable dz_g_bot
+  !  here, which correspond to dz_g(pver) in the original code,
+  !  should have a column dimension.
+  !--------------------------------------------------------------------------
   subroutine pblh_diag( state1, cam_in, cloud_frac, dz_g_bot, use_sgv, pblh )
 
    use physconst,      only: gravit,zvir
@@ -173,6 +275,10 @@ contains
   end subroutine pblh_diag
   !------------------------
 
+  !----------------------------------------------------------------------------------
+  ! The gustiness subroutine contains code lines separated from clubb_tend_cam.
+  ! Note in the original subroutine: !PMA adds gustiness and tpert
+  !----------------------------------------------------------------------------------
   subroutine gustiness( use_sgv, state1, cam_in, up2b, vp2b, prec_dp, snow_dp, pblh, thlp2, &! in
                         vmag_gust, tpert )
 
@@ -203,8 +309,6 @@ contains
     real(r8),parameter :: gust_facl = 1.2_r8 !gust fac for land
     real(r8),parameter :: gust_faco = 0.9_r8 !gust fac for ocean
     real(r8),parameter :: gust_facc = 1.5_r8 !gust fac for clubb
-
-!PMA adds gustiness and tpert
 
     ncol  = state1%ncol
     lchnk = state1%lchnk

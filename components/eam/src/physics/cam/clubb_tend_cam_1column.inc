@@ -30,10 +30,6 @@
       !------------------------------------------------------------------------------
       !  Compute virtual potential temperature, which is needed for CLUBB
 
-      call cnst_get_ind('Q',ixq)
-      call cnst_get_ind('CLDLIQ',ixcldliq)
-      call cnst_get_ind('CLDICE',ixcldice)
-
       do k=1,pver
          thv1d(k) = host_mean%t(i,k)*host_mean%exner_clubb(i,k)*(1._r8+zvir*host_mean%q(i,k,ixq)&
                    -host_mean%q(i,k,ixcldliq))
