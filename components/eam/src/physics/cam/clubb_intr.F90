@@ -1213,7 +1213,6 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: rvm_in(pverp)                    ! water vapor mixing ratio                     [kg/kg]
    real(core_rknd) :: um_in(pverp)                     ! meridional wind                              [m/s]
    real(core_rknd) :: vm_in(pverp)                     ! zonal wind                                   [m/s]
-   real(core_rknd) :: rho_in(pverp)                    ! mid-point density                            [kg/m^3]
    real(core_rknd) :: pre_in(pverp)                    ! input for precip evaporation
    real(core_rknd) :: rtp2_mc_out(pverp)               ! total water tendency from rain evap
    real(core_rknd) :: thlp2_mc_out(pverp)              ! thetal tendency from rain evap
@@ -1341,7 +1340,11 @@ end subroutine clubb_init_cnst
    real(r8) :: sl_output(pcols,pver)            ! Liquid water static energy                    [J/kg]
    real(r8) :: rho(pcols,pverp)                 ! Midpoint density in CAM                       [kg/m^3]
    real(r8) :: thv(pcols,pver)                        ! virtual potential temperature                 [K]
-   real(r8) :: thv1d(pver)
+
+  !real(r8) :: thv1d(pver)
+   real(r8) :: thvtmp
+   integer  :: kkhost
+
    real(r8) :: edsclr_out(pverp,edsclr_dim)     ! Scalars to be diffused through CLUBB          [units vary]
    real(r8) :: sclrpthvp(pcols,pverp,sclr_dim)  ! sclr'th_v' (momentum levels)                  [{units vary} K]
    real(r8) :: rcm_in_layer(pcols,pverp)        ! CLUBB in-cloud liquid water mixing ratio      [kg/kg]

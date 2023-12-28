@@ -1,57 +1,44 @@
 
-      !------------------------------------------------------------------------------
-      !  Compute virtual potential temperature, which is needed for CLUBB
+      zi_out(i,1) = 0._r8
 
-      do k=1,pver
-         thv1d(k) = host_mean%t(i,k)*host_mean%exner_clubb(i,k)*(1._r8+zvir*host_mean%q(i,k,ixq)&
-                   -host_mean%q(i,k,ixcldliq))
-      enddo
-
-      !------------------------------------------------------------------------------
+      !============================================
+      ! Prepare input to advance_clubb_core
+      !============================================
       invrs_gravit = 1._r8 / gravit
 
       do k=1,pver
          dz_g(k) = host_mean%zi(i,k)-host_mean%zi(i,k+1)  ! compute thickness
       enddo
 
+      ! k = pver
+      ! dz_g_bot = host_mean%zi(i,k)-host_mean%zi(i,k+1)  ! compute thickness
+
       !  Compute thermodynamic stuff needed for CLUBB on thermo levels.
       !  Inputs for the momentum levels are set below setup_clubb core
       do k=1,pver
-         p_in_Pa(k+1)         = real(host_mean%pmid(i,pver-k+1), kind = core_rknd)             ! Pressure profile
-         exner(k+1)           = 1._core_rknd/real(host_mean%exner_clubb(i,pver-k+1), kind = core_rknd)
-         rho(i,k+1)           = invrs_gravit*host_mean%pdel(i,pver-k+1)/dz_g(pver-k+1)
-         rho_ds_zt(k+1)       = real(rho(i,k+1), kind = core_rknd)
-         invrs_rho_ds_zt(k+1) = 1._core_rknd/(rho_ds_zt(k+1))                               ! Inverse ds rho at thermo
+         kkhost = pver-k+1
 
-         thv_ds_zt(k+1)       = real(thv1d(pver-k+1), kind = core_rknd)                       ! thetav on thermo
+         p_in_Pa(k+1)         = real( host_mean%pmid(i,kkhost), kind=core_rknd )
+         rho_ds_zt(k+1)       = real( invrs_gravit*host_mean%pdel(i,kkhost)/dz_g(kkhost), kind=core_rknd )
 
-         rfrzm(k+1)           = real(host_mean%q(i,pver-k+1,ixcldice), kind = core_rknd)
-         radf(k+1)            = real(radf_clubb(i,pver-k+1), kind = core_rknd)
-         dum1                 = qrl(i,pver-k+1)/(cpair*host_mean%pdel(i,pver-k+1))
-         qrl_clubb(k+1)       = real(dum1, kind = core_rknd)
+         exner(k+1) = real( 1._r8/host_mean%exner_clubb(i,kkhost), kind=core_rknd )
+         thvtmp =  host_mean%t(i,kkhost) &
+                  *host_mean%exner_clubb(i,kkhost) &
+                  *( 1._r8+zvir*host_mean%q(i,kkhost,ixq)-host_mean%q(i,kkhost,ixcldliq) )
+         thv_ds_zt(k+1) = real(thvtmp, kind = core_rknd)                       ! thetav on thermo
       enddo
 
-      !  Below computes the same stuff for the ghost point.  May or may
-      !  not be needed, just to be safe to avoid NaN's
-      rho_ds_zt(1)       = rho_ds_zt(2)
-      invrs_rho_ds_zt(1) = invrs_rho_ds_zt(2)
-      rho(i,1)           = rho(i,2)     !rho_ds_zt(2)
-      thv_ds_zt(1)       = thv_ds_zt(2)
-      rho_zt(:)          = rho_ds_zt(:) !rho(i,:)
       p_in_Pa(1)         = p_in_Pa(2)
       exner(1)           = exner(2)
-      rfrzm(1)           = rfrzm(2)
-      radf(1)            = radf(2)
-      qrl_clubb(1)       = qrl_clubb(2)
 
-      !  Compute mean w wind on thermo grid, convert from omega to w
-      wm_zt(1) = 0._core_rknd
-      do k=1,pver
-        dum1 = -1._r8*host_mean%omega(i,pver-k+1)*real(invrs_rho_ds_zt(k+1), kind = r8)*invrs_gravit
-        wm_zt(k+1) = real(dum1, kind = core_rknd)
-      enddo
+      rho_ds_zt(1)       = rho_ds_zt(2)
+      thv_ds_zt(1)       = thv_ds_zt(2)
 
+      !----------
+      rho_zt(:)          = rho_ds_zt(:)
 
+      invrs_rho_ds_zt(2:pverp) = 1._core_rknd/rho_ds_zt(2:pverp) ! Inverse ds rho at thermo
+      invrs_rho_ds_zt(1)       = invrs_rho_ds_zt(2)
 
       !  Compute some inputs from the thermodynamic grid to the momentum grid
       !  Note: this can only be done after "call setup_grid_heights_api"
@@ -60,8 +47,28 @@
       rho_zm          = zt2zm_api(rho_zt)
       invrs_rho_ds_zm = zt2zm_api(invrs_rho_ds_zt)
       thv_ds_zm       = zt2zm_api(thv_ds_zt)
+
+      !----------
+      !  Compute mean w wind on thermo grid, convert from omega to w
+      wm_zt(1) = 0._core_rknd
+      do k=1,pver
+        kkhost = pver-k+1
+        dum1 = -1._r8*host_mean%omega(i,kkhost) * real(invrs_rho_ds_zt(k+1),kind=r8) *invrs_gravit
+        wm_zt(k+1) = real(dum1,kind=core_rknd)
+      enddo
+
       wm_zm           = zt2zm_api(wm_zt)
 
+      !----------
+      do k=1,pver
+         rfrzm(k+1)     = real( host_mean%q(i,kkhost,ixcldice),                 kind=core_rknd )
+         radf(k+1)      = real( radf_clubb(i,kkhost),                           kind=core_rknd )
+         qrl_clubb(k+1) = real( qrl(i,kkhost)/(cpair*host_mean%pdel(i,kkhost)), kind=core_rknd )
+      enddo
+      radf(1)      = radf(2)
+      rfrzm(1)     = rfrzm(2)
+      qrl_clubb(1) = qrl_clubb(2)
+      !----------
 
       !  Need to flip arrays around for CLUBB core
       do k=1,pverp
@@ -97,13 +104,8 @@
          pdf_zm_varnce_w_1_inout(k) = pdf_zm_varnce_w_1(i,pverp-k+1)
          pdf_zm_varnce_w_2_inout(k) = pdf_zm_varnce_w_2(i,pverp-k+1)
          pdf_zm_mixt_frac_inout(k) =  pdf_zm_mixt_frac(i,pverp-k+1)
-
-         if (k .ne. 1) then
-            pre_in(k)    = real(prer_evap(i,pverp-k+1), kind = core_rknd)
-         endif
-
       enddo
-      pre_in(1) = pre_in(2)
+
 
       if (linearize_pbl_winds) then
          ! Each host model time step, reset the perturbed variables to be equal to
@@ -168,7 +170,11 @@
         endif
       endif
 
+      !-----------------------------------------------
+      ! Tracers 
+      !-----------------------------------------------
       !  Initialize these to prevent crashing behavior
+
       edsclr_in(:,:)      = 0._core_rknd
       edsclr_out(:,:)     = 0._r8
 
@@ -195,12 +201,9 @@
         edsclr_in(1,icnt+2) = edsclr_in(2,icnt+2)
       endif
 
-      rho_in(:) = real(rho(i,:), kind = core_rknd)
-
       ! --------------------------------------------------------- !
       ! Compute cloud-top radiative cooling contribution to CLUBB !
       ! --------------------------------------------------------- !
-
       ! Sandbox version of code to take into account meso organization
 
       if (clubb_do_deep) then
@@ -223,7 +226,6 @@
          varmu2   = real(varmu(i), kind = core_rknd)
 
       endif
-
       ! --------------------------------------------------------- !
       ! End cloud-top radiative cooling contribution to CLUBB     !
       ! --------------------------------------------------------- !
@@ -240,8 +242,12 @@
          pdf_params_zm%varnce_w_2 = pdf_zm_varnce_w_2_inout
          pdf_params_zm%mixt_frac = pdf_zm_mixt_frac_inout
       end if
+      !============================================
 
 
+      !**************************************************************************************
+      ! CLUBB's time-stepping sub-cycles
+      !**************************************************************************************
       call t_startf('adv_clubb_core_ts_loop')
       do t=1,n_clubb_core_step    ! do needed number of "sub" timesteps for each CAM step
 
@@ -265,7 +271,7 @@
               rtpthlp_forcing, wm_zm, wm_zt, &                             ! intent(in)
               wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, &                 ! intent(in)
               wpsclrp_sfc, wpedsclrp_sfc, &                                ! intent(in)
-              p_in_Pa, rho_zm, rho_in, exner, &                            ! intent(in)
+              p_in_Pa, rho_zm, rho_zt, exner, &                            ! intent(in)
               rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &                     ! intent(in)
               invrs_rho_ds_zt, thv_ds_zm, thv_ds_zt, hydromet, &           ! intent(in)
               rfrzm, radf, &                                               ! intent(in)
@@ -303,12 +309,17 @@
             call endrun('clubb_tend_cam:  Fatal error in CLUBB library'//errmsg(__FILE__,__LINE__))
          end if
 
+         !============================================
          pdf_zm_w_1_inout = pdf_params_zm%w_1
          pdf_zm_w_2_inout = pdf_params_zm%w_2
          pdf_zm_varnce_w_1_inout = pdf_params_zm%varnce_w_1
          pdf_zm_varnce_w_2_inout = pdf_params_zm%varnce_w_2
          pdf_zm_mixt_frac_inout = pdf_params_zm%mixt_frac
 
+         do k=2,pverp
+            pre_in(k)    = real(prer_evap(i,pverp-k+1), kind = core_rknd)
+         enddo
+         pre_in(1) = pre_in(2)
          if (do_rainturb) then
             rvm_in = rtm_in - rcm_inout
             call update_xp2_mc_api(pverp, dtime, cloud_frac_inout, &
@@ -351,7 +362,13 @@
 
       enddo  ! end time loop
       call t_stopf('adv_clubb_core_ts_loop')
+      !**************************************************************************************
+      ! End of CLUBB's time-stepping sub-cycles
+      !**************************************************************************************
 
+      !=====================================================
+      ! Put values back to host model's data structures
+      !=====================================================
       if (clubb_do_adv) then
          if (macmic_it .eq. cld_macmic_num_steps) then
             wp2_in=zm2zt_api(wp2_in)
@@ -440,9 +457,4 @@
           enddo
 
       enddo
-
-      !  Fill up arrays needed for McICA.  Note we do not want the ghost point,
-      !   thus why the second loop is needed.
-
-      zi_out(i,1) = 0._r8
-
+      !=================================================
