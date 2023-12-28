@@ -1242,11 +1242,9 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: rtpthlp_forcing(pverp)
    real(core_rknd) :: ice_supersat_frac(pverp)
 
-   real(core_rknd) :: zt_g(pverp)                      ! Thermodynamic grid of CLUBB                   [m]
-   real(core_rknd) :: zi_g(pverp)                      ! Momentum grid of CLUBB                        [m]
-   real(core_rknd) :: zt_bot
+   real(core_rknd) :: zt_bot  ! height of themo level that is closest to the Earth's surface [m]
 
-   real(core_rknd) :: fcor                             ! Coriolis forcing                              [s^-1]
+   real(core_rknd) :: fcoriolis                        ! Coriolis forcing                              [s^-1]
    real(core_rknd) :: sfc_elevation                    ! Elevation of ground                           [m AMSL]
    real(core_rknd) :: thlm_forcing(pverp)              ! theta_l forcing (thermodynamic levels)        [K/s]
    real(core_rknd) :: rtm_forcing(pverp)               ! r_t forcing (thermodynamic levels)            [(kg/kg)/s]
