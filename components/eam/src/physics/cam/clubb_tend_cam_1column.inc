@@ -87,12 +87,13 @@
          core_state%um(k)      = real(host_mean%um(i,pverp-k+1), kind = core_rknd)
          core_state%vm(k)      = real(host_mean%vm(i,pverp-k+1), kind = core_rknd)
 
-         upwp_in(k)    = real(host_mnts%upwp(i,pverp-k+1), kind = core_rknd)
-         vpwp_in(k)    = real(host_mnts%vpwp(i,pverp-k+1), kind = core_rknd)
-         up2_in(k)     = real(host_mnts%up2(i,pverp-k+1), kind = core_rknd)
-         vp2_in(k)     = real(host_mnts%vp2(i,pverp-k+1), kind = core_rknd)
-         wp2_in(k)     = real(host_mnts%wp2(i,pverp-k+1), kind = core_rknd)
-         wp3_in(k)     = real(host_mnts%wp3(i,pverp-k+1), kind = core_rknd)
+         core_state%up2(k)     = real(host_mnts%up2(i,pverp-k+1), kind = core_rknd)
+         core_state%vp2(k)     = real(host_mnts%vp2(i,pverp-k+1), kind = core_rknd)
+         core_state%wp2(k)     = real(host_mnts%wp2(i,pverp-k+1), kind = core_rknd)
+         core_state%wp3(k)     = real(host_mnts%wp3(i,pverp-k+1), kind = core_rknd)
+
+         core_state%upwp(k)    = real(host_mnts%upwp(i,pverp-k+1), kind = core_rknd)
+         core_state%vpwp(k)    = real(host_mnts%vpwp(i,pverp-k+1), kind = core_rknd)
          rtp2_in(k)    = real(host_mnts%rtp2(i,pverp-k+1), kind = core_rknd)
          thlp2_in(k)   = real(host_mnts%thlp2(i,pverp-k+1), kind = core_rknd)
 
@@ -124,8 +125,8 @@
          if (macmic_it == 1) then
             um_pert(i,:) = core_state%um
             vm_pert(i,:) = core_state%vm
-            upwp_pert(i,:) = upwp_in
-            vpwp_pert(i,:) = vpwp_in
+            upwp_pert(i,:) = core_state%upwp
+            vpwp_pert(i,:) = core_state%vpwp
          end if
          allocate(um_pert_col(pverp))
          allocate(vm_pert_col(pverp))
@@ -162,11 +163,13 @@
 
       if (clubb_do_adv) then
         if (macmic_it .eq. 1) then
-          wp2_in=zt2zm_api(wp2_in)
+
+          core_state%up2=zt2zm_api(core_state%up2)
+          core_state%vp2=zt2zm_api(core_state%vp2)
+          core_state%wp2=zt2zm_api(core_state%wp2)
+
           wpthlp_in=zt2zm_api(wpthlp_in)
           wprtp_in=zt2zm_api(wprtp_in)
-          up2_in=zt2zm_api(up2_in)
-          vp2_in=zt2zm_api(vp2_in)
           thlp2_in=zt2zm_api(thlp2_in)
           rtp2_in=zt2zm_api(rtp2_in)
           rtpthlp_in=zt2zm_api(rtpthlp_in)
@@ -174,9 +177,10 @@
           do k=1,pverp
             thlp2_in(k)=max(thl_tol**2,thlp2_in(k))
             rtp2_in(k)=max(rt_tol**2,rtp2_in(k))
-            wp2_in(k)=max(w_tol_sqd,wp2_in(k))
-            up2_in(k)=max(w_tol_sqd,up2_in(k))
-            vp2_in(k)=max(w_tol_sqd,vp2_in(k))
+
+            core_state%up2(k)=max(w_tol_sqd,core_state%up2(k))
+            core_state%vp2(k)=max(w_tol_sqd,core_state%vp2(k))
+            core_state%wp2(k)=max(w_tol_sqd,core_state%wp2(k))
           enddo
         endif
       endif
@@ -307,12 +311,16 @@
               host_dx, host_dy, &                                          ! intent(in)
               core_state%um, &
               core_state%vm, &
-              upwp_in, &                                     ! intent(inout)
-              vpwp_in, up2_in, vp2_in, &                                   ! intent(inout)
+              core_state%upwp, &                                     ! intent(inout)
+              core_state%vpwp, &
+              core_state%up2, &
+              core_state%vp2, &                                   ! intent(inout)
               core_state%thlm, &
               core_state%rtm,  &
               wprtp_in, wpthlp_in, &                      ! intent(inout)
-              wp2_in, wp3_in, rtp2_in, &                                   ! intent(inout)
+              core_state%wp2, &
+              core_state%wp3, &
+              rtp2_in, &                                   ! intent(inout)
               rtp3_in, thlp2_in, thlp3_in, rtpthlp_in, &                   ! intent(inout)
               sclrm,   &                                                   ! intent(inout)
               sclrp2, sclrprtp, sclrpthlp, &                               ! intent(inout)
@@ -412,11 +420,11 @@
       !=====================================================
       if (clubb_do_adv) then
          if (macmic_it .eq. cld_macmic_num_steps) then
-            wp2_in=zm2zt_api(wp2_in)
+            core_state%wp2=zm2zt_api(core_state%wp2)
             wpthlp_in=zm2zt_api(wpthlp_in)
             wprtp_in=zm2zt_api(wprtp_in)
-            up2_in=zm2zt_api(up2_in)
-            vp2_in=zm2zt_api(vp2_in)
+            core_state%up2=zm2zt_api(core_state%up2)
+            core_state%vp2=zm2zt_api(core_state%vp2)
             thlp2_in=zm2zt_api(thlp2_in)
             rtp2_in=zm2zt_api(rtp2_in)
             rtpthlp_in=zm2zt_api(rtpthlp_in)
@@ -424,9 +432,9 @@
             do k=1,pverp
                thlp2_in(k)=max(thl_tol**2,thlp2_in(k))
                rtp2_in(k)=max(rt_tol**2,rtp2_in(k))
-               wp2_in(k)=max(w_tol_sqd,wp2_in(k))
-               up2_in(k)=max(w_tol_sqd,up2_in(k))
-               vp2_in(k)=max(w_tol_sqd,vp2_in(k))
+               core_state%wp2(k)=max(w_tol_sqd,core_state%wp2(k))
+               core_state%up2(k)=max(w_tol_sqd,core_state%up2(k))
+               core_state%vp2(k)=max(w_tol_sqd,core_state%vp2(k))
             enddo
          endif
       endif
@@ -462,19 +470,20 @@
           host_mean% rtm (i,k) = real( core_state% rtm(pverp-k+1), kind=r8 )
           host_mean% rcm (i,k) = real( core_state% rcm(pverp-k+1), kind=r8 )
 
-          host_mnts% upwp(i,k)         = real(upwp_in(pverp-k+1), kind = r8)
-          host_mnts% vpwp(i,k)         = real(vpwp_in(pverp-k+1), kind = r8)
+          host_mnts% upwp(i,k)         = real(core_state%upwp(pverp-k+1), kind = r8)
+          host_mnts% vpwp(i,k)         = real(core_state%vpwp(pverp-k+1), kind = r8)
           host_mnts% wpthvp(i,k)       = real(wpthvp_inout(pverp-k+1), kind = r8)
           host_mnts% wp2thvp(i,k)      = real(wp2thvp_inout(pverp-k+1), kind = r8)
           host_mnts% rtpthvp(i,k)      = real(rtpthvp_inout(pverp-k+1), kind = r8)
           host_mnts% thlpthvp(i,k)     = real(thlpthvp_inout(pverp-k+1), kind = r8)
-          host_mnts% up2(i,k)          = real(up2_in(pverp-k+1), kind = r8)
-          host_mnts% vp2(i,k)          = real(vp2_in(pverp-k+1), kind = r8)
+
+          host_mnts% up2(i,k)          = real(core_state%up2(pverp-k+1), kind = r8)
+          host_mnts% vp2(i,k)          = real(core_state%vp2(pverp-k+1), kind = r8)
+          host_mnts% wp2(i,k)          = real(core_state%wp2(pverp-k+1), kind = r8)
+          host_mnts% wp3(i,k)          = real(core_state%wp3(pverp-k+1), kind = r8)
 
           host_mnts% wprtp(i,k)        = real(wprtp_in(pverp-k+1), kind = r8)
           host_mnts% wpthlp(i,k)       = real(wpthlp_in(pverp-k+1), kind = r8)
-          host_mnts% wp2(i,k)          = real(wp2_in(pverp-k+1), kind = r8)
-          host_mnts% wp3(i,k)          = real(wp3_in(pverp-k+1), kind = r8)
           host_mnts% rtp2(i,k)         = real(rtp2_in(pverp-k+1), kind = r8)
           host_mnts% thlp2(i,k)        = real(thlp2_in(pverp-k+1), kind = r8)
           host_mnts% rtpthlp(i,k)      = real(rtpthlp_in(pverp-k+1), kind = r8)

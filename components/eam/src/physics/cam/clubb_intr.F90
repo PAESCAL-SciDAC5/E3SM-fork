@@ -1194,9 +1194,6 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: dtime                            ! CLUBB time step                              [s]
    real(core_rknd) :: edsclr_in(pverp,edsclr_dim)      ! Scalars to be diffused through CLUBB         [units vary]
 
-   real(core_rknd) :: wp2_in(pverp)                    ! vertical velocity variance (CLUBB)           [m^2/s^2]
-   real(core_rknd) :: wp3_in(pverp)                    ! third moment vertical velocity               [m^3/s^3]
-
    real(core_rknd) :: wpthlp_in(pverp)                 ! turbulent flux of thetal                     [K m/s]
    real(core_rknd) :: wprtp_in(pverp)                  ! turbulent flux of total water                [kg/kg m/s]
    real(core_rknd) :: rtpthlp_in(pverp)                ! covariance of thetal and qt                  [kg/kg K]
@@ -1208,11 +1205,6 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: rtp3_in(pverp)                   ! thermodynamic levels (r_t'^3 )               [(kg/kg)^3]
    real(core_rknd) :: thlp3_in(pverp)                  ! thermodynamic levels (th_l'^3)               [K^3]
    real(core_rknd) :: thlpthvp_inout(pverp)               ! momentum levels (< th_l' th_v' >)            [K^2]
-
-   real(core_rknd) :: up2_in(pverp)                    ! meridional wind variance                     [m^2/s^2]
-   real(core_rknd) :: vp2_in(pverp)                    ! zonal wind variance                          [m^2/s^2]
-   real(core_rknd) :: upwp_in(pverp)                   ! meridional wind flux                         [m^2/s^2]
-   real(core_rknd) :: vpwp_in(pverp)                   ! zonal wind flux                              [m^2/s^2]
 
    real(core_rknd) :: rvm_in(pverp)                    ! water vapor mixing ratio                     [kg/kg]
 
