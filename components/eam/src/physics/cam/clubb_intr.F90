@@ -1194,17 +1194,8 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: dtime                            ! CLUBB time step                              [s]
    real(core_rknd) :: edsclr_in(pverp,edsclr_dim)      ! Scalars to be diffused through CLUBB         [units vary]
 
-   real(core_rknd) :: wpthlp_in(pverp)                 ! turbulent flux of thetal                     [K m/s]
-   real(core_rknd) :: wprtp_in(pverp)                  ! turbulent flux of total water                [kg/kg m/s]
-   real(core_rknd) :: rtpthlp_in(pverp)                ! covariance of thetal and qt                  [kg/kg K]
-   real(core_rknd) :: rtp2_in(pverp)                   ! total water variance                         [kg^2/k^2]
-   real(core_rknd) :: thlp2_in(pverp)                  ! thetal variance                              [K^2]
-   real(core_rknd) :: wp2thvp_inout(pverp)                ! thermodynamic levels (< w'^2 th_v' >)        [m^2/s^2 K]
-   real(core_rknd) :: wpthvp_inout(pverp)                 ! momentum levels (< w' th_v' > )              [kg/kg K]
-   real(core_rknd) :: rtpthvp_inout(pverp)                ! momentum levels (< r_t' th_v' > )            [kg/kg K]
    real(core_rknd) :: rtp3_in(pverp)                   ! thermodynamic levels (r_t'^3 )               [(kg/kg)^3]
    real(core_rknd) :: thlp3_in(pverp)                  ! thermodynamic levels (th_l'^3)               [K^3]
-   real(core_rknd) :: thlpthvp_inout(pverp)               ! momentum levels (< th_l' th_v' >)            [K^2]
 
    real(core_rknd) :: rvm_in(pverp)                    ! water vapor mixing ratio                     [kg/kg]
 
@@ -1215,13 +1206,13 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: wpthlp_mc_out(pverp)
    real(core_rknd) :: rtpthlp_mc_out(pverp)
    real(core_rknd) :: rcm_out_zm(pverp)
-   real(core_rknd) :: wprcp_out(pverp)                 ! CLUBB output of flux of liquid water          [kg/kg m/s]
+
    real(core_rknd) :: cloud_frac_inout(pverp)            ! CLUBB output of cloud fraction                [fraction]
    real(core_rknd) :: rcm_in_layer_out(pverp)          ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg]
    real(core_rknd) :: cloud_cover_out(pverp)           ! CLUBB output of in-cloud cloud fraction       [fraction]
-   real(core_rknd) :: thlprcp_out(pverp)
    real(core_rknd) :: rfrzm(pverp)
    real(core_rknd) :: radf(pverp)
+
    real(core_rknd) :: wprtp_forcing(pverp)
    real(core_rknd) :: wpthlp_forcing(pverp)
    real(core_rknd) :: rtp2_forcing(pverp)

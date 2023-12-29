@@ -40,6 +40,20 @@ module clubb_intr_core_types
     real(core_rknd), dimension(:), allocatable :: upwp
     real(core_rknd), dimension(:), allocatable :: vpwp
 
+    real(core_rknd), dimension(:), allocatable :: rtp2
+    real(core_rknd), dimension(:), allocatable :: thlp2
+    real(core_rknd), dimension(:), allocatable :: wprtp
+    real(core_rknd), dimension(:), allocatable :: wpthlp
+    real(core_rknd), dimension(:), allocatable :: rtpthlp
+
+    real(core_rknd), dimension(:), allocatable :: wp2thvp
+    real(core_rknd), dimension(:), allocatable :: wpthvp
+    real(core_rknd), dimension(:), allocatable :: rtpthvp
+    real(core_rknd), dimension(:), allocatable :: thlpthvp
+
+    real(core_rknd), dimension(:), allocatable :: wprcp
+    real(core_rknd), dimension(:), allocatable :: thlprcp
+
   end type core_state_t
 
   type core_forcing_t
@@ -92,6 +106,20 @@ contains
     allocate( core_state% upwp            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     allocate( core_state% vpwp            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
+    allocate( core_state% rtp2            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% thlp2           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% wprtp           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% wpthlp          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% rtpthlp         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    allocate( core_state% wp2thvp         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% wpthvp          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% rtpthvp         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% thlpthvp        (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    allocate( core_state% wprcp           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% thlprcp         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
    !allocate( core_state%            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
   end subroutine clubb_core_state_alloc
@@ -134,6 +162,20 @@ contains
 
     deallocate( core_state% upwp           , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( core_state% vpwp           , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    deallocate( core_state% rtp2           , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% thlp2          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% wprtp          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% wpthlp         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% rtpthlp        , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    deallocate( core_state% wp2thvp        , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% wpthvp         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% rtpthvp        , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% thlpthvp       , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    deallocate( core_state% wprcp          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% thlprcp        , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
    !deallocate( core_state%          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
