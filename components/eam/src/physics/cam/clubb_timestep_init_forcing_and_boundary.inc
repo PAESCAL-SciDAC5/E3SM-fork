@@ -6,19 +6,19 @@
       !-----------------------------------------
       !  Surface fluxes provided by host model
       !-----------------------------------------
-      wpthlp_sfc = real(cam_in%shf(i), kind = core_rknd)/(real(cpair, kind = core_rknd)*rho_ds_zm(1)) ! Sensible heat flux
-      wprtp_sfc  = real(cam_in%cflx(i,1), kind = core_rknd)/rho_ds_zm(1)                              ! Latent heat flux
-      upwp_sfc   = real(cam_in%wsx(i), kind = core_rknd)/rho_ds_zm(1)                                 ! Surface meridional momentum flux
-      vpwp_sfc   = real(cam_in%wsy(i), kind = core_rknd)/rho_ds_zm(1)                                 ! Surface zonal momentum flux
+      wpthlp_sfc = real(cam_in%shf(i), kind = core_rknd)/(real(cpair, kind = core_rknd)* core_state%rho_ds_zm(1)) ! Sensible heat flux
+      wprtp_sfc  = real(cam_in%cflx(i,1),    kind = core_rknd)/ core_state%rho_ds_zm(1) ! Latent heat flux
+      upwp_sfc   = real(cam_in%wsx(i),       kind = core_rknd)/ core_state%rho_ds_zm(1) ! Surface meridional momentum flux
+      vpwp_sfc   = real(cam_in%wsy(i),       kind = core_rknd)/ core_state%rho_ds_zm(1) ! Surface zonal momentum flux
 
       !-----------
       ! Apply TMS
       !-----------
        if ( do_tms ) then
          dum_core_rknd = real((ksrftms(i)*host_mean%um(i,pver)), kind = core_rknd)
-         upwp_sfc      = upwp_sfc-(dum_core_rknd/rho_ds_zm(1))
+         upwp_sfc      = upwp_sfc-(dum_core_rknd/core_state%rho_ds_zm(1))
          dum_core_rknd = real((ksrftms(i)*host_mean%vm(i,pver)), kind = core_rknd)
-         vpwp_sfc      = vpwp_sfc-(dum_core_rknd/rho_ds_zm(1))
+         vpwp_sfc      = vpwp_sfc-(dum_core_rknd/core_state%rho_ds_zm(1))
        endif
 
       ! ------------------------------------------------- !

@@ -1131,6 +1131,8 @@ end subroutine clubb_init_cnst
    use model_flags, only: ipdf_call_placement
    use advance_clubb_core_module, only: ipdf_post_advance_fields
    use clubb_intr_types
+   use clubb_intr_core_types, only: core_state_t
+   use clubb_intr_core_types, only: clubb_core_state_alloc, clubb_core_state_dealloc
 #endif
 
    implicit none
@@ -1226,10 +1228,6 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: rcm_in_layer_out(pverp)          ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg]
    real(core_rknd) :: cloud_cover_out(pverp)           ! CLUBB output of in-cloud cloud fraction       [fraction]
    real(core_rknd) :: thlprcp_out(pverp)
-   real(core_rknd) :: rho_ds_zm(pverp)                 ! Dry, static density on momentum levels        [kg/m^3]
-   real(core_rknd) :: rho_ds_zt(pverp)                 ! Dry, static density on thermodynamic levels   [kg/m^3]
-   real(core_rknd) :: invrs_rho_ds_zm(pverp)           ! Inv. dry, static density on momentum levels   [m^3/kg]
-   real(core_rknd) :: invrs_rho_ds_zt(pverp)           ! Inv. dry, static density on thermo. levels    [m^3/kg]
    real(core_rknd) :: thv_ds_zm(pverp)                 ! Dry, base-state theta_v on momentum levels    [K]
    real(core_rknd) :: thv_ds_zt(pverp)                 ! Dry, base-state theta_v on thermo. levels     [K]
    real(core_rknd) :: rfrzm(pverp)
@@ -1241,6 +1239,9 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: rtpthlp_forcing(pverp)
    real(core_rknd) :: ice_supersat_frac(pverp)
 
+
+
+
    real(core_rknd) :: zt_bot  ! height of themo level that is closest to the Earth's surface [m]
 
    real(core_rknd) :: fcoriolis                        ! Coriolis forcing                              [s^-1]
@@ -1251,14 +1252,14 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: vm_forcing(pverp)                ! v wind forcing (thermodynamic levels)         [m/s/s]
    real(core_rknd) :: wm_zm(pverp)                     ! w mean wind component on momentum levels      [m/s]
    real(core_rknd) :: wm_zt(pverp)                     ! w mean wind component on thermo. levels       [m/s]
-   real(core_rknd) :: p_in_Pa(pverp)                   ! Air pressure (thermodynamic levels)           [Pa]
-   real(core_rknd) :: rho_zt(pverp)                    ! Air density on thermo levels                  [kt/m^3]
-   real(core_rknd) :: rho_zm(pverp)                    ! Air density on momentum levels                [kg/m^3]
-   real(core_rknd) :: exner(pverp)                     ! Exner function (thermodynamic levels)         [-]
+
+   type(core_state_t)  :: core_state
+
    real(core_rknd) :: wpthlp_sfc                       ! w' theta_l' at surface                        [(m K)/s]
    real(core_rknd) :: wprtp_sfc                        ! w' r_t' at surface                            [(kg m)/( kg s)]
    real(core_rknd) :: upwp_sfc                         ! u'w' at surface                               [m^2/s^2]
    real(core_rknd) :: vpwp_sfc                         ! v'w' at surface                               [m^2/s^2]
+
    real(core_rknd) :: sclrpthvp_inout(pverp,sclr_dim)     ! momentum levels (< sclr' th_v' >)             [units vary]
    real(core_rknd) :: sclrm_forcing(pverp,sclr_dim)    ! Passive scalar forcing                        [{units vary}/s]
    real(core_rknd) :: wpsclrp_sfc(sclr_dim)            ! Scalar flux at surface                        [{units vary} m/s]

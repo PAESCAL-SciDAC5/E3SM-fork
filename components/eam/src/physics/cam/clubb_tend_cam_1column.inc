@@ -4,6 +4,8 @@
       !============================================
       ! Prepare input to advance_clubb_core
       !============================================
+      call clubb_core_state_alloc( core_state, pverp )
+
       invrs_gravit = 1._r8 / gravit
 
       do k=1,pver
@@ -18,34 +20,40 @@
       do k=1,pver
          kkhost = pver-k+1
 
-         p_in_Pa(k+1)         = real( host_mean%pmid(i,kkhost), kind=core_rknd )
-         rho_ds_zt(k+1)       = real( invrs_gravit*host_mean%pdel(i,kkhost)/dz_g(kkhost), kind=core_rknd )
+         core_state%p_in_Pa(k+1)   = real( host_mean%pmid(i,kkhost), kind=core_rknd )
+         core_state%exner(k+1)     = real( 1._r8/host_mean%exner_clubb(i,kkhost), kind=core_rknd )
 
-         exner(k+1) = real( 1._r8/host_mean%exner_clubb(i,kkhost), kind=core_rknd )
          thvtmp =  host_mean%t(i,kkhost) &
                   *host_mean%exner_clubb(i,kkhost) &
                   *( 1._r8+zvir*host_mean%q(i,kkhost,ixq)-host_mean%q(i,kkhost,ixcldliq) )
          thv_ds_zt(k+1) = real(thvtmp, kind = core_rknd)                       ! thetav on thermo
       enddo
 
-      p_in_Pa(1)         = p_in_Pa(2)
-      exner(1)           = exner(2)
-
-      rho_ds_zt(1)       = rho_ds_zt(2)
+      core_state%p_in_Pa(1) = core_state%p_in_Pa(2)
+      core_state%exner  (1) = core_state%exner  (2)
       thv_ds_zt(1)       = thv_ds_zt(2)
 
       !----------
-      rho_zt(:)          = rho_ds_zt(:)
+      do k=1,pver
+         kkhost = pver-k+1
+         core_state%rho_ds_zt(k+1) = real( invrs_gravit*host_mean%pdel(i,kkhost)/dz_g(kkhost), kind=core_rknd )
+      enddo
+      core_state%rho_ds_zt(1) = core_state%rho_ds_zt(2)
 
-      invrs_rho_ds_zt(2:pverp) = 1._core_rknd/rho_ds_zt(2:pverp) ! Inverse ds rho at thermo
-      invrs_rho_ds_zt(1)       = invrs_rho_ds_zt(2)
+
+      !----------
+      core_state%rho_zt(:)  = core_state%rho_ds_zt(:)
+
+      core_state%invrs_rho_ds_zt(2:pverp) = 1._core_rknd/core_state%rho_ds_zt(2:pverp) ! Inverse ds rho at thermo
+      core_state%invrs_rho_ds_zt(1)       = core_state%invrs_rho_ds_zt(2)
 
       !  Compute some inputs from the thermodynamic grid to the momentum grid
       !  Note: this can only be done after "call setup_grid_heights_api"
 
-      rho_ds_zm       = zt2zm_api(rho_ds_zt)
-      rho_zm          = zt2zm_api(rho_zt)
-      invrs_rho_ds_zm = zt2zm_api(invrs_rho_ds_zt)
+      core_state%rho_ds_zm       = zt2zm_api( core_state%rho_ds_zt )
+      core_state%rho_zm          = zt2zm_api( core_state%rho_zt    )
+      core_state%invrs_rho_ds_zm = zt2zm_api( core_state%invrs_rho_ds_zt)
+
       thv_ds_zm       = zt2zm_api(thv_ds_zt)
 
       !----------
@@ -53,7 +61,7 @@
       wm_zt(1) = 0._core_rknd
       do k=1,pver
         kkhost = pver-k+1
-        dum1 = -1._r8*host_mean%omega(i,kkhost) * real(invrs_rho_ds_zt(k+1),kind=r8) *invrs_gravit
+        dum1 = -1._r8*host_mean%omega(i,kkhost) * real(core_state%invrs_rho_ds_zt(k+1),kind=r8) *invrs_gravit
         wm_zt(k+1) = real(dum1,kind=core_rknd)
       enddo
 
@@ -61,13 +69,12 @@
 
       !----------
       do k=1,pver
+         kkhost = pver-k+1
          rfrzm(k+1)     = real( host_mean%q(i,kkhost,ixcldice),                 kind=core_rknd )
          radf(k+1)      = real( radf_clubb(i,kkhost),                           kind=core_rknd )
-         qrl_clubb(k+1) = real( qrl(i,kkhost)/(cpair*host_mean%pdel(i,kkhost)), kind=core_rknd )
       enddo
       radf(1)      = radf(2)
       rfrzm(1)     = rfrzm(2)
-      qrl_clubb(1) = qrl_clubb(2)
       !----------
 
       !  Need to flip arrays around for CLUBB core
@@ -131,13 +138,13 @@
          ! However, if there's no existing surface stress, just perturb zonal
          ! wind/stress.
          if (abs(cam_in%wsx(i)) < 1.e-12 .and. abs(cam_in%wsy(i)) < 1.e-12) then
-            upwp_sfc_pert = upwp_sfc + pert_tau / rho_ds_zm(1)
+            upwp_sfc_pert = upwp_sfc + pert_tau / core_state%rho_ds_zm(1)
             vpwp_sfc_pert = vpwp_sfc
          else
             upwp_sfc_pert = upwp_sfc + cam_in%wsx(i) * &
-                 (pert_tau / (rho_ds_zm(1) * hypot(cam_in%wsx(i), cam_in%wsy(i))))
+                 (pert_tau / (core_state%rho_ds_zm(1) * hypot(cam_in%wsx(i), cam_in%wsy(i))))
             vpwp_sfc_pert = vpwp_sfc + cam_in%wsy(i) * &
-                 (pert_tau / (rho_ds_zm(1) * hypot(cam_in%wsx(i), cam_in%wsy(i))))
+                 (pert_tau / (core_state%rho_ds_zm(1) * hypot(cam_in%wsx(i), cam_in%wsy(i))))
          end if
       else
          nullify(upwp_sfc_pert)
@@ -271,9 +278,17 @@
               rtpthlp_forcing, wm_zm, wm_zt, &                             ! intent(in)
               wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, &                 ! intent(in)
               wpsclrp_sfc, wpedsclrp_sfc, &                                ! intent(in)
-              p_in_Pa, rho_zm, rho_zt, exner, &                            ! intent(in)
-              rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &                     ! intent(in)
-              invrs_rho_ds_zt, thv_ds_zm, thv_ds_zt, hydromet, &           ! intent(in)
+              !
+              core_state%p_in_Pa,         &
+              core_state%rho_zm,          &
+              core_state%rho_zt,          &
+              core_state%exner,           &                          ! intent(in)
+              core_state%rho_ds_zm,       &
+              core_state%rho_ds_zt,       &
+              core_state%invrs_rho_ds_zm, &                          ! intent(in)
+              core_state%invrs_rho_ds_zt, &
+              !
+              thv_ds_zm, thv_ds_zt, hydromet, &           ! intent(in)
               rfrzm, radf, &                                               ! intent(in)
 #ifdef CLUBBND_CAM
               varmu2, &                                                    ! intent(in)
@@ -316,14 +331,16 @@
          pdf_zm_varnce_w_2_inout = pdf_params_zm%varnce_w_2
          pdf_zm_mixt_frac_inout = pdf_params_zm%mixt_frac
 
-         do k=2,pverp
-            pre_in(k)    = real(prer_evap(i,pverp-k+1), kind = core_rknd)
-         enddo
-         pre_in(1) = pre_in(2)
          if (do_rainturb) then
+
+            do k=2,pverp
+               pre_in(k)    = real(prer_evap(i,pverp-k+1), kind = core_rknd)
+            enddo
+            pre_in(1) = pre_in(2)
+
             rvm_in = rtm_in - rcm_inout
             call update_xp2_mc_api(pverp, dtime, cloud_frac_inout, &
-            rcm_inout, rvm_in, thlm_in, wm_zt, exner, pre_in, pdf_params, &
+            rcm_inout, rvm_in, thlm_in, wm_zt, core_state%exner, pre_in, pdf_params, &
             rtp2_mc_out, thlp2_mc_out, &
             wprtp_mc_out, wpthlp_mc_out, &
             rtpthlp_mc_out)
@@ -345,7 +362,13 @@
 
          endif
 
+         !----------------------
          if (do_cldcool) then
+            do k=1,pver
+               kkhost = pver-k+1
+               qrl_clubb(k+1) = real( qrl(i,kkhost)/(cpair*host_mean%pdel(i,kkhost)), kind=core_rknd )
+            enddo
+            qrl_clubb(1) = qrl_clubb(2)
 
             rcm_out_zm = zt2zm_api(rcm_inout)
             qrl_zm = zt2zm_api(qrl_clubb)
@@ -458,3 +481,4 @@
 
       enddo
       !=================================================
+      call clubb_core_state_dealloc( core_state )
