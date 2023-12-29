@@ -1193,8 +1193,10 @@ end subroutine clubb_init_cnst
   !=====================================================================================
    real(core_rknd) :: dtime                            ! CLUBB time step                              [s]
    real(core_rknd) :: edsclr_in(pverp,edsclr_dim)      ! Scalars to be diffused through CLUBB         [units vary]
+
    real(core_rknd) :: wp2_in(pverp)                    ! vertical velocity variance (CLUBB)           [m^2/s^2]
    real(core_rknd) :: wp3_in(pverp)                    ! third moment vertical velocity               [m^3/s^3]
+
    real(core_rknd) :: wpthlp_in(pverp)                 ! turbulent flux of thetal                     [K m/s]
    real(core_rknd) :: wprtp_in(pverp)                  ! turbulent flux of total water                [kg/kg m/s]
    real(core_rknd) :: rtpthlp_in(pverp)                ! covariance of thetal and qt                  [kg/kg K]
@@ -1206,30 +1208,26 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: rtp3_in(pverp)                   ! thermodynamic levels (r_t'^3 )               [(kg/kg)^3]
    real(core_rknd) :: thlp3_in(pverp)                  ! thermodynamic levels (th_l'^3)               [K^3]
    real(core_rknd) :: thlpthvp_inout(pverp)               ! momentum levels (< th_l' th_v' >)            [K^2]
+
    real(core_rknd) :: up2_in(pverp)                    ! meridional wind variance                     [m^2/s^2]
    real(core_rknd) :: vp2_in(pverp)                    ! zonal wind variance                          [m^2/s^2]
    real(core_rknd) :: upwp_in(pverp)                   ! meridional wind flux                         [m^2/s^2]
    real(core_rknd) :: vpwp_in(pverp)                   ! zonal wind flux                              [m^2/s^2]
-   real(core_rknd) :: thlm_in(pverp)                   ! liquid water potential temperature (thetal)  [K]
-   real(core_rknd) :: rtm_in(pverp)                    ! total water mixing ratio                     [kg/kg]
+
    real(core_rknd) :: rvm_in(pverp)                    ! water vapor mixing ratio                     [kg/kg]
-   real(core_rknd) :: um_in(pverp)                     ! meridional wind                              [m/s]
-   real(core_rknd) :: vm_in(pverp)                     ! zonal wind                                   [m/s]
+
    real(core_rknd) :: pre_in(pverp)                    ! input for precip evaporation
    real(core_rknd) :: rtp2_mc_out(pverp)               ! total water tendency from rain evap
    real(core_rknd) :: thlp2_mc_out(pverp)              ! thetal tendency from rain evap
    real(core_rknd) :: wprtp_mc_out(pverp)
    real(core_rknd) :: wpthlp_mc_out(pverp)
    real(core_rknd) :: rtpthlp_mc_out(pverp)
-   real(core_rknd) :: rcm_inout(pverp)                 ! CLUBB output of liquid water mixing ratio     [kg/kg]
    real(core_rknd) :: rcm_out_zm(pverp)
    real(core_rknd) :: wprcp_out(pverp)                 ! CLUBB output of flux of liquid water          [kg/kg m/s]
    real(core_rknd) :: cloud_frac_inout(pverp)            ! CLUBB output of cloud fraction                [fraction]
    real(core_rknd) :: rcm_in_layer_out(pverp)          ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg]
    real(core_rknd) :: cloud_cover_out(pverp)           ! CLUBB output of in-cloud cloud fraction       [fraction]
    real(core_rknd) :: thlprcp_out(pverp)
-   real(core_rknd) :: thv_ds_zm(pverp)                 ! Dry, base-state theta_v on momentum levels    [K]
-   real(core_rknd) :: thv_ds_zt(pverp)                 ! Dry, base-state theta_v on thermo. levels     [K]
    real(core_rknd) :: rfrzm(pverp)
    real(core_rknd) :: radf(pverp)
    real(core_rknd) :: wprtp_forcing(pverp)
@@ -1250,8 +1248,6 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: rtm_forcing(pverp)               ! r_t forcing (thermodynamic levels)            [(kg/kg)/s]
    real(core_rknd) :: um_forcing(pverp)                ! u wind forcing (thermodynamic levels)         [m/s/s]
    real(core_rknd) :: vm_forcing(pverp)                ! v wind forcing (thermodynamic levels)         [m/s/s]
-   real(core_rknd) :: wm_zm(pverp)                     ! w mean wind component on momentum levels      [m/s]
-   real(core_rknd) :: wm_zt(pverp)                     ! w mean wind component on thermo. levels       [m/s]
 
    type(core_state_t)  :: core_state
 

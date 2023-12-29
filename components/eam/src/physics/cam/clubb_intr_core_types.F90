@@ -8,14 +8,30 @@ module clubb_intr_core_types
   public 
 
   type core_state_t
+
     real(core_rknd), dimension(:), allocatable :: p_in_Pa
     real(core_rknd), dimension(:), allocatable :: exner
+
     real(core_rknd), dimension(:), allocatable :: rho_zt
     real(core_rknd), dimension(:), allocatable :: rho_zm
     real(core_rknd), dimension(:), allocatable :: rho_ds_zt
     real(core_rknd), dimension(:), allocatable :: rho_ds_zm
     real(core_rknd), dimension(:), allocatable :: invrs_rho_ds_zm
     real(core_rknd), dimension(:), allocatable :: invrs_rho_ds_zt
+
+    real(core_rknd), dimension(:), allocatable :: thv_ds_zt
+    real(core_rknd), dimension(:), allocatable :: thv_ds_zm
+
+    real(core_rknd), dimension(:), allocatable :: wm_zt
+    real(core_rknd), dimension(:), allocatable :: wm_zm
+
+    real(core_rknd), dimension(:), allocatable :: um
+    real(core_rknd), dimension(:), allocatable :: vm
+
+    real(core_rknd), dimension(:), allocatable :: thlm
+    real(core_rknd), dimension(:), allocatable :: rtm
+    real(core_rknd), dimension(:), allocatable :: rcm
+
   end type core_state_t
 
   type core_forcing_t
@@ -39,6 +55,7 @@ contains
 
     allocate( core_state% p_in_Pa         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     allocate( core_state% exner           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
     allocate( core_state% rho_zt          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     allocate( core_state% rho_zm          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     allocate( core_state% rho_ds_zt       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
@@ -46,9 +63,20 @@ contains
     allocate( core_state% invrs_rho_ds_zm (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     allocate( core_state% invrs_rho_ds_zt (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-   !(pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-   !(pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-   !(pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% thv_ds_zt       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% thv_ds_zm       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    allocate( core_state% wm_zt           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% wm_zm           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    allocate( core_state% um              (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% vm              (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    allocate( core_state% thlm            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% rtm             (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% rcm             (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+   !allocate( core_state%            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
   end subroutine clubb_core_state_alloc
 
@@ -62,12 +90,28 @@ contains
 
     deallocate( core_state% p_in_Pa        , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( core_state% exner          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
     deallocate( core_state% rho_zt         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( core_state% rho_zm         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( core_state% rho_ds_zt      , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( core_state% rho_ds_zm      , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( core_state% invrs_rho_ds_zm, stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( core_state% invrs_rho_ds_zt, stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    deallocate( core_state% thv_ds_zt      , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% thv_ds_zm      , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    deallocate( core_state% wm_zt          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% wm_zm          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    deallocate( core_state% um             , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% vm             , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    deallocate( core_state% thlm           , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% rtm            , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% rcm            , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+   !deallocate( core_state%          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
   end subroutine clubb_core_state_dealloc
 
