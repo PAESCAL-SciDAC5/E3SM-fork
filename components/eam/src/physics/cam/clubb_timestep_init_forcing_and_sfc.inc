@@ -6,19 +6,19 @@
       !-----------------------------------------
       !  Surface fluxes provided by host model
       !-----------------------------------------
-      core_sfc% wpthlp = real(cam_in%shf(i), kind = core_rknd)/(real(cpair, kind = core_rknd)* core_state%rho_ds_zm(1)) ! Sensible heat flux
-      core_sfc% wprtp  = real(cam_in%cflx(i,1),    kind = core_rknd)/ core_state%rho_ds_zm(1) ! Latent heat flux
-      core_sfc% upwp   = real(cam_in%wsx(i),       kind = core_rknd)/ core_state%rho_ds_zm(1) ! Surface meridional momentum flux
-      core_sfc% vpwp   = real(cam_in%wsy(i),       kind = core_rknd)/ core_state%rho_ds_zm(1) ! Surface zonal momentum flux
+      core_sfc% wpthlp = real(cam_in%shf(i), kind = core_rknd)/(real(cpair, kind = core_rknd)* core_auxil%rho_ds_zm(1)) ! Sensible heat flux
+      core_sfc% wprtp  = real(cam_in%cflx(i,1),    kind = core_rknd)/ core_auxil%rho_ds_zm(1) ! Latent heat flux
+      core_sfc% upwp   = real(cam_in%wsx(i),       kind = core_rknd)/ core_auxil%rho_ds_zm(1) ! Surface meridional momentum flux
+      core_sfc% vpwp   = real(cam_in%wsy(i),       kind = core_rknd)/ core_auxil%rho_ds_zm(1) ! Surface zonal momentum flux
 
       !-----------
       ! Apply TMS
       !-----------
        if ( do_tms ) then
          dum_core_rknd = real((ksrftms(i)*host_mean%um(i,pver)), kind = core_rknd)
-         core_sfc%upwp = core_sfc%upwp-(dum_core_rknd/core_state%rho_ds_zm(1))
+         core_sfc%upwp = core_sfc%upwp-(dum_core_rknd/core_auxil%rho_ds_zm(1))
          dum_core_rknd = real((ksrftms(i)*host_mean%vm(i,pver)), kind = core_rknd)
-         core_sfc%vpwp = core_sfc%vpwp-(dum_core_rknd/core_state%rho_ds_zm(1))
+         core_sfc%vpwp = core_sfc%vpwp-(dum_core_rknd/core_auxil%rho_ds_zm(1))
        endif
 
       !  Define surface sources for transported variables for diffusion, will

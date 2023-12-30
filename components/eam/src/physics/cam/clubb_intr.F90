@@ -1131,7 +1131,7 @@ end subroutine clubb_init_cnst
    use model_flags, only: ipdf_call_placement
    use advance_clubb_core_module, only: ipdf_post_advance_fields
    use clubb_intr_types
-   use clubb_intr_core_types, only: core_state_t, core_forcing_t, core_sfc_t
+   use clubb_intr_core_types, only: core_auxil_t, core_prog_t, core_diag_t, core_forcing_t, core_sfc_t
    use clubb_intr_core_types, only: clubb_core_fld_alloc, clubb_core_fld_dealloc
 #endif
 
@@ -1217,7 +1217,9 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: fcoriolis                        ! Coriolis forcing                              [s^-1]
    real(core_rknd) :: sfc_elevation                    ! Elevation of ground                           [m AMSL]
 
-   type(core_state_t)   :: core_state
+   type(core_auxil_t)   :: core_auxil
+   type(core_prog_t)    :: core_prog
+   type(core_diag_t)    :: core_diag
    type(core_forcing_t) :: core_forcing
    type(core_sfc_t)     :: core_sfc
 

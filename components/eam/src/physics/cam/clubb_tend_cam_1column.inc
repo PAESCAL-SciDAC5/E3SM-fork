@@ -1,7 +1,7 @@
 
       zi_out(i,1) = 0._r8
 
-      call clubb_core_fld_alloc( core_state, core_forcing, core_sfc, pverp, edsclr_dim )
+      call clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, pverp, edsclr_dim )
 
       !============================================
       ! Prepare input to advance_clubb_core
@@ -20,85 +20,85 @@
       do k=1,pver
          kkhost = pver-k+1
 
-         core_state%p_in_Pa(k+1)   = real( host_mean%pmid(i,kkhost), kind=core_rknd )
-         core_state%exner(k+1)     = real( 1._r8/host_mean%exner_clubb(i,kkhost), kind=core_rknd )
+         core_auxil%p_in_Pa(k+1)   = real( host_mean%pmid(i,kkhost), kind=core_rknd )
+         core_auxil%exner(k+1)     = real( 1._r8/host_mean%exner_clubb(i,kkhost), kind=core_rknd )
 
          thvtmp =  host_mean%t(i,kkhost) &
                   *host_mean%exner_clubb(i,kkhost) &
                   *( 1._r8+zvir*host_mean%q(i,kkhost,ixq)-host_mean%q(i,kkhost,ixcldliq) )
-         core_state%thv_ds_zt(k+1) = real(thvtmp, kind = core_rknd)                       ! thetav on thermo
+         core_auxil%thv_ds_zt(k+1) = real(thvtmp, kind = core_rknd)                       ! thetav on thermo
       enddo
 
-      core_state%p_in_Pa  (1) = core_state%p_in_Pa(2)
-      core_state%exner    (1) = core_state%exner  (2)
-      core_state%thv_ds_zt(1) = core_state%thv_ds_zt(2)
+      core_auxil%p_in_Pa  (1) = core_auxil%p_in_Pa(2)
+      core_auxil%exner    (1) = core_auxil%exner  (2)
+      core_auxil%thv_ds_zt(1) = core_auxil%thv_ds_zt(2)
 
       !----------
       do k=1,pver
          kkhost = pver-k+1
-         core_state%rho_ds_zt(k+1) = real( invrs_gravit*host_mean%pdel(i,kkhost)/dz_g(kkhost), kind=core_rknd )
+         core_auxil%rho_ds_zt(k+1) = real( invrs_gravit*host_mean%pdel(i,kkhost)/dz_g(kkhost), kind=core_rknd )
       enddo
-      core_state%rho_ds_zt(1) = core_state%rho_ds_zt(2)
+      core_auxil%rho_ds_zt(1) = core_auxil%rho_ds_zt(2)
 
 
       !----------
-      core_state%rho_zt(:)  = core_state%rho_ds_zt(:)
+      core_auxil%rho_zt(:)  = core_auxil%rho_ds_zt(:)
 
-      core_state%invrs_rho_ds_zt(2:pverp) = 1._core_rknd/core_state%rho_ds_zt(2:pverp) ! Inverse ds rho at thermo
-      core_state%invrs_rho_ds_zt(1)       = core_state%invrs_rho_ds_zt(2)
+      core_auxil%invrs_rho_ds_zt(2:pverp) = 1._core_rknd/core_auxil%rho_ds_zt(2:pverp) ! Inverse ds rho at thermo
+      core_auxil%invrs_rho_ds_zt(1)       = core_auxil%invrs_rho_ds_zt(2)
 
       !  Compute some inputs from the thermodynamic grid to the momentum grid
       !  Note: this can only be done after "call setup_grid_heights_api"
 
-      core_state%rho_ds_zm       = zt2zm_api( core_state%rho_ds_zt )
-      core_state%rho_zm          = zt2zm_api( core_state%rho_zt    )
-      core_state%invrs_rho_ds_zm = zt2zm_api( core_state%invrs_rho_ds_zt)
-      core_state%thv_ds_zm       = zt2zm_api( core_state%thv_ds_zt )
+      core_auxil%rho_ds_zm       = zt2zm_api( core_auxil%rho_ds_zt )
+      core_auxil%rho_zm          = zt2zm_api( core_auxil%rho_zt    )
+      core_auxil%invrs_rho_ds_zm = zt2zm_api( core_auxil%invrs_rho_ds_zt)
+      core_auxil%thv_ds_zm       = zt2zm_api( core_auxil%thv_ds_zt )
 
       !----------
       !  Compute mean w wind on thermo grid, convert from omega to w
 
-      core_state%wm_zt(1) = 0._core_rknd
+      core_auxil%wm_zt(1) = 0._core_rknd
       do k=1,pver
         kkhost = pver-k+1
-        dum1 = -1._r8*host_mean%omega(i,kkhost) * real(core_state%invrs_rho_ds_zt(k+1),kind=r8) *invrs_gravit
-        core_state%wm_zt(k+1) = real(dum1,kind=core_rknd)
+        dum1 = -1._r8*host_mean%omega(i,kkhost) * real(core_auxil%invrs_rho_ds_zt(k+1),kind=r8) *invrs_gravit
+        core_auxil%wm_zt(k+1) = real(dum1,kind=core_rknd)
       enddo
 
-      core_state%wm_zm = zt2zm_api( core_state%wm_zt )
+      core_auxil%wm_zm = zt2zm_api( core_auxil%wm_zt )
 
       !----------
 
       !  Need to flip arrays around for CLUBB core
       do k=1,pverp
 
-         core_state%thlm(k) = real(host_mean%thlm(i,pverp-k+1), kind = core_rknd)
-         core_state%rtm (k) = real(host_mean%rtm(i,pverp-k+1), kind = core_rknd)
-         core_state%rcm (k) = real(host_mean%rcm(i,pverp-k+1), kind = core_rknd)
+         core_prog%thlm(k) = real(host_mean%thlm(i,pverp-k+1), kind = core_rknd)
+         core_prog%rtm (k) = real(host_mean%rtm(i,pverp-k+1), kind = core_rknd)
 
-         core_state%um(k)      = real(host_mean%um(i,pverp-k+1), kind = core_rknd)
-         core_state%vm(k)      = real(host_mean%vm(i,pverp-k+1), kind = core_rknd)
+         core_prog%um(k)      = real(host_mean%um(i,pverp-k+1), kind = core_rknd)
+         core_prog%vm(k)      = real(host_mean%vm(i,pverp-k+1), kind = core_rknd)
 
-         core_state%up2(k)     = real(host_mnts%up2(i,pverp-k+1), kind = core_rknd)
-         core_state%vp2(k)     = real(host_mnts%vp2(i,pverp-k+1), kind = core_rknd)
-         core_state%wp2(k)     = real(host_mnts%wp2(i,pverp-k+1), kind = core_rknd)
-         core_state%wp3(k)     = real(host_mnts%wp3(i,pverp-k+1), kind = core_rknd)
+         core_prog%up2(k)     = real(host_mnts%up2(i,pverp-k+1), kind = core_rknd)
+         core_prog%vp2(k)     = real(host_mnts%vp2(i,pverp-k+1), kind = core_rknd)
+         core_prog%wp2(k)     = real(host_mnts%wp2(i,pverp-k+1), kind = core_rknd)
+         core_prog%wp3(k)     = real(host_mnts%wp3(i,pverp-k+1), kind = core_rknd)
 
-         core_state%upwp(k)    = real(host_mnts%upwp(i,pverp-k+1), kind = core_rknd)
-         core_state%vpwp(k)    = real(host_mnts%vpwp(i,pverp-k+1), kind = core_rknd)
+         core_prog%upwp(k)    = real(host_mnts%upwp(i,pverp-k+1), kind = core_rknd)
+         core_prog%vpwp(k)    = real(host_mnts%vpwp(i,pverp-k+1), kind = core_rknd)
 
-         core_state%rtp2   (k) = real(host_mnts%rtp2(i,pverp-k+1), kind = core_rknd)
-         core_state%thlp2  (k) = real(host_mnts%thlp2(i,pverp-k+1), kind = core_rknd)
-         core_state%wprtp  (k) = real(host_mnts%wprtp(i,pverp-k+1), kind = core_rknd)
-         core_state%wpthlp (k) = real(host_mnts%wpthlp(i,pverp-k+1), kind = core_rknd)
-         core_state%rtpthlp(k) = real(host_mnts%rtpthlp(i,pverp-k+1), kind = core_rknd)
+         core_prog%rtp2   (k) = real(host_mnts%rtp2(i,pverp-k+1), kind = core_rknd)
+         core_prog%thlp2  (k) = real(host_mnts%thlp2(i,pverp-k+1), kind = core_rknd)
+         core_prog%wprtp  (k) = real(host_mnts%wprtp(i,pverp-k+1), kind = core_rknd)
+         core_prog%wpthlp (k) = real(host_mnts%wpthlp(i,pverp-k+1), kind = core_rknd)
+         core_prog%rtpthlp(k) = real(host_mnts%rtpthlp(i,pverp-k+1), kind = core_rknd)
 
-         core_state%wpthvp  (k) = real(host_mnts%wpthvp  (i,pverp-k+1), kind = core_rknd)
-         core_state%wp2thvp (k) = real(host_mnts%wp2thvp (i,pverp-k+1), kind = core_rknd)
-         core_state%rtpthvp (k) = real(host_mnts%rtpthvp (i,pverp-k+1), kind = core_rknd)
-         core_state%thlpthvp(k) = real(host_mnts%thlpthvp(i,pverp-k+1), kind = core_rknd)
+         core_diag%wpthvp  (k) = real(host_mnts%wpthvp  (i,pverp-k+1), kind = core_rknd)
+         core_diag%wp2thvp (k) = real(host_mnts%wp2thvp (i,pverp-k+1), kind = core_rknd)
+         core_diag%rtpthvp (k) = real(host_mnts%rtpthvp (i,pverp-k+1), kind = core_rknd)
+         core_diag%thlpthvp(k) = real(host_mnts%thlpthvp(i,pverp-k+1), kind = core_rknd)
 
-         core_state%cloud_frac(k) = real( cloud_frac(i,pverp-k+1), kind = core_rknd)
+         core_diag%rcm       (k) = real(host_mean%rcm(i,pverp-k+1), kind = core_rknd)
+         core_diag%cloud_frac(k) = real( cloud_frac(i,pverp-k+1), kind = core_rknd)
       enddo
 
          ! also flip the arrays for the pdf_params_zm variables to have
@@ -118,10 +118,10 @@
          ! Each host model time step, reset the perturbed variables to be equal to
          ! the unperturbed values.
          if (macmic_it == 1) then
-            um_pert(i,:) = core_state%um
-            vm_pert(i,:) = core_state%vm
-            upwp_pert(i,:) = core_state%upwp
-            vpwp_pert(i,:) = core_state%vpwp
+            um_pert(i,:) = core_prog%um
+            vm_pert(i,:) = core_prog%vm
+            upwp_pert(i,:) = core_prog%upwp
+            vpwp_pert(i,:) = core_prog%vpwp
          end if
          allocate(um_pert_col(pverp))
          allocate(vm_pert_col(pverp))
@@ -138,13 +138,13 @@
          ! However, if there's no existing surface stress, just perturb zonal
          ! wind/stress.
          if (abs(cam_in%wsx(i)) < 1.e-12 .and. abs(cam_in%wsy(i)) < 1.e-12) then
-            upwp_sfc_pert = core_sfc%upwp + pert_tau / core_state%rho_ds_zm(1)
+            upwp_sfc_pert = core_sfc%upwp + pert_tau / core_auxil%rho_ds_zm(1)
             vpwp_sfc_pert = core_sfc%vpwp
          else
             upwp_sfc_pert = core_sfc%upwp + cam_in%wsx(i) * &
-                 (pert_tau / (core_state%rho_ds_zm(1) * hypot(cam_in%wsx(i), cam_in%wsy(i))))
+                 (pert_tau / (core_auxil%rho_ds_zm(1) * hypot(cam_in%wsx(i), cam_in%wsy(i))))
             vpwp_sfc_pert = core_sfc%vpwp + cam_in%wsy(i) * &
-                 (pert_tau / (core_state%rho_ds_zm(1) * hypot(cam_in%wsx(i), cam_in%wsy(i))))
+                 (pert_tau / (core_auxil%rho_ds_zm(1) * hypot(cam_in%wsx(i), cam_in%wsy(i))))
          end if
       else
          nullify(upwp_sfc_pert)
@@ -159,23 +159,23 @@
       if (clubb_do_adv) then
         if (macmic_it .eq. 1) then
 
-          core_state%up2 = zt2zm_api( core_state%up2 )
-          core_state%vp2 = zt2zm_api( core_state%vp2 )
-          core_state%wp2 = zt2zm_api( core_state%wp2 )
+          core_prog%up2 = zt2zm_api( core_prog%up2 )
+          core_prog%vp2 = zt2zm_api( core_prog%vp2 )
+          core_prog%wp2 = zt2zm_api( core_prog%wp2 )
 
-          core_state%wpthlp  = zt2zm_api( core_state%wpthlp  )
-          core_state%wprtp   = zt2zm_api( core_state%wprtp   )
-          core_state%thlp2   = zt2zm_api( core_state%thlp2   )
-          core_state%rtp2    = zt2zm_api( core_state%rtp2    )
-          core_state%rtpthlp = zt2zm_api( core_state%rtpthlp )
+          core_prog%wpthlp  = zt2zm_api( core_prog%wpthlp  )
+          core_prog%wprtp   = zt2zm_api( core_prog%wprtp   )
+          core_prog%thlp2   = zt2zm_api( core_prog%thlp2   )
+          core_prog%rtp2    = zt2zm_api( core_prog%rtp2    )
+          core_prog%rtpthlp = zt2zm_api( core_prog%rtpthlp )
 
           do k=1,pverp
-            core_state%thlp2(k)=max(thl_tol**2,core_state%thlp2(k))
-            core_state%rtp2 (k)=max( rt_tol**2,core_state%rtp2 (k))
+            core_prog%thlp2(k)=max(thl_tol**2,core_prog%thlp2(k))
+            core_prog%rtp2 (k)=max( rt_tol**2,core_prog%rtp2 (k))
 
-            core_state%up2(k)=max(w_tol_sqd,core_state%up2(k))
-            core_state%vp2(k)=max(w_tol_sqd,core_state%vp2(k))
-            core_state%wp2(k)=max(w_tol_sqd,core_state%wp2(k))
+            core_prog%up2(k)=max(w_tol_sqd,core_prog%up2(k))
+            core_prog%vp2(k)=max(w_tol_sqd,core_prog%vp2(k))
+            core_prog%wp2(k)=max(w_tol_sqd,core_prog%wp2(k))
           enddo
         endif
       endif
@@ -183,27 +183,27 @@
       !-----------------------------------------------
       ! Get input values for passive tracers
       !-----------------------------------------------
-      core_state%edsclr(:,:) = 0._core_rknd
+      core_prog%edsclr(:,:) = 0._core_rknd
  
       icnt=0
       do ixind=1,pcnst
          if (lq(ixind))  then
             icnt=icnt+1
             do k=1,pver
-               core_state%edsclr(k+1,icnt) = real(host_mean%q(i,pver-k+1,ixind), kind = core_rknd)
+               core_prog%edsclr(k+1,icnt) = real(host_mean%q(i,pver-k+1,ixind), kind = core_rknd)
             enddo
-            core_state%edsclr(1,icnt) = core_state%edsclr(2,icnt)
+            core_prog%edsclr(1,icnt) = core_prog%edsclr(2,icnt)
          end if
       enddo
 
       if (do_expldiff) then
         do k=1,pver
-          core_state%edsclr(k+1,icnt+1) = real(host_mean%thlm(i,pver-k+1), kind = core_rknd)
-          core_state%edsclr(k+1,icnt+2) = real(host_mean%rtm (i,pver-k+1), kind = core_rknd)
+          core_prog%edsclr(k+1,icnt+1) = real(host_mean%thlm(i,pver-k+1), kind = core_rknd)
+          core_prog%edsclr(k+1,icnt+2) = real(host_mean%rtm (i,pver-k+1), kind = core_rknd)
         enddo
 
-        core_state%edsclr(1,icnt+1) = core_state%edsclr(2,icnt+1)
-        core_state%edsclr(1,icnt+2) = core_state%edsclr(2,icnt+2)
+        core_prog%edsclr(1,icnt+1) = core_prog%edsclr(2,icnt+1)
+        core_prog%edsclr(1,icnt+2) = core_prog%edsclr(2,icnt+2)
       endif
 
       ! --------------------------------------------------------- !
@@ -296,8 +296,8 @@
               core_forcing%thlp2,   &! intent(in)
               core_forcing%rtpthlp, &
               !
-              core_state%wm_zm, &
-              core_state%wm_zt, &! intent(in)
+              core_auxil%wm_zm, &
+              core_auxil%wm_zt, &! intent(in)
               !
               core_sfc%wpthlp,    &
               core_sfc%wprtp,     &
@@ -306,16 +306,16 @@
               wpsclrp_sfc,        &
               core_sfc%wpedsclrp, &! intent(in)
               !
-              core_state%p_in_Pa,         &
-              core_state%rho_zm,          &
-              core_state%rho_zt,          &
-              core_state%exner,           &! intent(in)
-              core_state%rho_ds_zm,       &
-              core_state%rho_ds_zt,       &
-              core_state%invrs_rho_ds_zm, &! intent(in)
-              core_state%invrs_rho_ds_zt, &
-              core_state%thv_ds_zm,       &
-              core_state%thv_ds_zt,       &
+              core_auxil%p_in_Pa,         &
+              core_auxil%rho_zm,          &
+              core_auxil%rho_zt,          &
+              core_auxil%exner,           &! intent(in)
+              core_auxil%rho_ds_zm,       &
+              core_auxil%rho_ds_zt,       &
+              core_auxil%invrs_rho_ds_zm, &! intent(in)
+              core_auxil%invrs_rho_ds_zt, &
+              core_auxil%thv_ds_zm,       &
+              core_auxil%thv_ds_zt,       &
               !
               hydromet,    &! intent(in)
               rfrzm, radf, &! intent(in)
@@ -325,45 +325,45 @@
               wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt, &! intent(in)
               host_dx, host_dy, &                          ! intent(in)
               !
-              core_state%um,     &
-              core_state%vm,     &
-              core_state%upwp,   &! intent(inout)
-              core_state%vpwp,   &
-              core_state%up2,    &
-              core_state%vp2,    &! intent(inout)
-              core_state%thlm,   &
-              core_state%rtm,    &
-              core_state%wprtp,  &
-              core_state%wpthlp, &! intent(inout)
-              core_state%wp2,    &
-              core_state%wp3,    &
-              core_state%rtp2,   &! intent(inout)
-              rtp3_in,           &
-              core_state%thlp2,  &
-              thlp3_in, &
-              core_state%rtpthlp,&! intent(inout)
+              core_prog%um,     &
+              core_prog%vm,     &
+              core_prog%upwp,   &! intent(inout)
+              core_prog%vpwp,   &
+              core_prog%up2,    &
+              core_prog%vp2,    &! intent(inout)
+              core_prog%thlm,   &
+              core_prog%rtm,    &
+              core_prog%wprtp,  &
+              core_prog%wpthlp, &! intent(inout)
+              core_prog%wp2,    &
+              core_prog%wp3,    &
+              core_prog%rtp2,   &! intent(inout)
+              rtp3_in,          &
+              core_prog%thlp2,  &
+              thlp3_in,         &
+              core_prog%rtpthlp,&! intent(inout)
               sclrm,                       &! intent(inout)
               sclrp2, sclrprtp, sclrpthlp, &! intent(inout)
               wpsclrp, &
-              core_state%edsclr, &
-              err_code,          &! intent(inout)
+              core_prog%edsclr, &
+              err_code,         &! intent(inout)
               !
-              core_state%rcm,        &
-              core_state%cloud_frac, &! intent(inout)
+              core_diag%rcm,        &
+              core_diag%cloud_frac, &! intent(inout)
               !
-              core_state%wpthvp,  &
-              core_state%wp2thvp, &
-              core_state%rtpthvp, &
-              core_state%thlpthvp,&! intent(inout)
+              core_diag%wpthvp,  &
+              core_diag%wp2thvp, &
+              core_diag%rtpthvp, &
+              core_diag%thlpthvp,&! intent(inout)
               !
               sclrpthvp_inout, &! intent(inout)
               pdf_params, pdf_params_zm, &! intent(inout)
               !
-              core_state%khzm,    &
-              core_state%khzt,    &
-              core_state%qclvar,  &
-              core_state%thlprcp, &! intent(out)
-              core_state%wprcp,   &
+              core_diag%khzm,    &
+              core_diag%khzt,    &
+              core_diag%qclvar,  &
+              core_diag%thlprcp, &! intent(out)
+              core_diag%wprcp,   &
               !
               ice_supersat_frac,                 &! intent(out)
               rcm_in_layer_out, cloud_cover_out, &! intent(out)
@@ -396,10 +396,10 @@
             enddo
             pre_in(1) = pre_in(2)
 
-            rvm_in = core_state%rtm - core_state%rcm
-            call update_xp2_mc_api(pverp, dtime, core_state%cloud_frac, &
-                                   core_state%rcm, rvm_in, core_state%thlm, &
-                                   core_state%wm_zt, core_state%exner, pre_in, pdf_params, &
+            rvm_in = core_prog%rtm - core_diag%rcm
+            call update_xp2_mc_api(pverp, dtime, core_diag%cloud_frac, &
+                                   core_diag%rcm, rvm_in, core_prog%thlm, &
+                                   core_auxil%wm_zt, core_auxil%exner, pre_in, pdf_params, &
             rtp2_mc_out, thlp2_mc_out, &
             wprtp_mc_out, wpthlp_mc_out, &
             rtpthlp_mc_out)
@@ -411,11 +411,11 @@
             end if
 
             ! update turbulent moments based on rain evaporation
-            core_state%rtp2  = core_state%rtp2  + real(clubb_rnevap_effic, kind = core_rknd) * dum_core_rknd *  rtp2_mc_out * dtime
-            core_state%thlp2 = core_state%thlp2 + real(clubb_rnevap_effic, kind = core_rknd) * dum_core_rknd * thlp2_mc_out * dtime
+            core_prog%rtp2  = core_prog%rtp2  + real(clubb_rnevap_effic, kind = core_rknd) * dum_core_rknd *  rtp2_mc_out * dtime
+            core_prog%thlp2 = core_prog%thlp2 + real(clubb_rnevap_effic, kind = core_rknd) * dum_core_rknd * thlp2_mc_out * dtime
             if (.not. clubb_do_deep) then
-               core_state%wprtp  = core_state%wprtp  + real(clubb_rnevap_effic, kind = core_rknd) * dum_core_rknd *  wprtp_mc_out * dtime
-               core_state%wpthlp = core_state%wpthlp + real(clubb_rnevap_effic, kind = core_rknd) * dum_core_rknd * wpthlp_mc_out * dtime
+               core_prog%wprtp  = core_prog%wprtp  + real(clubb_rnevap_effic, kind = core_rknd) * dum_core_rknd *  wprtp_mc_out * dtime
+               core_prog%wpthlp = core_prog%wpthlp + real(clubb_rnevap_effic, kind = core_rknd) * dum_core_rknd * wpthlp_mc_out * dtime
             endif
 !                     rtpthlp_in = rtpthlp_in + rtpthlp_mc_out * dtime
 
@@ -429,12 +429,12 @@
             enddo
             qrl_clubb(1) = qrl_clubb(2)
 
-            rcm_out_zm = zt2zm_api( core_state%rcm )
+            rcm_out_zm = zt2zm_api( core_diag%rcm )
             qrl_zm = zt2zm_api(qrl_clubb)
             thlp2_rad_out(:) = 0._r8
-            call calculate_thlp2_rad_api(pverp, rcm_out_zm, core_state%thlprcp, qrl_zm, thlp2_rad_out)
-            core_state%thlp2 = core_state%thlp2 + thlp2_rad_out * dtime
-            core_state%thlp2 = max(thl_tol**2,core_state%thlp2)
+            call calculate_thlp2_rad_api(pverp, rcm_out_zm, core_diag%thlprcp, qrl_zm, thlp2_rad_out)
+            core_prog%thlp2 = core_prog%thlp2 + thlp2_rad_out * dtime
+            core_prog%thlp2 = max(thl_tol**2,core_prog%thlp2)
           endif
 
           !  Check to see if stats should be output, here stats are read into
@@ -453,21 +453,21 @@
       !=====================================================
       if (clubb_do_adv) then
          if (macmic_it .eq. cld_macmic_num_steps) then
-            core_state%wp2     = zm2zt_api( core_state%wp2     )
-            core_state%wpthlp  = zm2zt_api( core_state%wpthlp  )
-            core_state%wprtp   = zm2zt_api( core_state%wprtp   )
-            core_state%up2     = zm2zt_api( core_state%up2     )
-            core_state%vp2     = zm2zt_api( core_state%vp2     )
-            core_state%thlp2   = zm2zt_api( core_state%thlp2   )
-            core_state%rtp2    = zm2zt_api( core_state%rtp2    )
-            core_state%rtpthlp = zm2zt_api( core_state%rtpthlp )
+            core_prog%wp2     = zm2zt_api( core_prog%wp2     )
+            core_prog%wpthlp  = zm2zt_api( core_prog%wpthlp  )
+            core_prog%wprtp   = zm2zt_api( core_prog%wprtp   )
+            core_prog%up2     = zm2zt_api( core_prog%up2     )
+            core_prog%vp2     = zm2zt_api( core_prog%vp2     )
+            core_prog%thlp2   = zm2zt_api( core_prog%thlp2   )
+            core_prog%rtp2    = zm2zt_api( core_prog%rtp2    )
+            core_prog%rtpthlp = zm2zt_api( core_prog%rtpthlp )
 
             do k=1,pverp
-               core_state%thlp2(k) = max( thl_tol**2,core_state%thlp2(k) )
-               core_state%rtp2 (k) = max( rt_tol**2, core_state%rtp2 (k) )
-               core_state%wp2  (k) = max( w_tol_sqd, core_state%wp2  (k) )
-               core_state%up2  (k) = max( w_tol_sqd, core_state%up2  (k) )
-               core_state%vp2  (k) = max( w_tol_sqd, core_state%vp2  (k) )
+               core_prog%thlp2(k) = max( thl_tol**2,core_prog%thlp2(k) )
+               core_prog%rtp2 (k) = max( rt_tol**2, core_prog%rtp2 (k) )
+               core_prog%wp2  (k) = max( w_tol_sqd, core_prog%wp2  (k) )
+               core_prog%up2  (k) = max( w_tol_sqd, core_prog%up2  (k) )
+               core_prog%vp2  (k) = max( w_tol_sqd, core_prog%vp2  (k) )
             enddo
          endif
       endif
@@ -485,10 +485,10 @@
          deallocate(upwp_sfc_pert)
          deallocate(vpwp_sfc_pert)
          if (abs(cam_in%wsx(i)) < 1.e-12 .and. abs(cam_in%wsy(i)) < 1.e-12) then
-            sfc_v_diff_tau(i) = um_pert(i,2) - core_state%um(2)
+            sfc_v_diff_tau(i) = um_pert(i,2) - core_prog%um(2)
          else
-            sfc_v_diff_tau(i) = ((um_pert(i,2) - core_state%um(2))*cam_in%wsx(i) &
-                 + (vm_pert(i,2) - core_state%vm(2))*cam_in%wsy(i)) &
+            sfc_v_diff_tau(i) = ((um_pert(i,2) - core_prog%um(2))*cam_in%wsx(i) &
+                 + (vm_pert(i,2) - core_prog%vm(2))*cam_in%wsy(i)) &
                  / hypot(cam_in%wsx(i), cam_in%wsy(i))
          end if
       end if
@@ -496,41 +496,41 @@
       !  Arrays need to be "flipped" to CAM grid
       do k=1,pverp
 
-          host_mean% um(i,k) = real(core_state%um(pverp-k+1), kind = r8)
-          host_mean% vm(i,k) = real(core_state%vm(pverp-k+1), kind = r8)
+          host_mean% um(i,k) = real(core_prog%um(pverp-k+1), kind = r8)
+          host_mean% vm(i,k) = real(core_prog%vm(pverp-k+1), kind = r8)
 
-          host_mean% thlm(i,k) = real( core_state%thlm(pverp-k+1), kind=r8 )
-          host_mean% rtm (i,k) = real( core_state% rtm(pverp-k+1), kind=r8 )
-          host_mean% rcm (i,k) = real( core_state% rcm(pverp-k+1), kind=r8 )
+          host_mean% thlm(i,k) = real( core_prog%thlm(pverp-k+1), kind=r8 )
+          host_mean% rtm (i,k) = real( core_prog% rtm(pverp-k+1), kind=r8 )
+          host_mean% rcm (i,k) = real( core_diag% rcm(pverp-k+1), kind=r8 )
 
-          host_mnts% upwp(i,k)         = real(core_state%upwp(pverp-k+1), kind = r8)
-          host_mnts% vpwp(i,k)         = real(core_state%vpwp(pverp-k+1), kind = r8)
+          host_mnts% upwp(i,k)         = real(core_prog%upwp(pverp-k+1), kind = r8)
+          host_mnts% vpwp(i,k)         = real(core_prog%vpwp(pverp-k+1), kind = r8)
 
-          host_mnts% wpthvp(i,k)       = real( core_state%wpthvp  (pverp-k+1), kind = r8)
-          host_mnts% wp2thvp(i,k)      = real( core_state%wp2thvp (pverp-k+1), kind = r8)
-          host_mnts% rtpthvp(i,k)      = real( core_state%rtpthvp (pverp-k+1), kind = r8)
-          host_mnts% thlpthvp(i,k)     = real( core_state%thlpthvp(pverp-k+1), kind = r8)
+          host_mnts% wpthvp(i,k)       = real( core_diag%wpthvp  (pverp-k+1), kind = r8)
+          host_mnts% wp2thvp(i,k)      = real( core_diag%wp2thvp (pverp-k+1), kind = r8)
+          host_mnts% rtpthvp(i,k)      = real( core_diag%rtpthvp (pverp-k+1), kind = r8)
+          host_mnts% thlpthvp(i,k)     = real( core_diag%thlpthvp(pverp-k+1), kind = r8)
 
-          host_mnts% up2(i,k)          = real(core_state%up2(pverp-k+1), kind = r8)
-          host_mnts% vp2(i,k)          = real(core_state%vp2(pverp-k+1), kind = r8)
-          host_mnts% wp2(i,k)          = real(core_state%wp2(pverp-k+1), kind = r8)
-          host_mnts% wp3(i,k)          = real(core_state%wp3(pverp-k+1), kind = r8)
+          host_mnts% up2(i,k)          = real(core_prog%up2(pverp-k+1), kind = r8)
+          host_mnts% vp2(i,k)          = real(core_prog%vp2(pverp-k+1), kind = r8)
+          host_mnts% wp2(i,k)          = real(core_prog%wp2(pverp-k+1), kind = r8)
+          host_mnts% wp3(i,k)          = real(core_prog%wp3(pverp-k+1), kind = r8)
 
-          host_mnts% rtp2(i,k)         = real( core_state%rtp2   (pverp-k+1), kind = r8)
-          host_mnts% thlp2(i,k)        = real( core_state%thlp2  (pverp-k+1), kind = r8)
-          host_mnts% wprtp(i,k)        = real( core_state%wprtp  (pverp-k+1), kind = r8)
-          host_mnts% wpthlp(i,k)       = real( core_state%wpthlp (pverp-k+1), kind = r8)
-          host_mnts% rtpthlp(i,k)      = real( core_state%rtpthlp(pverp-k+1), kind = r8)
+          host_mnts% rtp2(i,k)         = real( core_prog%rtp2   (pverp-k+1), kind = r8)
+          host_mnts% thlp2(i,k)        = real( core_prog%thlp2  (pverp-k+1), kind = r8)
+          host_mnts% wprtp(i,k)        = real( core_prog%wprtp  (pverp-k+1), kind = r8)
+          host_mnts% wpthlp(i,k)       = real( core_prog%wpthlp (pverp-k+1), kind = r8)
+          host_mnts% rtpthlp(i,k)      = real( core_prog%rtpthlp(pverp-k+1), kind = r8)
 
-          wprcp(i,k)        = real( core_state%wprcp(pverp-k+1), kind = r8)
-          cloud_frac(i,k)   = min(real(core_state%cloud_frac(pverp-k+1), kind = r8),1._r8)
+          wprcp(i,k)        = real( core_diag%wprcp(pverp-k+1), kind = r8)
+          cloud_frac(i,k)   = min(real(core_diag%cloud_frac(pverp-k+1), kind = r8),1._r8)
           rcm_in_layer(i,k) = real(rcm_in_layer_out(pverp-k+1), kind = r8)
           cloud_cover(i,k)  = min(real(cloud_cover_out(pverp-k+1), kind = r8),1._r8)
 
-          c2h%khzm(i,k)     = real( core_state%khzm(pverp-k+1), kind=r8 )
-          c2h%khzt(i,k)     = real( core_state%khzt(pverp-k+1), kind=r8 )
+          c2h%khzm(i,k)     = real( core_diag%khzm(pverp-k+1), kind=r8 )
+          c2h%khzt(i,k)     = real( core_diag%khzt(pverp-k+1), kind=r8 )
 
-          qclvar(i,k)   = real( min( 1._core_rknd, core_state%qclvar(pverp-k+1) ), kind=r8 )
+          qclvar(i,k)   = real( min( 1._core_rknd, core_diag%qclvar(pverp-k+1) ), kind=r8 )
 
           sclrpthvp(i,k,:)  = real(sclrpthvp_inout(pverp-k+1,:), kind = r8)
           pdf_zm_w_1(i,k) = pdf_zm_w_1_inout(pverp-k+1)
@@ -543,8 +543,8 @@
 
       edsclr_out(i,:,1:edsclr_dim)     = 0._r8
       do k=1,pverp
-         edsclr_out(i,k,1:edsclr_dim) = real( core_state%edsclr(pverp-k+1,1:edsclr_dim), kind = r8 )
+         edsclr_out(i,k,1:edsclr_dim) = real( core_prog%edsclr(pverp-k+1,1:edsclr_dim), kind = r8 )
       enddo
 
       !=================================================
-      call clubb_core_fld_dealloc( core_state, core_forcing, core_sfc )
+      call clubb_core_fld_dealloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc )
