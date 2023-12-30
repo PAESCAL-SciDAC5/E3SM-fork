@@ -106,11 +106,11 @@
          ! also need to flip back after calling advance_clubb_core
 
       do k=1,pverp
-         pdf_zm_w_1_inout(k) = pdf_zm_w_1(i,pverp-k+1)
-         pdf_zm_w_2_inout(k) = pdf_zm_w_2(i,pverp-k+1)
-         pdf_zm_varnce_w_1_inout(k) = pdf_zm_varnce_w_1(i,pverp-k+1)
-         pdf_zm_varnce_w_2_inout(k) = pdf_zm_varnce_w_2(i,pverp-k+1)
-         pdf_zm_mixt_frac_inout(k) =  pdf_zm_mixt_frac(i,pverp-k+1)
+         pdf_zm_w_1_inout(k)        = c2h%pdf_zm_w_1       (i,pverp-k+1)
+         pdf_zm_w_2_inout(k)        = c2h%pdf_zm_w_2       (i,pverp-k+1)
+         pdf_zm_varnce_w_1_inout(k) = c2h%pdf_zm_varnce_w_1(i,pverp-k+1)
+         pdf_zm_varnce_w_2_inout(k) = c2h%pdf_zm_varnce_w_2(i,pverp-k+1)
+         pdf_zm_mixt_frac_inout(k)  = c2h%pdf_zm_mixt_frac (i,pverp-k+1)
       enddo
 
 
@@ -241,11 +241,11 @@
       if ( is_first_restart_step() .and. ipdf_call_placement .eq. ipdf_post_advance_fields ) then
          ! assign the values read back from restart file
          ! This is necessary when ipdf_call_placement = 2
-         pdf_params_zm%w_1 = pdf_zm_w_1_inout
-         pdf_params_zm%w_2 = pdf_zm_w_2_inout
+         pdf_params_zm%w_1        = pdf_zm_w_1_inout
+         pdf_params_zm%w_2        = pdf_zm_w_2_inout
          pdf_params_zm%varnce_w_1 = pdf_zm_varnce_w_1_inout
          pdf_params_zm%varnce_w_2 = pdf_zm_varnce_w_2_inout
-         pdf_params_zm%mixt_frac = pdf_zm_mixt_frac_inout
+         pdf_params_zm%mixt_frac  = pdf_zm_mixt_frac_inout
       end if
 
       !----------
@@ -383,11 +383,11 @@
          end if
 
          !============================================
-         pdf_zm_w_1_inout = pdf_params_zm%w_1
-         pdf_zm_w_2_inout = pdf_params_zm%w_2
+         pdf_zm_w_1_inout        = pdf_params_zm%w_1
+         pdf_zm_w_2_inout        = pdf_params_zm%w_2
          pdf_zm_varnce_w_1_inout = pdf_params_zm%varnce_w_1
          pdf_zm_varnce_w_2_inout = pdf_params_zm%varnce_w_2
-         pdf_zm_mixt_frac_inout = pdf_params_zm%mixt_frac
+         pdf_zm_mixt_frac_inout  = pdf_params_zm%mixt_frac
 
          if (do_rainturb) then
 
@@ -533,11 +533,12 @@
           qclvar(i,k)   = real( min( 1._core_rknd, core_diag%qclvar(pverp-k+1) ), kind=r8 )
 
           sclrpthvp(i,k,:)  = real(sclrpthvp_inout(pverp-k+1,:), kind = r8)
-          pdf_zm_w_1(i,k) = pdf_zm_w_1_inout(pverp-k+1)
-          pdf_zm_w_2(i,k) = pdf_zm_w_2_inout(pverp-k+1)
-          pdf_zm_varnce_w_1(i,k) = pdf_zm_varnce_w_1_inout(pverp-k+1)
-          pdf_zm_varnce_w_2(i,k) = pdf_zm_varnce_w_2_inout(pverp-k+1)
-          pdf_zm_mixt_frac(i,k) =  pdf_zm_mixt_frac_inout(pverp-k+1)
+
+          c2h%pdf_zm_w_1(i,k)        = pdf_zm_w_1_inout(pverp-k+1)
+          c2h%pdf_zm_w_2(i,k)        = pdf_zm_w_2_inout(pverp-k+1)
+          c2h%pdf_zm_varnce_w_1(i,k) = pdf_zm_varnce_w_1_inout(pverp-k+1)
+          c2h%pdf_zm_varnce_w_2(i,k) = pdf_zm_varnce_w_2_inout(pverp-k+1)
+          c2h%pdf_zm_mixt_frac(i,k)  = pdf_zm_mixt_frac_inout(pverp-k+1)
 
       enddo
 

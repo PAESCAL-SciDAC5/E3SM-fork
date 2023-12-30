@@ -200,4 +200,10 @@
    call pbuf_get_field( pbuf, kvm_idx, c2h%khzt )
    call pbuf_get_field( pbuf, kvh_idx, c2h%khzm )
 
+   call pbuf_get_field( pbuf, pdf_zm_w_1_idx,        c2h%pdf_zm_w_1 )
+   call pbuf_get_field( pbuf, pdf_zm_w_2_idx,        c2h%pdf_zm_w_2 )
+   call pbuf_get_field( pbuf, pdf_zm_varnce_w_1_idx, c2h%pdf_zm_varnce_w_1 )
+   call pbuf_get_field( pbuf, pdf_zm_varnce_w_2_idx, c2h%pdf_zm_varnce_w_2 )
+   call pbuf_get_field( pbuf, pdf_zm_mixt_frac_idx,  c2h%pdf_zm_mixt_frac  )
+
   end subroutine setup_clubb_to_host_fields

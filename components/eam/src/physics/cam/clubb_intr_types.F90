@@ -66,6 +66,12 @@ module clubb_intr_types
     real(r8), pointer, dimension(:,:) ::  khzm    ! eddy diffusivity on thermo levels [m^2/s]
     real(r8), pointer, dimension(:,:) ::  qclvar  ! cloud water variance [kg^2/kg^2]
 
+    real(r8), pointer, dimension(:,:) ::  pdf_zm_w_1
+    real(r8), pointer, dimension(:,:) ::  pdf_zm_w_2
+    real(r8), pointer, dimension(:,:) ::  pdf_zm_varnce_w_1
+    real(r8), pointer, dimension(:,:) ::  pdf_zm_varnce_w_2
+    real(r8), pointer, dimension(:,:) ::  pdf_zm_mixt_frac
+
   end type clubb_to_host_t
 
 end module clubb_intr_types
