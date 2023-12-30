@@ -1273,7 +1273,9 @@ end subroutine clubb_init_cnst
    real(r8) :: newfice(pcols,pver)              ! fraction of ice in cloud at CLUBB start       [-]
    real(r8) :: bflx22                           ! Variable for buoyancy flux for pbl            [K m/s]
    real(r8) :: invrs_hdtime                     ! Preculate 1/hdtime to reduce divide operations
-   real(r8) :: invrs_gravit                     ! Preculate 1/gravit to reduce divide operations
+
+  !real(r8) :: invrs_gravit                     ! Preculate 1/gravit to reduce divide operations
+
    real(r8) :: ubar                             ! surface wind                                  [m/s]
    real(r8) :: ustar                            ! surface stress                                [m/s]
    real(r8) :: z0                               ! roughness height                              [m]
@@ -1309,10 +1311,6 @@ end subroutine clubb_init_cnst
    real(r8) :: rho(pcols,pverp)                 ! Midpoint density in CAM                       [kg/m^3]
    real(r8) :: thv(pcols,pver)                        ! virtual potential temperature                 [K]
 
-  !real(r8) :: thv1d(pver)
-   real(r8) :: thvtmp
-   integer  :: kkhost
-
    real(r8) :: edsclr_out(pcols,pverp,edsclr_dim)     ! Scalars to be diffused through CLUBB          [units vary]
 
    real(r8) :: sclrpthvp(pcols,pverp,sclr_dim)  ! sclr'th_v' (momentum levels)                  [{units vary} K]
@@ -1322,6 +1320,8 @@ end subroutine clubb_init_cnst
    real(r8) :: wpthvp_diag(pcols,pverp)              ! CLUBB buoyancy flux                           [W/m^2]
    real(r8) :: eps                              ! Rv/Rd                                         [-]
    real(r8) :: dum1                             ! dummy variable                                [units vary]
+
+   integer :: kkhost
 
    real(r8) :: ksrftms(pcols)                   ! Turbulent mountain stress surface drag        [kg/s/m2]
    real(r8) :: tautmsx(pcols)                   ! U component of turbulent mountain stress      [N/m2]

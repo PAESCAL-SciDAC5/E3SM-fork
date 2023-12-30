@@ -200,10 +200,208 @@
    call pbuf_get_field( pbuf, kvm_idx, c2h%khzt )
    call pbuf_get_field( pbuf, kvh_idx, c2h%khzm )
 
-   call pbuf_get_field( pbuf, pdf_zm_w_1_idx,        c2h%pdf_zm_w_1 )
-   call pbuf_get_field( pbuf, pdf_zm_w_2_idx,        c2h%pdf_zm_w_2 )
-   call pbuf_get_field( pbuf, pdf_zm_varnce_w_1_idx, c2h%pdf_zm_varnce_w_1 )
-   call pbuf_get_field( pbuf, pdf_zm_varnce_w_2_idx, c2h%pdf_zm_varnce_w_2 )
-   call pbuf_get_field( pbuf, pdf_zm_mixt_frac_idx,  c2h%pdf_zm_mixt_frac  )
+   call pbuf_get_field( pbuf, cloud_frac_idx,        c2h% cloud_frac )
+
+   call pbuf_get_field( pbuf, pdf_zm_w_1_idx,        c2h% pdf_zm_w_1 )
+   call pbuf_get_field( pbuf, pdf_zm_w_2_idx,        c2h% pdf_zm_w_2 )
+   call pbuf_get_field( pbuf, pdf_zm_varnce_w_1_idx, c2h% pdf_zm_varnce_w_1 )
+   call pbuf_get_field( pbuf, pdf_zm_varnce_w_2_idx, c2h% pdf_zm_varnce_w_2 )
+   call pbuf_get_field( pbuf, pdf_zm_mixt_frac_idx,  c2h% pdf_zm_mixt_frac  )
 
   end subroutine setup_clubb_to_host_fields
+
+
+  !===============================================================================
+  !===============================================================================
+  subroutine map_1column_of_info_from_host_to_clubb( i, host_mean, host_mnts, c2h, &
+                                                     pver, pverp, edsclr_dim, lq,ixq, ixcldliq, &
+                                                     macmic_it, clubb_do_adv, do_expldiff,      &
+                                                     core_auxil, core_prog, core_diag,          &
+                                                     core_forcing, core_sfc, dz_g               )
+
+    use shr_kind_mod,     only: r8=>shr_kind_r8
+    use clubb_precision,  only: core_rknd
+    use clubb_intr_types, only: clubb_mean_2d_t, clubb_mnts_2d_t, clubb_to_host_t
+    use clubb_intr_core_types, only: core_auxil_t, core_prog_t, core_diag_t
+    use clubb_intr_core_types, only: core_forcing_t, core_sfc_t
+    use clubb_api_module,      only: zt2zm_api
+
+    use physconst,        only: gravit
+      
+    type(clubb_mean_2d_t),intent(in) :: host_mean
+    type(clubb_mnts_2d_t),intent(in) :: host_mnts
+    type(clubb_to_host_t),intent(in) :: c2h
+
+    integer, intent(in) :: i             ! column index 
+    integer, intent(in) :: pver, pverp   ! number of vertical levels in column
+    integer, intent(in) :: edsclr_dim 
+    logical, intent(in) :: lq(:)
+    integer, intent(in) :: ixq, ixcldliq
+    integer, intent(in) :: macmic_it
+    logical, intent(in) :: clubb_do_adv
+    logical, intent(in) :: do_expldiff
+
+    type(core_auxil_t  ),intent(inout) :: core_auxil
+    type(core_prog_t   ),intent(inout) :: core_prog
+    type(core_diag_t   ),intent(inout) :: core_diag
+    type(core_forcing_t),intent(inout) :: core_forcing
+    type(core_sfc_t    ),intent(inout) :: core_sfc
+
+    real(r8),intent(out) :: dz_g(:)
+
+    integer :: icnt, ixind
+    integer :: k,kkhost
+    real(r8) :: invrs_gravit 
+    real(r8) :: thvtmp, dum1
+
+      !------------------------------------------------------------------
+      invrs_gravit = 1._r8 / gravit
+
+      do k=1,pver
+         dz_g(k) = host_mean%zi(i,k)-host_mean%zi(i,k+1)  ! compute thickness
+      enddo
+
+      ! k = pver
+      ! dz_g_bot = host_mean%zi(i,k)-host_mean%zi(i,k+1)  ! compute thickness
+
+      !------------------------------------------------------------------
+      !  Compute thermodynamic stuff needed for CLUBB on thermo levels.
+      !  Inputs for the momentum levels are set below setup_clubb core
+      !------------------------------------------------------------------
+      do k=1,pver
+         kkhost = pver-k+1
+
+         core_auxil%p_in_Pa(k+1)   = real( host_mean%pmid(i,kkhost), kind=core_rknd )
+         core_auxil%exner(k+1)     = real( 1._r8/host_mean%exner_clubb(i,kkhost), kind=core_rknd )
+
+         thvtmp =  host_mean%t(i,kkhost) &
+                  *host_mean%exner_clubb(i,kkhost) &
+                  *( 1._r8+zvir*host_mean%q(i,kkhost,ixq)-host_mean%q(i,kkhost,ixcldliq) )
+         core_auxil%thv_ds_zt(k+1) = real(thvtmp, kind = core_rknd)                       ! thetav on thermo
+      enddo
+
+      core_auxil%p_in_Pa  (1) = core_auxil%p_in_Pa(2)
+      core_auxil%exner    (1) = core_auxil%exner  (2)
+      core_auxil%thv_ds_zt(1) = core_auxil%thv_ds_zt(2)
+
+      !----------
+      do k=1,pver
+         kkhost = pver-k+1
+         core_auxil%rho_ds_zt(k+1) = real( invrs_gravit*host_mean%pdel(i,kkhost)/dz_g(kkhost), kind=core_rknd )
+      enddo
+      core_auxil%rho_ds_zt(1) = core_auxil%rho_ds_zt(2)
+
+
+      !----------
+      core_auxil%rho_zt(:)  = core_auxil%rho_ds_zt(:)
+
+      core_auxil%invrs_rho_ds_zt(2:pverp) = 1._core_rknd/core_auxil%rho_ds_zt(2:pverp) ! Inverse ds rho at thermo
+      core_auxil%invrs_rho_ds_zt(1)       = core_auxil%invrs_rho_ds_zt(2)
+
+      !  Compute some inputs from the thermodynamic grid to the momentum grid
+      !  Note: this can only be done after "call setup_grid_heights_api"
+
+      core_auxil%rho_ds_zm       = zt2zm_api( core_auxil%rho_ds_zt )
+      core_auxil%rho_zm          = zt2zm_api( core_auxil%rho_zt    )
+      core_auxil%invrs_rho_ds_zm = zt2zm_api( core_auxil%invrs_rho_ds_zt)
+      core_auxil%thv_ds_zm       = zt2zm_api( core_auxil%thv_ds_zt )
+
+      !----------
+      !  Compute mean w wind on thermo grid, convert from omega to w
+
+      core_auxil%wm_zt(1) = 0._core_rknd
+      do k=1,pver
+        kkhost = pver-k+1
+        dum1 = -1._r8*host_mean%omega(i,kkhost) * real(core_auxil%invrs_rho_ds_zt(k+1),kind=r8) *invrs_gravit
+        core_auxil%wm_zt(k+1) = real(dum1,kind=core_rknd)
+      enddo
+
+      core_auxil%wm_zm = zt2zm_api( core_auxil%wm_zt )
+
+      !----------
+
+      !  Need to flip arrays around for CLUBB core
+      do k=1,pverp
+
+         core_prog%thlm(k) = real(host_mean%thlm(i,pverp-k+1), kind = core_rknd)
+         core_prog%rtm (k) = real(host_mean%rtm(i,pverp-k+1), kind = core_rknd)
+
+         core_prog%um(k)      = real(host_mean%um(i,pverp-k+1), kind = core_rknd)
+         core_prog%vm(k)      = real(host_mean%vm(i,pverp-k+1), kind = core_rknd)
+
+         core_prog%up2(k)     = real(host_mnts%up2(i,pverp-k+1), kind = core_rknd)
+         core_prog%vp2(k)     = real(host_mnts%vp2(i,pverp-k+1), kind = core_rknd)
+         core_prog%wp2(k)     = real(host_mnts%wp2(i,pverp-k+1), kind = core_rknd)
+         core_prog%wp3(k)     = real(host_mnts%wp3(i,pverp-k+1), kind = core_rknd)
+
+         core_prog%upwp(k)    = real(host_mnts%upwp(i,pverp-k+1), kind = core_rknd)
+         core_prog%vpwp(k)    = real(host_mnts%vpwp(i,pverp-k+1), kind = core_rknd)
+
+         core_prog%rtp2   (k) = real(host_mnts%rtp2(i,pverp-k+1), kind = core_rknd)
+         core_prog%thlp2  (k) = real(host_mnts%thlp2(i,pverp-k+1), kind = core_rknd)
+         core_prog%wprtp  (k) = real(host_mnts%wprtp(i,pverp-k+1), kind = core_rknd)
+         core_prog%wpthlp (k) = real(host_mnts%wpthlp(i,pverp-k+1), kind = core_rknd)
+         core_prog%rtpthlp(k) = real(host_mnts%rtpthlp(i,pverp-k+1), kind = core_rknd)
+
+         core_diag%wpthvp  (k) = real(host_mnts%wpthvp  (i,pverp-k+1), kind = core_rknd)
+         core_diag%wp2thvp (k) = real(host_mnts%wp2thvp (i,pverp-k+1), kind = core_rknd)
+         core_diag%rtpthvp (k) = real(host_mnts%rtpthvp (i,pverp-k+1), kind = core_rknd)
+         core_diag%thlpthvp(k) = real(host_mnts%thlpthvp(i,pverp-k+1), kind = core_rknd)
+
+         core_diag%rcm       (k) = real(host_mean%rcm(i,pverp-k+1), kind = core_rknd)
+         core_diag%cloud_frac(k) = real( c2h% cloud_frac(i,pverp-k+1), kind = core_rknd)
+      enddo
+
+      !-----------------------------------------------
+      ! Get input values for passive tracers
+      !-----------------------------------------------
+      core_prog%edsclr(:,:) = 0._core_rknd
+ 
+      icnt=0
+      do ixind=1,pcnst
+         if (lq(ixind))  then
+            icnt=icnt+1
+            do k=1,pver
+               core_prog%edsclr(k+1,icnt) = real(host_mean%q(i,pver-k+1,ixind), kind = core_rknd)
+            enddo
+            core_prog%edsclr(1,icnt) = core_prog%edsclr(2,icnt)
+         end if
+      enddo
+
+      if (do_expldiff) then
+        do k=1,pver
+          core_prog%edsclr(k+1,icnt+1) = real(host_mean%thlm(i,pver-k+1), kind = core_rknd)
+          core_prog%edsclr(k+1,icnt+2) = real(host_mean%rtm (i,pver-k+1), kind = core_rknd)
+        enddo
+
+        core_prog%edsclr(1,icnt+1) = core_prog%edsclr(2,icnt+1)
+        core_prog%edsclr(1,icnt+2) = core_prog%edsclr(2,icnt+2)
+      endif
+
+      !-----------------------------------------------
+      if (clubb_do_adv) then
+        if (macmic_it .eq. 1) then
+
+          core_prog%up2 = zt2zm_api( core_prog%up2 )
+          core_prog%vp2 = zt2zm_api( core_prog%vp2 )
+          core_prog%wp2 = zt2zm_api( core_prog%wp2 )
+
+          core_prog%wpthlp  = zt2zm_api( core_prog%wpthlp  )
+          core_prog%wprtp   = zt2zm_api( core_prog%wprtp   )
+          core_prog%thlp2   = zt2zm_api( core_prog%thlp2   )
+          core_prog%rtp2    = zt2zm_api( core_prog%rtp2    )
+          core_prog%rtpthlp = zt2zm_api( core_prog%rtpthlp )
+
+          do k=1,pverp
+            core_prog%thlp2(k)=max(thl_tol**2,core_prog%thlp2(k))
+            core_prog%rtp2 (k)=max( rt_tol**2,core_prog%rtp2 (k))
+
+            core_prog%up2(k)=max(w_tol_sqd,core_prog%up2(k))
+            core_prog%vp2(k)=max(w_tol_sqd,core_prog%vp2(k))
+            core_prog%wp2(k)=max(w_tol_sqd,core_prog%wp2(k))
+          enddo
+        endif
+      endif
+      !-----------------------------------------------
+
+  end subroutine map_1column_of_info_from_host_to_clubb
