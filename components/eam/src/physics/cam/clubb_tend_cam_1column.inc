@@ -1,7 +1,7 @@
 
       zi_out(i,1) = 0._r8
 
-      call clubb_core_state_alloc( core_state, pverp, edsclr_dim )
+      call clubb_core_fld_alloc( core_state, core_forcing, core_sfc, pverp, edsclr_dim )
 
       !============================================
       ! Prepare input to advance_clubb_core
@@ -138,12 +138,12 @@
          ! However, if there's no existing surface stress, just perturb zonal
          ! wind/stress.
          if (abs(cam_in%wsx(i)) < 1.e-12 .and. abs(cam_in%wsy(i)) < 1.e-12) then
-            upwp_sfc_pert = upwp_sfc + pert_tau / core_state%rho_ds_zm(1)
-            vpwp_sfc_pert = vpwp_sfc
+            upwp_sfc_pert = core_sfc%upwp + pert_tau / core_state%rho_ds_zm(1)
+            vpwp_sfc_pert = core_sfc%vpwp
          else
-            upwp_sfc_pert = upwp_sfc + cam_in%wsx(i) * &
+            upwp_sfc_pert = core_sfc%upwp + cam_in%wsx(i) * &
                  (pert_tau / (core_state%rho_ds_zm(1) * hypot(cam_in%wsx(i), cam_in%wsy(i))))
-            vpwp_sfc_pert = vpwp_sfc + cam_in%wsy(i) * &
+            vpwp_sfc_pert = core_sfc%vpwp + cam_in%wsy(i) * &
                  (pert_tau / (core_state%rho_ds_zm(1) * hypot(cam_in%wsx(i), cam_in%wsy(i))))
          end if
       else
@@ -257,6 +257,7 @@
       radf(1)      = radf(2)
       rfrzm(1)     = rfrzm(2)
 
+      ice_supersat_frac(1:pverp) = 0._core_rknd
       !============================================
 
 
@@ -272,7 +273,9 @@
             call stats_begin_timestep_api(time_elapsed, 1, 1)
          endif
 
-#include "clubb_timestep_init_forcing_and_boundary.inc"
+#include "clubb_timestep_init_forcing_and_sfc.inc"
+
+#include "clubb_terms_not_in_eqns.inc"
 
          !  Advance CLUBB CORE one timestep in the future
          call t_startf('advance_clubb_core')
@@ -281,80 +284,92 @@
          call advance_clubb_core_api &
               ( l_implemented, dtime, fcoriolis, sfc_elevation, hydromet_dim, & ! intent(in)
               !
-              thlm_forcing, rtm_forcing, um_forcing, vm_forcing, &         ! intent(in)
-              sclrm_forcing, edsclrm_forcing, wprtp_forcing, &             ! intent(in)
-              wpthlp_forcing, rtp2_forcing, thlp2_forcing, &               ! intent(in)
-              rtpthlp_forcing,  &
+              core_forcing%thlm, &
+              core_forcing%rtm,  &
+              core_forcing%um,   &
+              core_forcing%vm,   &! intent(in)
+              sclrm_forcing,     &
+              core_forcing%edsclr,  &
+              core_forcing%wprtp,   &! intent(in)
+              core_forcing%wpthlp,  &
+              core_forcing%rtp2,    &
+              core_forcing%thlp2,   &! intent(in)
+              core_forcing%rtpthlp, &
               !
               core_state%wm_zm, &
-              core_state%wm_zt, &                             ! intent(in)
+              core_state%wm_zt, &! intent(in)
               !
-              wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, &                 ! intent(in)
-              wpsclrp_sfc, wpedsclrp_sfc, &                                ! intent(in)
+              core_sfc%wpthlp,    &
+              core_sfc%wprtp,     &
+              core_sfc%upwp,      &
+              core_sfc%vpwp,      &! intent(in)
+              wpsclrp_sfc,        &
+              core_sfc%wpedsclrp, &! intent(in)
               !
               core_state%p_in_Pa,         &
               core_state%rho_zm,          &
               core_state%rho_zt,          &
-              core_state%exner,           &                          ! intent(in)
+              core_state%exner,           &! intent(in)
               core_state%rho_ds_zm,       &
               core_state%rho_ds_zt,       &
-              core_state%invrs_rho_ds_zm, &                          ! intent(in)
+              core_state%invrs_rho_ds_zm, &! intent(in)
               core_state%invrs_rho_ds_zt, &
               core_state%thv_ds_zm,       &
               core_state%thv_ds_zt,       &
               !
-              hydromet, &           ! intent(in)
-              rfrzm, radf, &                                               ! intent(in)
+              hydromet,    &! intent(in)
+              rfrzm, radf, &! intent(in)
 #ifdef CLUBBND_CAM
-              varmu2, &                                                    ! intent(in)
+              varmu2,      &! intent(in)
 #endif
-              wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt, &                ! intent(in)
-              host_dx, host_dy, &                                          ! intent(in)
+              wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt, &! intent(in)
+              host_dx, host_dy, &                          ! intent(in)
               !
-              core_state%um, &
-              core_state%vm, &
-              core_state%upwp, &                                     ! intent(inout)
-              core_state%vpwp, &
-              core_state%up2, &
-              core_state%vp2, &                                   ! intent(inout)
-              core_state%thlm, &
-              core_state%rtm,  &
-              core_state%wprtp, &
-              core_state%wpthlp, &                      ! intent(inout)
-              core_state%wp2, &
-              core_state%wp3, &
-              core_state%rtp2, &                                   ! intent(inout)
-              rtp3_in, &
-              core_state%thlp2, &
+              core_state%um,     &
+              core_state%vm,     &
+              core_state%upwp,   &! intent(inout)
+              core_state%vpwp,   &
+              core_state%up2,    &
+              core_state%vp2,    &! intent(inout)
+              core_state%thlm,   &
+              core_state%rtm,    &
+              core_state%wprtp,  &
+              core_state%wpthlp, &! intent(inout)
+              core_state%wp2,    &
+              core_state%wp3,    &
+              core_state%rtp2,   &! intent(inout)
+              rtp3_in,           &
+              core_state%thlp2,  &
               thlp3_in, &
-              core_state%rtpthlp, &                   ! intent(inout)
-              sclrm,   &                                                   ! intent(inout)
-              sclrp2, sclrprtp, sclrpthlp, &                               ! intent(inout)
+              core_state%rtpthlp,&! intent(inout)
+              sclrm,                       &! intent(inout)
+              sclrp2, sclrprtp, sclrpthlp, &! intent(inout)
               wpsclrp, &
               core_state%edsclr, &
-              err_code, &                              ! intent(inout)
+              err_code,          &! intent(inout)
               !
               core_state%rcm,        &
-              core_state%cloud_frac, &                               ! intent(inout)
+              core_state%cloud_frac, &! intent(inout)
               !
-              core_state%wpthvp, &
+              core_state%wpthvp,  &
               core_state%wp2thvp, &
               core_state%rtpthvp, &
-              core_state%thlpthvp, & ! intent(inout)
+              core_state%thlpthvp,&! intent(inout)
               !
-              sclrpthvp_inout, &                                            ! intent(inout)
-              pdf_params, pdf_params_zm, &                                 ! intent(inout)
+              sclrpthvp_inout, &! intent(inout)
+              pdf_params, pdf_params_zm, &! intent(inout)
               !
               core_state%khzm,    &
               core_state%khzt,    &
               core_state%qclvar,  &
-              core_state%thlprcp, &               ! intent(out)
-              core_state%wprcp, &
+              core_state%thlprcp, &! intent(out)
+              core_state%wprcp,   &
               !
-              ice_supersat_frac, &                              ! intent(out)
-              rcm_in_layer_out, cloud_cover_out, &                         ! intent(out)
-              upwp_sfc_pert, vpwp_sfc_pert, &                              ! intent(in)
-              um_pert_col, vm_pert_col, upwp_pert_col, vpwp_pert_col)      ! intent(inout)
+              ice_supersat_frac,                 &! intent(out)
+              rcm_in_layer_out, cloud_cover_out, &! intent(out)
+              upwp_sfc_pert, vpwp_sfc_pert,      &! intent(in)
+              um_pert_col, vm_pert_col,          &! 
+              upwp_pert_col, vpwp_pert_col)       ! intent(inout)
          call t_stopf('advance_clubb_core')
 
          if ( err_code == clubb_fatal_error ) then
@@ -532,4 +547,4 @@
       enddo
 
       !=================================================
-      call clubb_core_state_dealloc( core_state )
+      call clubb_core_fld_dealloc( core_state, core_forcing, core_sfc )

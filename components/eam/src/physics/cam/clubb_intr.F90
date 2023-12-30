@@ -1131,8 +1131,8 @@ end subroutine clubb_init_cnst
    use model_flags, only: ipdf_call_placement
    use advance_clubb_core_module, only: ipdf_post_advance_fields
    use clubb_intr_types
-   use clubb_intr_core_types, only: core_state_t
-   use clubb_intr_core_types, only: clubb_core_state_alloc, clubb_core_state_dealloc
+   use clubb_intr_core_types, only: core_state_t, core_forcing_t, core_sfc_t
+   use clubb_intr_core_types, only: clubb_core_fld_alloc, clubb_core_fld_dealloc
 #endif
 
    implicit none
@@ -1208,11 +1208,7 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: rfrzm(pverp)
    real(core_rknd) :: radf(pverp)
 
-   real(core_rknd) :: wprtp_forcing(pverp)
-   real(core_rknd) :: wpthlp_forcing(pverp)
-   real(core_rknd) :: rtp2_forcing(pverp)
-   real(core_rknd) :: thlp2_forcing(pverp)
-   real(core_rknd) :: rtpthlp_forcing(pverp)
+
    real(core_rknd) :: ice_supersat_frac(pverp)
 
 
@@ -1220,28 +1216,22 @@ end subroutine clubb_init_cnst
 
    real(core_rknd) :: fcoriolis                        ! Coriolis forcing                              [s^-1]
    real(core_rknd) :: sfc_elevation                    ! Elevation of ground                           [m AMSL]
-   real(core_rknd) :: thlm_forcing(pverp)              ! theta_l forcing (thermodynamic levels)        [K/s]
-   real(core_rknd) :: rtm_forcing(pverp)               ! r_t forcing (thermodynamic levels)            [(kg/kg)/s]
-   real(core_rknd) :: um_forcing(pverp)                ! u wind forcing (thermodynamic levels)         [m/s/s]
-   real(core_rknd) :: vm_forcing(pverp)                ! v wind forcing (thermodynamic levels)         [m/s/s]
 
-   type(core_state_t)  :: core_state
+   type(core_state_t)   :: core_state
+   type(core_forcing_t) :: core_forcing
+   type(core_sfc_t)     :: core_sfc
 
-   real(core_rknd) :: wpthlp_sfc                       ! w' theta_l' at surface                        [(m K)/s]
-   real(core_rknd) :: wprtp_sfc                        ! w' r_t' at surface                            [(kg m)/( kg s)]
-   real(core_rknd) :: upwp_sfc                         ! u'w' at surface                               [m^2/s^2]
-   real(core_rknd) :: vpwp_sfc                         ! v'w' at surface                               [m^2/s^2]
-
-   real(core_rknd) :: sclrpthvp_inout(pverp,sclr_dim)     ! momentum levels (< sclr' th_v' >)             [units vary]
-   real(core_rknd) :: sclrm_forcing(pverp,sclr_dim)    ! Passive scalar forcing                        [{units vary}/s]
-   real(core_rknd) :: wpsclrp_sfc(sclr_dim)            ! Scalar flux at surface                        [{units vary} m/s]
-   real(core_rknd) :: edsclrm_forcing(pverp,edsclr_dim)! Eddy passive scalar forcing                   [{units vary}/s]
-   real(core_rknd) :: wpedsclrp_sfc(edsclr_dim)        ! Eddy-scalar flux at surface                   [{units vary} m/s]
-   real(core_rknd) :: sclrm(pverp,sclr_dim)            ! Passive scalar mean (thermo. levels)          [units vary]
-   real(core_rknd) :: wpsclrp(pverp,sclr_dim)          ! w'sclr' (momentum levels)                     [{units vary} m/s]
-   real(core_rknd) :: sclrp2(pverp,sclr_dim)           ! sclr'^2 (momentum levels)                     [{units vary}^2]
-   real(core_rknd) :: sclrprtp(pverp,sclr_dim)         ! sclr'rt' (momentum levels)                    [{units vary} (kg/kg)]
+   !-----------------
+   real(core_rknd), dimension(sclr_dim) :: sclr_tol    ! Tolerance on passive scalar                   [units vary]
+   real(core_rknd) :: sclrm    (pverp,sclr_dim)        ! Passive scalar mean (thermo. levels)          [units vary]
+   real(core_rknd) :: wpsclrp  (pverp,sclr_dim)        ! w'sclr' (momentum levels)                     [{units vary} m/s]
+   real(core_rknd) :: sclrp2   (pverp,sclr_dim)        ! sclr'^2 (momentum levels)                     [{units vary}^2]
+   real(core_rknd) :: sclrprtp (pverp,sclr_dim)        ! sclr'rt' (momentum levels)                    [{units vary} (kg/kg)]
    real(core_rknd) :: sclrpthlp(pverp,sclr_dim)        ! sclr'thlp' (momentum levels)                  [{units vary} (K)]
+
+   real(core_rknd) :: wpsclrp_sfc(sclr_dim)            ! Scalar flux at surface                        [{units vary} m/s]
+   real(core_rknd) ::   sclrm_forcing(pverp,sclr_dim)  ! Passive scalar forcing                        [{units vary}/s]
+   real(core_rknd) :: sclrpthvp_inout(pverp,sclr_dim)  ! momentum levels (< sclr' th_v' >)             [units vary]
 
    !-----------------
    real(core_rknd) :: rtp3_in(pverp)                   ! thermodynamic levels (r_t'^3 )               [(kg/kg)^3]
@@ -1261,7 +1251,6 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: qrl_zm(pverp)
    real(core_rknd) :: thlp2_rad_out(pverp)
 
-   real(core_rknd), dimension(sclr_dim) :: sclr_tol     ! Tolerance on passive scalar       [units vary]
 
    real(core_rknd) :: dum_core_rknd                    ! dummy variable  [units vary]
    real(core_rknd) :: hdtime_core_rknd                 ! host model's cloud macmic timestep in core_rknd

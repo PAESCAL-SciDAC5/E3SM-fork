@@ -59,29 +59,57 @@ module clubb_intr_core_types
     real(core_rknd), dimension(:), allocatable :: cloud_frac
     real(core_rknd), dimension(:), allocatable :: qclvar      ! cloud water variance [kg^2/kg^2]
 
-    ! Passive tracers
-    real(core_rknd), dimension(:,:), allocatable :: edsclr    ! tracer mixing ratio [kg/kg]
+    ! Passive scalars
+    real(core_rknd), dimension(:,:), allocatable :: edsclr    ! eddy passive scalars
 
   end type core_state_t
 
+  !------------------------------------
   type core_forcing_t
-    real(core_rknd), dimension(:), allocatable :: fld
+
+    real(core_rknd), dimension(:), allocatable :: um    ! u wind forcing (thermodynamic levels)         [m/s/s]
+    real(core_rknd), dimension(:), allocatable :: vm    ! v wind forcing (thermodynamic levels)         [m/s/s]
+
+    real(core_rknd), dimension(:), allocatable :: thlm  ! theta_l forcing (thermodynamic levels)        [K/s]
+    real(core_rknd), dimension(:), allocatable :: rtm   ! r_t forcing (thermodynamic levels)            [(kg/kg)/s]
+
+    real(core_rknd), dimension(:), allocatable :: rtp2
+    real(core_rknd), dimension(:), allocatable :: thlp2
+    real(core_rknd), dimension(:), allocatable :: rtpthlp 
+    real(core_rknd), dimension(:), allocatable :: wprtp
+    real(core_rknd), dimension(:), allocatable :: wpthlp
+
+    ! Passive scalars
+    real(core_rknd), dimension(:,:), allocatable :: edsclr    ! eddy passive scalars
+
   end type core_forcing_t
 
-  type core_srcflx_t
-    real(core_rknd), dimension(:), allocatable :: fld
-  end type core_srcflx_t
+  !------------------------------------
+  type core_sfc_t
+
+    real(core_rknd) :: upwp
+    real(core_rknd) :: vpwp
+
+    real(core_rknd) :: wpthlp
+    real(core_rknd) :: wprtp
+ 
+    real(core_rknd), dimension(:), allocatable :: wpedsclrp
+
+  end type core_sfc_t
 
 contains
 
   !------------------------------------------------------ 
-  subroutine clubb_core_state_alloc( core_state, pverp, ntracer )
+  subroutine clubb_core_fld_alloc( core_state, core_forcing, core_sfc, pverp, ntracer )
 
-    type(core_state_t),intent(inout) :: core_state
+    type(core_state_t),  intent(inout) :: core_state
+    type(core_forcing_t),intent(inout) :: core_forcing
+    type(core_sfc_t),    intent(inout) :: core_sfc
+
     integer,           intent(in)    :: pverp
     integer,           intent(in)    :: ntracer
 
-    character(len=100) :: routine='allocate_clubb_core_state'
+    character(len=100) :: routine='clubb_core_fld_alloc'
     integer :: ierr
 
     allocate( core_state% p_in_Pa         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
@@ -136,16 +164,39 @@ contains
 
     allocate( core_state% edsclr  (pverp,ntracer), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-   !allocate( core_state%            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    !-------------------------
+    ! Forcing terms
+    !-------------------------
+    allocate( core_forcing% um            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% vm            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-  end subroutine clubb_core_state_alloc
+    allocate( core_forcing% thlm          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% rtm           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    allocate( core_forcing% rtp2          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% thlp2         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% wprtp         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% wpthlp        (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% rtpthlp       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    allocate( core_forcing% edsclr(pverp,ntracer), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    !-------------------------
+    ! Sfc values
+    !-------------------------
+    ! Only need to allocate array(s) for passive scalar(s)
+    allocate( core_sfc% wpedsclrp(ntracer), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+  end subroutine clubb_core_fld_alloc
 
   !----------------------------------------------- 
-  subroutine clubb_core_state_dealloc( core_state )
+  subroutine clubb_core_fld_dealloc( core_state, core_forcing, core_sfc )
 
-    type(core_state_t),intent(inout) :: core_state
+    type(core_state_t),  intent(inout) :: core_state
+    type(core_forcing_t),intent(inout) :: core_forcing
+    type(core_sfc_t),    intent(inout) :: core_sfc
 
-    character(len=100) :: routine='clubb_core_state_dealloc'
+    character(len=100) :: routine='clubb_core_fld_dealloc'
     integer :: ierr
 
     deallocate( core_state% p_in_Pa        , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
@@ -200,8 +251,30 @@ contains
 
     deallocate( core_state% edsclr         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-   !deallocate( core_state%          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    !-------------------------
+    ! Forcing terms
+    !-------------------------
+    deallocate( core_forcing% um           , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_forcing% vm           , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-  end subroutine clubb_core_state_dealloc
+    deallocate( core_forcing% thlm         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_forcing% rtm          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    deallocate( core_forcing% rtp2         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_forcing% thlp2        , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_forcing% wprtp        , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_forcing% wpthlp       , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_forcing% rtpthlp      , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    deallocate( core_forcing% edsclr       , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    !-------------------------
+    ! Sfc values
+    !-------------------------
+    ! Only need to deallocate array(s) for passive scalar(s)
+
+    deallocate( core_sfc% wpedsclrp        , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+  end subroutine clubb_core_fld_dealloc
 
 end module clubb_intr_core_types
