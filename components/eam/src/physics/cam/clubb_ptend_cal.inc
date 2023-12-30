@@ -60,7 +60,7 @@
                    (ixind /= ixrtpthlp) .and. (ixind /= ixwpthlp) .and.&
                    (ixind /= ixwprtp)   .and. (ixind /= ixwp2)    .and.&
                    (ixind /= ixwp3)     .and. (ixind /= ixup2)    .and. (ixind /= ixvp2) ) then
-                       ptend_loc%q(i,k,ixind) = (edsclr_out(k,icnt)-state1%q(i,k,ixind))*invrs_hdtime ! transported constituents
+                       ptend_loc%q(i,k,ixind) = (edsclr_out(i,k,icnt)-state1%q(i,k,ixind))*invrs_hdtime ! transported constituents
                end if
             end if
          enddo

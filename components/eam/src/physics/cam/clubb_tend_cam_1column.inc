@@ -1,7 +1,7 @@
 
       zi_out(i,1) = 0._r8
 
-      call clubb_core_state_alloc( core_state, pverp )
+      call clubb_core_state_alloc( core_state, pverp, edsclr_dim )
 
       !============================================
       ! Prepare input to advance_clubb_core
@@ -68,14 +68,6 @@
       core_state%wm_zm = zt2zm_api( core_state%wm_zt )
 
       !----------
-      do k=1,pver
-         kkhost = pver-k+1
-         rfrzm(k+1)     = real( host_mean%q(i,kkhost,ixcldice),                 kind=core_rknd )
-         radf(k+1)      = real( radf_clubb(i,kkhost),                           kind=core_rknd )
-      enddo
-      radf(1)      = radf(2)
-      rfrzm(1)     = rfrzm(2)
-      !----------
 
       !  Need to flip arrays around for CLUBB core
       do k=1,pverp
@@ -106,12 +98,14 @@
          core_state%rtpthvp (k) = real(host_mnts%rtpthvp (i,pverp-k+1), kind = core_rknd)
          core_state%thlpthvp(k) = real(host_mnts%thlpthvp(i,pverp-k+1), kind = core_rknd)
 
-         cloud_frac_inout(k) = real(cloud_frac(i,pverp-k+1), kind = core_rknd)
+         core_state%cloud_frac(k) = real( cloud_frac(i,pverp-k+1), kind = core_rknd)
+      enddo
 
          ! also flip the arrays for the pdf_params_zm variables to have
          ! consistent vertical orientation for all variables in restart file
          ! also need to flip back after calling advance_clubb_core
 
+      do k=1,pverp
          pdf_zm_w_1_inout(k) = pdf_zm_w_1(i,pverp-k+1)
          pdf_zm_w_2_inout(k) = pdf_zm_w_2(i,pverp-k+1)
          pdf_zm_varnce_w_1_inout(k) = pdf_zm_varnce_w_1(i,pverp-k+1)
@@ -165,9 +159,9 @@
       if (clubb_do_adv) then
         if (macmic_it .eq. 1) then
 
-          core_state%up2=zt2zm_api(core_state%up2)
-          core_state%vp2=zt2zm_api(core_state%vp2)
-          core_state%wp2=zt2zm_api(core_state%wp2)
+          core_state%up2 = zt2zm_api( core_state%up2 )
+          core_state%vp2 = zt2zm_api( core_state%vp2 )
+          core_state%wp2 = zt2zm_api( core_state%wp2 )
 
           core_state%wpthlp  = zt2zm_api( core_state%wpthlp  )
           core_state%wprtp   = zt2zm_api( core_state%wprtp   )
@@ -187,34 +181,29 @@
       endif
 
       !-----------------------------------------------
-      ! Tracers 
+      ! Get input values for passive tracers
       !-----------------------------------------------
-      !  Initialize these to prevent crashing behavior
-
-      edsclr_in(:,:)      = 0._core_rknd
-      edsclr_out(:,:)     = 0._r8
-
-      !  Get input values for tracers
+      core_state%edsclr(:,:) = 0._core_rknd
  
       icnt=0
       do ixind=1,pcnst
          if (lq(ixind))  then
             icnt=icnt+1
             do k=1,pver
-               edsclr_in(k+1,icnt) = real(host_mean%q(i,pver-k+1,ixind), kind = core_rknd)
+               core_state%edsclr(k+1,icnt) = real(host_mean%q(i,pver-k+1,ixind), kind = core_rknd)
             enddo
-            edsclr_in(1,icnt) = edsclr_in(2,icnt)
+            core_state%edsclr(1,icnt) = core_state%edsclr(2,icnt)
          end if
       enddo
 
       if (do_expldiff) then
         do k=1,pver
-          edsclr_in(k+1,icnt+1) = real(host_mean%thlm(i,pver-k+1), kind = core_rknd)
-          edsclr_in(k+1,icnt+2) = real(host_mean%rtm(i,pver-k+1), kind = core_rknd)
+          core_state%edsclr(k+1,icnt+1) = real(host_mean%thlm(i,pver-k+1), kind = core_rknd)
+          core_state%edsclr(k+1,icnt+2) = real(host_mean%rtm (i,pver-k+1), kind = core_rknd)
         enddo
 
-        edsclr_in(1,icnt+1) = edsclr_in(2,icnt+1)
-        edsclr_in(1,icnt+2) = edsclr_in(2,icnt+2)
+        core_state%edsclr(1,icnt+1) = core_state%edsclr(2,icnt+1)
+        core_state%edsclr(1,icnt+2) = core_state%edsclr(2,icnt+2)
       endif
 
       ! --------------------------------------------------------- !
@@ -258,6 +247,16 @@
          pdf_params_zm%varnce_w_2 = pdf_zm_varnce_w_2_inout
          pdf_params_zm%mixt_frac = pdf_zm_mixt_frac_inout
       end if
+
+      !----------
+      do k=1,pver
+         kkhost = pver-k+1
+         rfrzm(k+1)     = real( host_mean%q(i,kkhost,ixcldice),                 kind=core_rknd )
+         radf(k+1)      = real( radf_clubb(i,kkhost),                           kind=core_rknd )
+      enddo
+      radf(1)      = radf(2)
+      rfrzm(1)     = rfrzm(2)
+
       !============================================
 
 
@@ -331,11 +330,12 @@
               core_state%rtpthlp, &                   ! intent(inout)
               sclrm,   &                                                   ! intent(inout)
               sclrp2, sclrprtp, sclrpthlp, &                               ! intent(inout)
-              wpsclrp, edsclr_in, err_code, &                              ! intent(inout)
+              wpsclrp, &
+              core_state%edsclr, &
+              err_code, &                              ! intent(inout)
               !
-              core_state%rcm, &
-              !
-              cloud_frac_inout, &                               ! intent(inout)
+              core_state%rcm,        &
+              core_state%cloud_frac, &                               ! intent(inout)
               !
               core_state%wpthvp, &
               core_state%wp2thvp, &
@@ -344,9 +344,13 @@
               !
               sclrpthvp_inout, &                                            ! intent(inout)
               pdf_params, pdf_params_zm, &                                 ! intent(inout)
-              khzm_out, khzt_out, qclvar_out, &
+              !
+              core_state%khzm,    &
+              core_state%khzt,    &
+              core_state%qclvar,  &
               core_state%thlprcp, &               ! intent(out)
               core_state%wprcp, &
+              !
               ice_supersat_frac, &                              ! intent(out)
               rcm_in_layer_out, cloud_cover_out, &                         ! intent(out)
               upwp_sfc_pert, vpwp_sfc_pert, &                              ! intent(in)
@@ -378,7 +382,7 @@
             pre_in(1) = pre_in(2)
 
             rvm_in = core_state%rtm - core_state%rcm
-            call update_xp2_mc_api(pverp, dtime, cloud_frac_inout, &
+            call update_xp2_mc_api(pverp, dtime, core_state%cloud_frac, &
                                    core_state%rcm, rvm_in, core_state%thlm, &
                                    core_state%wm_zt, core_state%exner, pre_in, pdf_params, &
             rtp2_mc_out, thlp2_mc_out, &
@@ -504,14 +508,15 @@
           host_mnts% rtpthlp(i,k)      = real( core_state%rtpthlp(pverp-k+1), kind = r8)
 
           wprcp(i,k)        = real( core_state%wprcp(pverp-k+1), kind = r8)
-          cloud_frac(i,k)   = min(real(cloud_frac_inout(pverp-k+1), kind = r8),1._r8)
+          cloud_frac(i,k)   = min(real(core_state%cloud_frac(pverp-k+1), kind = r8),1._r8)
           rcm_in_layer(i,k) = real(rcm_in_layer_out(pverp-k+1), kind = r8)
           cloud_cover(i,k)  = min(real(cloud_cover_out(pverp-k+1), kind = r8),1._r8)
 
-          c2h%khzm(i,k)     = real(khzm_out(pverp-k+1), kind = r8)
-          c2h%khzt(i,k)     = real(khzt_out(pverp-k+1), kind = r8)
+          c2h%khzm(i,k)     = real( core_state%khzm(pverp-k+1), kind=r8 )
+          c2h%khzt(i,k)     = real( core_state%khzt(pverp-k+1), kind=r8 )
 
-          qclvar(i,k)       = min(1._r8,real(qclvar_out(pverp-k+1), kind = r8))
+          qclvar(i,k)   = real( min( 1._core_rknd, core_state%qclvar(pverp-k+1) ), kind=r8 )
+
           sclrpthvp(i,k,:)  = real(sclrpthvp_inout(pverp-k+1,:), kind = r8)
           pdf_zm_w_1(i,k) = pdf_zm_w_1_inout(pverp-k+1)
           pdf_zm_w_2(i,k) = pdf_zm_w_2_inout(pverp-k+1)
@@ -519,10 +524,12 @@
           pdf_zm_varnce_w_2(i,k) = pdf_zm_varnce_w_2_inout(pverp-k+1)
           pdf_zm_mixt_frac(i,k) =  pdf_zm_mixt_frac_inout(pverp-k+1)
 
-          do ixind=1,edsclr_dim
-              edsclr_out(k,ixind) = real(edsclr_in(pverp-k+1,ixind), kind = r8)
-          enddo
-
       enddo
+
+      edsclr_out(i,:,1:edsclr_dim)     = 0._r8
+      do k=1,pverp
+         edsclr_out(i,k,1:edsclr_dim) = real( core_state%edsclr(pverp-k+1,1:edsclr_dim), kind = r8 )
+      enddo
+
       !=================================================
       call clubb_core_state_dealloc( core_state )

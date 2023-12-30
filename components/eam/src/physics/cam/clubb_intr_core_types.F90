@@ -54,6 +54,14 @@ module clubb_intr_core_types
     real(core_rknd), dimension(:), allocatable :: wprcp
     real(core_rknd), dimension(:), allocatable :: thlprcp
 
+    real(core_rknd), dimension(:), allocatable :: khzm
+    real(core_rknd), dimension(:), allocatable :: khzt
+    real(core_rknd), dimension(:), allocatable :: cloud_frac
+    real(core_rknd), dimension(:), allocatable :: qclvar      ! cloud water variance [kg^2/kg^2]
+
+    ! Passive tracers
+    real(core_rknd), dimension(:,:), allocatable :: edsclr    ! tracer mixing ratio [kg/kg]
+
   end type core_state_t
 
   type core_forcing_t
@@ -67,10 +75,11 @@ module clubb_intr_core_types
 contains
 
   !------------------------------------------------------ 
-  subroutine clubb_core_state_alloc( core_state, pverp )
+  subroutine clubb_core_state_alloc( core_state, pverp, ntracer )
 
     type(core_state_t),intent(inout) :: core_state
     integer,           intent(in)    :: pverp
+    integer,           intent(in)    :: ntracer
 
     character(len=100) :: routine='allocate_clubb_core_state'
     integer :: ierr
@@ -119,6 +128,13 @@ contains
 
     allocate( core_state% wprcp           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     allocate( core_state% thlprcp         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    allocate( core_state% khzm            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% khzt            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% cloud_frac      (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_state% qclvar          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    allocate( core_state% edsclr  (pverp,ntracer), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
    !allocate( core_state%            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
@@ -176,6 +192,13 @@ contains
 
     deallocate( core_state% wprcp          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( core_state% thlprcp        , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    deallocate( core_state% khzm           , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% khzt           , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% cloud_frac     , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_state% qclvar         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    deallocate( core_state% edsclr         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
    !deallocate( core_state%          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 

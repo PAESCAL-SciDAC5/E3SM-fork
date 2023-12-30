@@ -1192,10 +1192,6 @@ end subroutine clubb_init_cnst
   ! subroutine, the changes here is to change the precision in the CLUBB calculation
   !=====================================================================================
    real(core_rknd) :: dtime                            ! CLUBB time step                              [s]
-   real(core_rknd) :: edsclr_in(pverp,edsclr_dim)      ! Scalars to be diffused through CLUBB         [units vary]
-
-   real(core_rknd) :: rtp3_in(pverp)                   ! thermodynamic levels (r_t'^3 )               [(kg/kg)^3]
-   real(core_rknd) :: thlp3_in(pverp)                  ! thermodynamic levels (th_l'^3)               [K^3]
 
    real(core_rknd) :: rvm_in(pverp)                    ! water vapor mixing ratio                     [kg/kg]
 
@@ -1207,7 +1203,6 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: rtpthlp_mc_out(pverp)
    real(core_rknd) :: rcm_out_zm(pverp)
 
-   real(core_rknd) :: cloud_frac_inout(pverp)            ! CLUBB output of cloud fraction                [fraction]
    real(core_rknd) :: rcm_in_layer_out(pverp)          ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg]
    real(core_rknd) :: cloud_cover_out(pverp)           ! CLUBB output of in-cloud cloud fraction       [fraction]
    real(core_rknd) :: rfrzm(pverp)
@@ -1219,8 +1214,6 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: thlp2_forcing(pverp)
    real(core_rknd) :: rtpthlp_forcing(pverp)
    real(core_rknd) :: ice_supersat_frac(pverp)
-
-
 
 
    real(core_rknd) :: zt_bot  ! height of themo level that is closest to the Earth's surface [m]
@@ -1249,15 +1242,20 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: sclrp2(pverp,sclr_dim)           ! sclr'^2 (momentum levels)                     [{units vary}^2]
    real(core_rknd) :: sclrprtp(pverp,sclr_dim)         ! sclr'rt' (momentum levels)                    [{units vary} (kg/kg)]
    real(core_rknd) :: sclrpthlp(pverp,sclr_dim)        ! sclr'thlp' (momentum levels)                  [{units vary} (K)]
+
+   !-----------------
+   real(core_rknd) :: rtp3_in(pverp)                   ! thermodynamic levels (r_t'^3 )               [(kg/kg)^3]
+   real(core_rknd) :: thlp3_in(pverp)                  ! thermodynamic levels (th_l'^3)               [K^3]
+
    real(core_rknd) :: hydromet(pverp,hydromet_dim)
    real(core_rknd) :: wphydrometp(pverp,hydromet_dim)
    real(core_rknd) :: wp2hmp(pverp,hydromet_dim)
    real(core_rknd) :: rtphmp_zt(pverp,hydromet_dim)
    real(core_rknd) :: thlphmp_zt (pverp,hydromet_dim)
+   !-----------------
+
    real(core_rknd) :: C_10                             ! transfer coefficient                          [-]
-   real(core_rknd) :: khzm_out(pverp)                  ! eddy diffusivity on momentum grids            [m^2/s]
-   real(core_rknd) :: khzt_out(pverp)                  ! eddy diffusivity on thermo grids              [m^2/s]
-   real(core_rknd) :: qclvar_out(pverp)                ! cloud water variance                          [kg^2/kg^2]
+
    real(core_rknd) :: varmu2
    real(core_rknd) :: qrl_clubb(pverp)
    real(core_rknd) :: qrl_zm(pverp)
@@ -1281,7 +1279,6 @@ end subroutine clubb_init_cnst
    !===========================================================================================================================
 
    real(r8) :: apply_const
-   real(r8) :: qclvar(pcols,pverp)              ! cloud water variance                          [kg^2/kg^2]
    real(r8) :: newfice(pcols,pver)              ! fraction of ice in cloud at CLUBB start       [-]
    real(r8) :: bflx22                           ! Variable for buoyancy flux for pbl            [K m/s]
    real(r8) :: invrs_hdtime                     ! Preculate 1/hdtime to reduce divide operations
@@ -1325,7 +1322,8 @@ end subroutine clubb_init_cnst
    real(r8) :: thvtmp
    integer  :: kkhost
 
-   real(r8) :: edsclr_out(pverp,edsclr_dim)     ! Scalars to be diffused through CLUBB          [units vary]
+   real(r8) :: edsclr_out(pcols,pverp,edsclr_dim)     ! Scalars to be diffused through CLUBB          [units vary]
+
    real(r8) :: sclrpthvp(pcols,pverp,sclr_dim)  ! sclr'th_v' (momentum levels)                  [{units vary} K]
    real(r8) :: rcm_in_layer(pcols,pverp)        ! CLUBB in-cloud liquid water mixing ratio      [kg/kg]
    real(r8) :: cloud_cover(pcols,pverp)         ! CLUBB in-cloud cloud fraction                 [fraction]
@@ -1404,6 +1402,7 @@ end subroutine clubb_init_cnst
   !real(r8), pointer, dimension(:,:) :: rtm      ! mean moisture mixing ratio                   [kg/kg]
   !real(r8), pointer, dimension(:,:) :: rcm        ! CLUBB cloud water mixing ratio               [kg/kg]
 
+   real(r8) :: qclvar(pcols,pverp)              ! cloud water variance                          [kg^2/kg^2]
    real(r8), pointer, dimension(:,:) :: cloud_frac ! CLUBB cloud fraction                       [-]
 
    real(r8), pointer, dimension(:) :: pblh     ! planetary boundary layer height                [m]
