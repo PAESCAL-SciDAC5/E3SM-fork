@@ -6,11 +6,11 @@
       !============================================
       ! Prepare input to advance_clubb_core
       !============================================
-      call map_1column_of_info_from_host_to_clubb( i, host_mean, host_mnts, c2h,               &
-                                                   pver, pverp, edsclr_dim, lq, ixq, ixcldliq, &
-                                                   macmic_it, clubb_do_adv, do_expldiff,       &
-                                                   core_auxil, core_prog, core_diag,           &
-                                                   core_forcing, core_sfc, clubb_misc, dz_g    )
+      call map_1column_of_info_from_host_to_clubb( i, host_mean, host_mnts, c2h,               &! in
+                                                   pver, pverp, edsclr_dim, lq, ixq, ixcldliq, &! in
+                                                   macmic_it, clubb_do_adv, do_expldiff,       &! in
+                                                   core_auxil, core_prog, core_diag,           &! inout
+                                                   core_forcing, core_sfc, clubb_misc, dz_g, varmu(i)   )! inout
 
 #include "more_info_to_clubb.inc"
 

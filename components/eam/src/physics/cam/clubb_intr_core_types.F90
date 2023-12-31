@@ -121,6 +121,8 @@ module clubb_intr_core_types
   !-------------------------
   type clubb_misc_t
 
+    real(core_rknd) :: varmu
+
     real(core_rknd), dimension(:), allocatable :: qrl_zt
     real(core_rknd), dimension(:), allocatable :: prer_evap
 

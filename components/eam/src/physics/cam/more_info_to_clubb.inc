@@ -43,40 +43,6 @@
       end if
 
 
-      ! --------------------------------------------------------- !
-      ! Compute cloud-top radiative cooling contribution to CLUBB !
-      ! --------------------------------------------------------- !
-      ! Sandbox version of code to take into account meso organization
-
-      if (clubb_do_deep) then
-         orgparam = 0._r8
-         delpavg = 0._r8
-
-         do k = 1, pver
-           if (abs(prer_evap(i,k)) .gt. 0._r8) then
-             orgparam = orgparam + (abs(prer_evap(i,k)) * 1000._r8 * 1000._r8 * 2._r8 ) * host_mean%pdel(i,k)
-             delpavg = delpavg + host_mean%pdel(i,k)
-           endif
-         enddo
-
-         if (delpavg .gt. 0._r8) then
-           orgparam = orgparam/delpavg
-         endif
-
-         ! Now compute new entrainment rate based on organization
-         varmu(i) = mu / (1._r8 + orgparam * 100._r8)
-         varmu2   = real(varmu(i), kind = core_rknd)
-
-      endif
-      ! --------------------------------------------------------- !
-      ! End cloud-top radiative cooling contribution to CLUBB     !
-      ! --------------------------------------------------------- !
-
-
-
-
-
-
 
       !---------------------------------------------------------
       ! also flip the arrays for the pdf_params_zm variables to have

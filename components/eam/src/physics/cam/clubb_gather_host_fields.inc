@@ -226,7 +226,7 @@
                                                      pver, pverp, edsclr_dim, lq,ixq, ixcldliq, &
                                                      macmic_it, clubb_do_adv, do_expldiff,      &
                                                      core_auxil, core_prog, core_diag,          &
-                                                     core_forcing, core_sfc, clubb_misc, dz_g   )
+                                                     core_forcing, core_sfc, clubb_misc, dz_g, varmu  )
 
     use shr_kind_mod,     only: r8=>shr_kind_r8
     use clubb_precision,  only: core_rknd
@@ -258,6 +258,7 @@
     type(clubb_misc_t  ),intent(inout) :: clubb_misc
 
     real(r8),intent(out) :: dz_g(:)
+    real(r8),intent(out) :: varmu
 
     integer :: icnt, ixind
     integer :: k,kkhost
@@ -430,6 +431,52 @@
          enddo
          clubb_misc% qrl_zt(1) = clubb_misc% qrl_zt(2)
       end if
-      !------
+
+      !--------------------------------------------------------------------
+      ! Sandbox version of code to take into account meso organization
+      !--------------------------------------------------------------------
+      if (clubb_do_deep) then
+         call varmu_cal( pver, host_mean%prer_evap(i,:), host_mean%pdel(i,:), & 
+                         varmu, clubb_misc%varmu )
+      endif
 
   end subroutine map_1column_of_info_from_host_to_clubb
+
+  !=========================================================
+  ! Code separated from clubb_tend_cam by Hui Wan, 2023-12
+  !=========================================================
+  subroutine varmu_cal( pver, prer_evap, pdel, varmu, varmu2 )
+
+    use parameters_tunable, only: mu
+
+    integer, intent(in) :: pver
+    real(r8),intent(in) :: prer_evap(:)
+    real(r8),intent(in) :: pdel(:)
+
+    real(r8),       intent(out) :: varmu 
+    real(core_rknd),intent(out) :: varmu2
+
+    real(r8) :: orgparam, delpavg
+    integer  :: k
+
+    !------------------
+    orgparam = 0._r8
+    delpavg = 0._r8
+
+    do k = 1, pver
+       if (abs(prer_evap(k)) .gt. 0._r8) then
+          orgparam = orgparam + (abs(prer_evap(k)) * 1000._r8 * 1000._r8 * 2._r8 ) * pdel(k)
+          delpavg = delpavg + pdel(k)
+       endif
+    enddo
+
+    if (delpavg .gt. 0._r8) then
+      orgparam = orgparam/delpavg
+    endif
+
+    ! Now compute new entrainment rate based on organization
+
+    varmu   = mu / (1._r8 + orgparam * 100._r8)
+    varmu2  = real( varmu, kind=core_rknd )
+
+  end subroutine varmu_cal

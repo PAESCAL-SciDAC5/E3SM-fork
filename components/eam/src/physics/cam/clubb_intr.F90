@@ -1107,7 +1107,6 @@ end subroutine clubb_init_cnst
    use macrop_driver_with_clubb,  only: gustiness
    use macrop_driver_with_clubb,  only: deepcu_detrainment_tend
 
-   use parameters_tunable,        only: mu
    use clubb_api_module, only: &
         cleanup_clubb_core_api, &
         w_tol_sqd, &
@@ -1238,8 +1237,6 @@ end subroutine clubb_init_cnst
 
    real(core_rknd) :: C_10                             ! transfer coefficient                          [-]
 
-   real(core_rknd) :: varmu2
-
    real(core_rknd) :: dum_core_rknd                    ! dummy variable  [units vary]
    real(core_rknd) :: hdtime_core_rknd                 ! host model's cloud macmic timestep in core_rknd
 
@@ -1328,7 +1325,7 @@ end subroutine clubb_init_cnst
    real(r8) :: qs(pcols,pver)
    real(r8) :: gam(pcols,pver)
    real(r8) :: tmp_array(state%ncol,pverp)
-   real(r8) :: bfact, orgparam, delpavg
+
    character(len=6) :: choice_radf
 
    integer                               :: time_elapsed                ! time keep track of stats          [s]
