@@ -185,6 +185,11 @@
    call pbuf_get_field(pbuf, thlpthvp_idx, host_mnts%thlpthvp,   start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
 
    !=====================
+   ! Miscellaneous fields
+   !=====================
+
+   call pbuf_get_field(pbuf, prer_evap_idx, host_mean%prer_evap)
+
    if (do_cldcool) then
       call pbuf_get_field(pbuf, qrl_idx, host_mean%qrl)
    end if
@@ -411,14 +416,19 @@
       !--------------------------------------------------------------------
       ! Get QRL for use in subroutine enhance_thlp2_for_cloud_top_cooling
       !--------------------------------------------------------------------
-      if (do_cldcool) then
+      if (do_rainturb) then
+         do k=2,pverp
+            clubb_misc% prer_evap(k) = real( host_mean%prer_evap(i,pverp-k+1), kind=core_rknd )
+         enddo
+         clubb_misc% prer_evap(1) = clubb_misc% prer_evap(2)
+      end if
 
+      if (do_cldcool) then
          do k=1,pver
             kkhost = pver-k+1
             clubb_misc% qrl_zt(k+1) = real( host_mean%qrl(i,kkhost)/(cpair*host_mean%pdel(i,kkhost)), kind=core_rknd )
          enddo
          clubb_misc% qrl_zt(1) = clubb_misc% qrl_zt(2)
-
       end if
       !------
 

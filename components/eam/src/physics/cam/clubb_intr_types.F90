@@ -30,7 +30,8 @@ module clubb_intr_types
 
    real(r8), pointer, dimension(:,:,:) :: q          ! tracer mixing ratio  [-]
 
-   real(r8), pointer, dimension(:,:) :: qrl 
+   real(r8), pointer, dimension(:,:) :: qrl
+   real(r8), pointer, dimension(:,:) :: prer_evap 
 
   end type clubb_mean_2d_t
 

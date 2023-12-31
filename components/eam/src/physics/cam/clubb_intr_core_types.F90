@@ -120,7 +120,10 @@ module clubb_intr_core_types
   !-------------------------
   !-------------------------
   type clubb_misc_t
+
     real(core_rknd), dimension(:), allocatable :: qrl_zt
+    real(core_rknd), dimension(:), allocatable :: prer_evap
+
   end type clubb_misc_t
 
 contains
@@ -164,6 +167,7 @@ contains
     ! Misc.
     !------------------------------
     allocate( clubb_misc% qrl_zt          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( clubb_misc% prer_evap       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     !------------------------------
     ! CLUBB's prognostic variables
@@ -269,6 +273,7 @@ contains
     ! Misc.
     !------------------------------
     deallocate( clubb_misc% qrl_zt         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( clubb_misc% prer_evap      , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     !------------------------------
     ! CLUBB's prognostic variables

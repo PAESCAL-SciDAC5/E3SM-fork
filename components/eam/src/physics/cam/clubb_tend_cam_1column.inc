@@ -40,42 +40,32 @@
          pdf_zm_varnce_w_2_inout = pdf_params_zm%varnce_w_2
          pdf_zm_mixt_frac_inout  = pdf_params_zm%mixt_frac
 
+         !------------------------------------------------------------
+         ! Consider impact of rain evaporation on turbulent moments 
+         !------------------------------------------------------------
          if (do_rainturb) then
 
-            do k=2,pverp
-               pre_in(k)    = real(prer_evap(i,pverp-k+1), kind = core_rknd)
-            enddo
-            pre_in(1) = pre_in(2)
+            core_rknd_landfrac     = real( cam_in%landfrac(i), kind=core_rknd )
+            core_rknd_rnevap_effic = real( clubb_rnevap_effic, kind=core_rknd )
 
-            rvm_in = core_prog%rtm - core_diag%rcm
-            call update_xp2_mc_api(pverp, dtime, core_diag%cloud_frac, &
-                                   core_diag%rcm, rvm_in, core_prog%thlm, &
-                                   core_auxil%wm_zt, core_auxil%exner, pre_in, pdf_params, &
-            rtp2_mc_out, thlp2_mc_out, &
-            wprtp_mc_out, wpthlp_mc_out, &
-            rtpthlp_mc_out)
-
-            if (clubb_do_deep) then
-               dum_core_rknd = 1._core_rknd
-            else
-               dum_core_rknd = (1._core_rknd - real(cam_in%landfrac(i), kind = core_rknd))
-            end if
-
-            ! update turbulent moments based on rain evaporation
-            core_prog%rtp2  = core_prog%rtp2  + real(clubb_rnevap_effic, kind = core_rknd) * dum_core_rknd *  rtp2_mc_out * dtime
-            core_prog%thlp2 = core_prog%thlp2 + real(clubb_rnevap_effic, kind = core_rknd) * dum_core_rknd * thlp2_mc_out * dtime
-            if (.not. clubb_do_deep) then
-               core_prog%wprtp  = core_prog%wprtp  + real(clubb_rnevap_effic, kind = core_rknd) * dum_core_rknd *  wprtp_mc_out * dtime
-               core_prog%wpthlp = core_prog%wpthlp + real(clubb_rnevap_effic, kind = core_rknd) * dum_core_rknd * wpthlp_mc_out * dtime
-            endif
-!                     rtpthlp_in = rtpthlp_in + rtpthlp_mc_out * dtime
-
+            call update_mnts_for_rain_evap( core_prog%rtp2,       core_prog%thlp2,        &! inout
+                                            core_prog%wprtp,      core_prog%wpthlp,       &! inout
+                                            core_prog%rtm,        core_diag%rcm,          &! in
+                                            core_diag%cloud_frac, core_prog%thlm,         &! in
+                                            core_auxil%wm_zt,     core_auxil%exner,       &! in
+                                            clubb_misc%prer_evap, pdf_params,             &! in
+                                            core_rknd_landfrac,   core_rknd_rnevap_effic, &! in
+                                            pverp, dtime, clubb_do_deep                   )! in
          endif
 
-         !----------------------
+         !-----------------------------------------------
+         ! Consider impact of cloud-top cooling on thlp2
+         !-----------------------------------------------
          if (do_cldcool) then
-            call enchance_thlp2_for_cloud_top_cooling( core_diag%rcm, clubb_misc%qrl_zt, core_diag%thlprcp, &
-                                                       core_prog%thlp2, pverp, dtime )
+            call enchance_thlp2_for_cloud_top_cooling( core_prog%thlp2,                  &! inout
+                                                       core_diag%rcm, clubb_misc%qrl_zt, &! in
+                                                       core_diag%thlprcp,                &! in
+                                                       pverp, dtime                      )
          endif
 
          !------------------------------------------------------------------- 

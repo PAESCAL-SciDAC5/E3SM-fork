@@ -1125,7 +1125,6 @@ end subroutine clubb_init_cnst
         pdf_parameter, &
         stats_begin_timestep_api, &
         advance_clubb_core_api, &
-        update_xp2_mc_api, &
         zt2zm_api, zm2zt_api
    use model_flags, only: ipdf_call_placement
    use advance_clubb_core_module, only: ipdf_post_advance_fields
@@ -1192,26 +1191,17 @@ end subroutine clubb_init_cnst
   !=====================================================================================
    real(core_rknd) :: dtime                            ! CLUBB time step                              [s]
 
-   real(core_rknd) :: rvm_in(pverp)                    ! water vapor mixing ratio                     [kg/kg]
-
-   real(core_rknd) :: pre_in(pverp)                    ! input for precip evaporation
-   real(core_rknd) :: rtp2_mc_out(pverp)               ! total water tendency from rain evap
-   real(core_rknd) :: thlp2_mc_out(pverp)              ! thetal tendency from rain evap
-   real(core_rknd) :: wprtp_mc_out(pverp)
-   real(core_rknd) :: wpthlp_mc_out(pverp)
-   real(core_rknd) :: rtpthlp_mc_out(pverp)
-   real(core_rknd) :: rcm_out_zm(pverp)
-
    real(core_rknd) :: rcm_in_layer_out(pverp)          ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg]
    real(core_rknd) :: cloud_cover_out(pverp)           ! CLUBB output of in-cloud cloud fraction       [fraction]
    real(core_rknd) :: rfrzm(pverp)
    real(core_rknd) :: radf(pverp)
 
-
    real(core_rknd) :: ice_supersat_frac(pverp)
 
-
-   real(core_rknd) :: zt_bot  ! height of themo level that is closest to the Earth's surface [m]
+   !-----------------
+   real(core_rknd) :: zt_bot                  ! height of themo level that is closest to the Earth's surface [m]
+   real(core_rknd) :: core_rknd_landfrac
+   real(core_rknd) :: core_rknd_rnevap_effic
 
    real(core_rknd) :: fcoriolis                        ! Coriolis forcing                              [s^-1]
    real(core_rknd) :: sfc_elevation                    ! Elevation of ground                           [m AMSL]
