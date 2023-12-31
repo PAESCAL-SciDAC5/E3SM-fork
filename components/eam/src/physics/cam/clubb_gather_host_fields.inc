@@ -185,6 +185,10 @@
    call pbuf_get_field(pbuf, thlpthvp_idx, host_mnts%thlpthvp,   start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
 
    !=====================
+   if (do_cldcool) then
+      call pbuf_get_field(pbuf, qrl_idx, host_mean%qrl)
+   end if
+
   end subroutine gather_host_fields
 
   !===============================================================================
@@ -217,13 +221,13 @@
                                                      pver, pverp, edsclr_dim, lq,ixq, ixcldliq, &
                                                      macmic_it, clubb_do_adv, do_expldiff,      &
                                                      core_auxil, core_prog, core_diag,          &
-                                                     core_forcing, core_sfc, dz_g               )
+                                                     core_forcing, core_sfc, clubb_misc, dz_g   )
 
     use shr_kind_mod,     only: r8=>shr_kind_r8
     use clubb_precision,  only: core_rknd
     use clubb_intr_types, only: clubb_mean_2d_t, clubb_mnts_2d_t, clubb_to_host_t
     use clubb_intr_core_types, only: core_auxil_t, core_prog_t, core_diag_t
-    use clubb_intr_core_types, only: core_forcing_t, core_sfc_t
+    use clubb_intr_core_types, only: core_forcing_t, core_sfc_t, clubb_misc_t
     use clubb_api_module,      only: zt2zm_api
 
     use physconst,        only: gravit
@@ -246,6 +250,7 @@
     type(core_diag_t   ),intent(inout) :: core_diag
     type(core_forcing_t),intent(inout) :: core_forcing
     type(core_sfc_t    ),intent(inout) :: core_sfc
+    type(clubb_misc_t  ),intent(inout) :: clubb_misc
 
     real(r8),intent(out) :: dz_g(:)
 
@@ -402,6 +407,19 @@
           enddo
         endif
       endif
-      !-----------------------------------------------
+
+      !--------------------------------------------------------------------
+      ! Get QRL for use in subroutine enhance_thlp2_for_cloud_top_cooling
+      !--------------------------------------------------------------------
+      if (do_cldcool) then
+
+         do k=1,pver
+            kkhost = pver-k+1
+            clubb_misc% qrl_zt(k+1) = real( host_mean%qrl(i,kkhost)/(cpair*host_mean%pdel(i,kkhost)), kind=core_rknd )
+         enddo
+         clubb_misc% qrl_zt(1) = clubb_misc% qrl_zt(2)
+
+      end if
+      !------
 
   end subroutine map_1column_of_info_from_host_to_clubb

@@ -1,7 +1,7 @@
 
       zi_out(i,1) = 0._r8
 
-      call clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, pverp, edsclr_dim )
+      call clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, pverp, edsclr_dim )
 
       !============================================
       ! Prepare input to advance_clubb_core
@@ -10,7 +10,7 @@
                                                    pver, pverp, edsclr_dim, lq, ixq, ixcldliq, &
                                                    macmic_it, clubb_do_adv, do_expldiff,       &
                                                    core_auxil, core_prog, core_diag,           &
-                                                   core_forcing, core_sfc, dz_g                )
+                                                   core_forcing, core_sfc, clubb_misc, dz_g    )
 
 #include "more_info_to_clubb.inc"
 
@@ -72,28 +72,17 @@
 
          endif
 
-          !----------------------
-          if (do_cldcool) then
-            do k=1,pver
-               kkhost = pver-k+1
-               qrl_clubb(k+1) = real( qrl(i,kkhost)/(cpair*host_mean%pdel(i,kkhost)), kind=core_rknd )
-            enddo
-            qrl_clubb(1) = qrl_clubb(2)
+         !----------------------
+         if (do_cldcool) then
+            call enchance_thlp2_for_cloud_top_cooling( core_diag%rcm, clubb_misc%qrl_zt, core_diag%thlprcp, &
+                                                       core_prog%thlp2, pverp, dtime )
+         endif
 
-            rcm_out_zm = zt2zm_api( core_diag%rcm )
-            qrl_zm = zt2zm_api(qrl_clubb)
-            thlp2_rad_out(:) = 0._r8
-            call calculate_thlp2_rad_api(pverp, rcm_out_zm, core_diag%thlprcp, qrl_zm, thlp2_rad_out)
-            core_prog%thlp2 = core_prog%thlp2 + thlp2_rad_out * dtime
-            core_prog%thlp2 = max(thl_tol**2,core_prog%thlp2)
-          endif
-
-          !------------------------------------------------------------------- 
-          !  Check to see if stats should be output, here stats are read into
-          !  output arrays to make them conformable to CAM output
-          !------------------------------------------------------------------- 
-          if (l_stats) call stats_end_timestep_clubb(lchnk,i,out_zt,out_zm,&
-                                                     out_radzt,out_radzm,out_sfc)
+         !------------------------------------------------------------------- 
+         !  Check to see if stats should be output, here stats are read into
+         !  output arrays to make them conformable to CAM output
+         !------------------------------------------------------------------- 
+         if (l_stats) call stats_end_timestep_clubb(lchnk,i,out_zt,out_zm, out_radzt,out_radzm,out_sfc)
 
       enddo  ! end time loop
       call t_stopf('adv_clubb_core_ts_loop')
@@ -106,5 +95,5 @@
 
 
       !=================================================
-      call clubb_core_fld_dealloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc )
+      call clubb_core_fld_dealloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc )
 

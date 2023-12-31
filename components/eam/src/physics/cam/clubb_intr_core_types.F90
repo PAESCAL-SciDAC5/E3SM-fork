@@ -117,16 +117,23 @@ module clubb_intr_core_types
 
   end type core_sfc_t
 
+  !-------------------------
+  !-------------------------
+  type clubb_misc_t
+    real(core_rknd), dimension(:), allocatable :: qrl_zt
+  end type clubb_misc_t
+
 contains
 
   !------------------------------------------------------ 
-  subroutine clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, pverp, ntracer )
+  subroutine clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, pverp, ntracer )
 
     type(core_auxil_t),  intent(inout) :: core_auxil
     type(core_prog_t),   intent(inout) :: core_prog
     type(core_diag_t),   intent(inout) :: core_diag
     type(core_forcing_t),intent(inout) :: core_forcing
     type(core_sfc_t),    intent(inout) :: core_sfc
+    type(clubb_misc_t),  intent(inout) :: clubb_misc
 
     integer,           intent(in)    :: pverp
     integer,           intent(in)    :: ntracer
@@ -152,6 +159,11 @@ contains
 
     allocate( core_auxil% wm_zt           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     allocate( core_auxil% wm_zm           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    !------------------------------
+    ! Misc.
+    !------------------------------
+    allocate( clubb_misc% qrl_zt          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     !------------------------------
     ! CLUBB's prognostic variables
@@ -222,13 +234,14 @@ contains
   end subroutine clubb_core_fld_alloc
 
   !----------------------------------------------- 
-  subroutine clubb_core_fld_dealloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc )
+  subroutine clubb_core_fld_dealloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc )
 
     type(core_auxil_t),  intent(inout) :: core_auxil
     type(core_prog_t),   intent(inout) :: core_prog
     type(core_diag_t),   intent(inout) :: core_diag
     type(core_forcing_t),intent(inout) :: core_forcing
     type(core_sfc_t),    intent(inout) :: core_sfc
+    type(clubb_misc_t),  intent(inout) :: clubb_misc
 
     character(len=100) :: routine='clubb_core_fld_dealloc'
     integer :: ierr
@@ -251,6 +264,11 @@ contains
 
     deallocate( core_auxil% wm_zt          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( core_auxil% wm_zm          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    !------------------------------
+    ! Misc.
+    !------------------------------
+    deallocate( clubb_misc% qrl_zt         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     !------------------------------
     ! CLUBB's prognostic variables

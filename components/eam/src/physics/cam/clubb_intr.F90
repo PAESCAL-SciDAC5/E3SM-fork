@@ -1125,13 +1125,12 @@ end subroutine clubb_init_cnst
         pdf_parameter, &
         stats_begin_timestep_api, &
         advance_clubb_core_api, &
-        calculate_thlp2_rad_api, &
         update_xp2_mc_api, &
         zt2zm_api, zm2zt_api
    use model_flags, only: ipdf_call_placement
    use advance_clubb_core_module, only: ipdf_post_advance_fields
    use clubb_intr_types
-   use clubb_intr_core_types, only: core_auxil_t, core_prog_t, core_diag_t, core_forcing_t, core_sfc_t
+   use clubb_intr_core_types, only: core_auxil_t, core_prog_t, core_diag_t, core_forcing_t, core_sfc_t, clubb_misc_t
    use clubb_intr_core_types, only: clubb_core_fld_alloc, clubb_core_fld_dealloc
 #endif
 
@@ -1222,6 +1221,7 @@ end subroutine clubb_init_cnst
    type(core_diag_t)    :: core_diag
    type(core_forcing_t) :: core_forcing
    type(core_sfc_t)     :: core_sfc
+   type(clubb_misc_t)   :: clubb_misc
 
    !-----------------
    real(core_rknd), dimension(sclr_dim) :: sclr_tol    ! Tolerance on passive scalar                   [units vary]
@@ -1249,10 +1249,6 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: C_10                             ! transfer coefficient                          [-]
 
    real(core_rknd) :: varmu2
-   real(core_rknd) :: qrl_clubb(pverp)
-   real(core_rknd) :: qrl_zm(pverp)
-   real(core_rknd) :: thlp2_rad_out(pverp)
-
 
    real(core_rknd) :: dum_core_rknd                    ! dummy variable  [units vary]
    real(core_rknd) :: hdtime_core_rknd                 ! host model's cloud macmic timestep in core_rknd
@@ -2808,6 +2804,7 @@ end function diag_ustar
 
 #include "clubb_gather_host_fields.inc"
 #include "clubb_setup_zgrid_1col.inc"
+#include "misc_clubb_intr_subs.inc"
 
 #endif
 
