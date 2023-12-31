@@ -1192,10 +1192,8 @@ end subroutine clubb_init_cnst
 
    real(core_rknd) :: rcm_in_layer_out(pverp)          ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg]
    real(core_rknd) :: cloud_cover_out(pverp)           ! CLUBB output of in-cloud cloud fraction       [fraction]
-   real(core_rknd) :: rfrzm(pverp)
-   real(core_rknd) :: radf(pverp)
 
-   real(core_rknd) :: ice_supersat_frac(pverp)
+
 
    !-----------------
    real(core_rknd) :: zt_bot                  ! height of themo level that is closest to the Earth's surface [m]
@@ -1233,6 +1231,9 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: wp2hmp(pverp,hydromet_dim)
    real(core_rknd) :: rtphmp_zt(pverp,hydromet_dim)
    real(core_rknd) :: thlphmp_zt (pverp,hydromet_dim)
+
+   real(core_rknd) :: radf(pverp)               !input to clubb_core, set to zero 
+   real(core_rknd) :: ice_supersat_frac(pverp)  !output from clubb_core, not used.
    !-----------------
 
    real(core_rknd) :: C_10                             ! transfer coefficient                          [-]
@@ -1310,23 +1311,7 @@ end subroutine clubb_init_cnst
    real(r8) :: tautmsx(pcols)                   ! U component of turbulent mountain stress      [N/m2]
    real(r8) :: tautmsy(pcols)                   ! V component of turbulent mountain stress      [N/m2]
 
-  !real(r8) :: dlf2(pcols,pver)                 ! Detraining cld H20 from shallow convection    [kg/kg/day]
-  !real(r8) :: latsub
-
-   integer  :: ktop(pcols,pver)
-   integer  :: ncvfin(pcols)
-   real(r8) :: chs(pcols,pverp)
-   real(r8) :: lwp_CL(pver)
-   real(r8) :: opt_depth_CL(pver)
-   real(r8) :: radinvfrac_CL(pver)
-   real(r8) :: radf_CL(pver)
-   real(r8) :: radf_out(pver)
-   real(r8) :: es(pcols,pver)
-   real(r8) :: qs(pcols,pver)
-   real(r8) :: gam(pcols,pver)
    real(r8) :: tmp_array(state%ncol,pverp)
-
-   character(len=6) :: choice_radf
 
    integer                               :: time_elapsed                ! time keep track of stats          [s]
    character(len=200)                    :: temp1, sub                  ! Strings needed for CLUBB output

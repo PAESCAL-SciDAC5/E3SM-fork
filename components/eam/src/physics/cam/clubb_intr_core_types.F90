@@ -125,6 +125,7 @@ module clubb_intr_core_types
 
     real(core_rknd), dimension(:), allocatable :: qrl_zt
     real(core_rknd), dimension(:), allocatable :: prer_evap
+    real(core_rknd), dimension(:), allocatable :: rfrzm      ! Total ice-phase water mixing ratio        [kg/kg] 
 
   end type clubb_misc_t
 
@@ -170,6 +171,7 @@ contains
     !------------------------------
     allocate( clubb_misc% qrl_zt          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     allocate( clubb_misc% prer_evap       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( clubb_misc% rfrzm           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     !------------------------------
     ! CLUBB's prognostic variables
@@ -276,6 +278,7 @@ contains
     !------------------------------
     deallocate( clubb_misc% qrl_zt         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( clubb_misc% prer_evap      , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( clubb_misc% rfrzm          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     !------------------------------
     ! CLUBB's prognostic variables

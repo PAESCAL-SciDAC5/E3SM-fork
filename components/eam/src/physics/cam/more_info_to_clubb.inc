@@ -1,6 +1,4 @@
-
       !--------------------------------------------------------------------------
-
       if (linearize_pbl_winds) then
          ! Each host model time step, reset the perturbed variables to be equal to
          ! the unperturbed values.
@@ -43,11 +41,11 @@
       end if
 
 
-
       !---------------------------------------------------------
       ! also flip the arrays for the pdf_params_zm variables to have
       ! consistent vertical orientation for all variables in restart file
       ! also need to flip back after calling advance_clubb_core
+      !---------------------------------------------------------
       do k=1,pverp
          pdf_zm_w_1_inout(k)        = c2h%pdf_zm_w_1       (i,pverp-k+1)
          pdf_zm_w_2_inout(k)        = c2h%pdf_zm_w_2       (i,pverp-k+1)
@@ -55,7 +53,6 @@
          pdf_zm_varnce_w_2_inout(k) = c2h%pdf_zm_varnce_w_2(i,pverp-k+1)
          pdf_zm_mixt_frac_inout(k)  = c2h%pdf_zm_mixt_frac (i,pverp-k+1)
       enddo
-
 
       pdf_params    => pdf_params_chnk(i,lchnk)
       pdf_params_zm => pdf_params_zm_chnk(i,lchnk)
@@ -70,20 +67,3 @@
          pdf_params_zm%mixt_frac  = pdf_zm_mixt_frac_inout
       end if
       !---------------------------------------------------------
-
-
-
-
-      !----------
-      do k=1,pver
-         kkhost = pver-k+1
-         rfrzm(k+1)     = real( host_mean%q(i,kkhost,ixcldice),                 kind=core_rknd )
-         radf(k+1)      = real( radf_clubb(i,kkhost),                           kind=core_rknd )
-      enddo
-      radf(1)      = radf(2)
-      rfrzm(1)     = rfrzm(2)
-
-      ice_supersat_frac(1:pverp) = 0._core_rknd
-      !============================================
-
-

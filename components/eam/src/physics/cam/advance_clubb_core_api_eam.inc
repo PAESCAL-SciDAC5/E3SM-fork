@@ -2,6 +2,8 @@
 
 #include "clubb_terms_not_in_eqns.inc"
 
+         radf(:) = 0._core_rknd
+
          !Balli- to do: check whether initent-ins and intent-inouts are actually what they say
 
          call advance_clubb_core_api &
@@ -41,7 +43,8 @@
               core_auxil%thv_ds_zt,       &
               !
               hydromet,    &! intent(in)
-              rfrzm, radf, &! intent(in)
+              clubb_misc%rfrzm, &! intent(in)
+              radf,             &! intent(in)
 #ifdef CLUBBND_CAM
               clubb_misc%varmu, &! intent(in)
 #endif

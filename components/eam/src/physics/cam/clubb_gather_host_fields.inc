@@ -223,7 +223,7 @@
   !===============================================================================
   !===============================================================================
   subroutine map_1column_of_info_from_host_to_clubb( i, host_mean, host_mnts, c2h, &
-                                                     pver, pverp, edsclr_dim, lq,ixq, ixcldliq, &
+                                                     pver, pverp, edsclr_dim, lq,ixq, ixcldliq, ixcldice, &
                                                      macmic_it, clubb_do_adv, do_expldiff,      &
                                                      core_auxil, core_prog, core_diag,          &
                                                      core_forcing, core_sfc, clubb_misc, dz_g, varmu  )
@@ -245,7 +245,7 @@
     integer, intent(in) :: pver, pverp   ! number of vertical levels in column
     integer, intent(in) :: edsclr_dim 
     logical, intent(in) :: lq(:)
-    integer, intent(in) :: ixq, ixcldliq
+    integer, intent(in) :: ixq, ixcldliq, ixcldice
     integer, intent(in) :: macmic_it
     logical, intent(in) :: clubb_do_adv
     logical, intent(in) :: do_expldiff
@@ -413,6 +413,14 @@
           enddo
         endif
       endif
+
+      !------------------------
+      ! Cloud ice mixing ratio
+      !------------------------
+      do k=1,pver
+         clubb_misc%rfrzm(k+1) = real( host_mean%q(i,pver-k+1,ixcldice), kind=core_rknd )
+      enddo
+      clubb_misc%rfrzm(1) = clubb_misc%rfrzm(2)
 
       !--------------------------------------------------------------------
       ! Get QRL for use in subroutine enhance_thlp2_for_cloud_top_cooling
