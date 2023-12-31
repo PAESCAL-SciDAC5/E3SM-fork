@@ -43,7 +43,7 @@
               hydromet,    &! intent(in)
               rfrzm, radf, &! intent(in)
 #ifdef CLUBBND_CAM
-              varmu2,      &! intent(in)
+              clubb_misc%varmu, &! intent(in)
 #endif
               wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt, &! intent(in)
               host_dx, host_dy, &                          ! intent(in)
