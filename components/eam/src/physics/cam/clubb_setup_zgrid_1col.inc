@@ -55,4 +55,6 @@
          zi_out_1col(k) = real( zi_g(pverp-k+1), kind=r8 )
       enddo
 
+      zi_out_1col(1) = 0._r8
+
   end subroutine setup_clubb_zgrid_for_1column

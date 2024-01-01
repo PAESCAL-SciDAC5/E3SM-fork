@@ -35,7 +35,6 @@
       ! But we place the call here (meaning repeating the calculation every timestep and
       ! in each grid column), as we are preparing for the implementation of AMR.
       !------------------------------------------------------------------------------------
-
       call determine_clubb_dtime( hdtime, clubb_timestep, hdtime_core_rknd, dtime, n_clubb_core_step ) ! 2xin, 3xout
 
       ! Set time_elapsed to host model time step, this is for CLUBB's budget stats
@@ -51,7 +50,34 @@
       call setup_clubb_zgrid_for_1column( pver, pverp, host_mean%zi(i,:), host_mean%zm(i,:), &
                                           zt_bot, sfc_elevation, zt_out(i,:), zi_out(i,:)    )
 
-#include "clubb_tend_cam_1column.inc"
+      !--------------------------------------
+      ! Prepare input to advance_clubb_core
+      !--------------------------------------
+      ! Allocate memory for derived-type variables
+
+      call clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, pverp, edsclr_dim )
+
+      ! Associate pointers for CLUBB's PDF parameters
+
+      pdf_params    => pdf_params_chnk(i,lchnk)
+      pdf_params_zm => pdf_params_zm_chnk(i,lchnk)
+
+      ! Now fill those data structures with values
+
+      call map_1column_of_info_from_host_to_clubb( i, host_mean, host_mnts, c2h,         &! in
+                                                   pver, pverp, edsclr_dim, lq,          &! in
+                                                   ixq, ixcldliq, ixcldice,              &! in
+                                                   macmic_it, clubb_do_adv, do_expldiff, &! in
+                                                   core_auxil, core_prog, core_diag,     &! inout
+                                                   core_forcing, core_sfc, clubb_misc,   &! inout
+                                                   pdf_params_zm,                        &! inout
+                                                   dz_g, varmu(i)                        )! out
+#include "more_info_to_clubb.inc"
+#include "clubb_timeloop.inc"
+#include "info_from_clubb_to_host.inc"
+
+      ! Clean up
+      call clubb_core_fld_dealloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc )
 
       !---------------------------------------------------------------------------------------------------------
       ! After advancing CLUBB in time, apply a total energy fixer by adjusting the ending s (dry static energy)
