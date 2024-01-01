@@ -12,6 +12,9 @@ module clubb_intr_core_types
   !--------------------------------------------------------------------
   type core_auxil_t
 
+    integer         :: icol, lchnk   ! column and chunk indicies in the host model
+    real(core_rknd) :: lat, lon      ! latitude and longitude [radian]
+
     real(core_rknd), dimension(:), allocatable :: p_in_Pa
     real(core_rknd), dimension(:), allocatable :: exner
 
@@ -77,7 +80,9 @@ module clubb_intr_core_types
 
     real(core_rknd), dimension(:), allocatable :: rcm
     real(core_rknd), dimension(:), allocatable :: cloud_frac
-    real(core_rknd), dimension(:), allocatable :: qclvar      ! cloud water variance [kg^2/kg^2]
+    real(core_rknd), dimension(:), allocatable :: qclvar        ! cloud water variance [kg^2/kg^2]
+    real(core_rknd), dimension(:), allocatable :: rcm_in_layer  ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg] 
+    real(core_rknd), dimension(:), allocatable :: cloud_cover   ! CLUBB output of in-cloud cloud fraction       [fraction] 
 
   end type core_diag_t
 
@@ -215,6 +220,8 @@ contains
     allocate( core_diag% rcm             (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     allocate( core_diag% cloud_frac      (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     allocate( core_diag% qclvar          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% rcm_in_layer    (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% cloud_cover     (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     !-------------------------
     ! Forcing terms
@@ -322,6 +329,8 @@ contains
     deallocate( core_diag% rcm            , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( core_diag% cloud_frac     , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( core_diag% qclvar         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_diag% rcm_in_layer   , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    deallocate( core_diag% cloud_cover    , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     !-------------------------
     ! Forcing terms

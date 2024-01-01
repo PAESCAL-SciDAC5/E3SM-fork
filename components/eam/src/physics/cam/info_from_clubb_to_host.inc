@@ -75,15 +75,15 @@
 
           wprcp(i,k)        = real( core_diag%wprcp(pverp-k+1), kind = r8)
           cloud_frac(i,k)   = min(real(core_diag%cloud_frac(pverp-k+1), kind = r8),1._r8)
-          rcm_in_layer(i,k) = real(rcm_in_layer_out(pverp-k+1), kind = r8)
-          cloud_cover(i,k)  = min(real(cloud_cover_out(pverp-k+1), kind = r8),1._r8)
+          rcm_in_layer(i,k) = real( core_diag%rcm_in_layer(pverp-k+1), kind = r8)
+          cloud_cover(i,k)  = min(real(core_diag%cloud_cover(pverp-k+1), kind = r8),1._r8)
 
           c2h%khzm(i,k)     = real( core_diag%khzm(pverp-k+1), kind=r8 )
           c2h%khzt(i,k)     = real( core_diag%khzt(pverp-k+1), kind=r8 )
 
           qclvar(i,k)   = real( min( 1._core_rknd, core_diag%qclvar(pverp-k+1) ), kind=r8 )
 
-          sclrpthvp(i,k,:)  = real(sclrpthvp_inout(pverp-k+1,:), kind = r8)
+         !sclrpthvp(i,k,:)  = real(sclrpthvp_inout(pverp-k+1,:), kind = r8)
       enddo
 
 

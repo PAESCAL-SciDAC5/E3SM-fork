@@ -1,12 +1,12 @@
 
-  subroutine setup_clubb_zgrid_for_1column( pver, pverp, host_zi, host_zm, &
+  subroutine setup_clubb_zgrid_for_1column( nz, pverp, host_zi, host_zm,   &
                                             zt_bot, sfc_elevation,         &
                                             zt_out_1col, zi_out_1col )
 
       use clubb_api_module, only: read_parameters_api, nparams
       use clubb_api_module, only: setup_grid_heights_api, setup_parameters_api
 
-      integer,        intent(in)  :: pver
+      integer,        intent(in)  :: nz
       integer,        intent(in)  :: pverp
       real(r8),       intent(in)  :: host_zi(:)
       real(r8),       intent(in)  :: host_zm(:)
@@ -18,20 +18,26 @@
       real(core_rknd) :: zi_g(pverp)
       real(core_rknd) :: zt_g(pverp)
 
+      integer :: pver
       integer :: k
       integer :: err_code
 
       logical,parameter :: l_implemented = .true.
       real(core_rknd), dimension(nparams)  :: clubb_params ! Adjustable CLUBB parameters (C1, C2 ...)
 
-      !--------
-      !  Define the CLUBB momentum grid (in height, units of m)
-      do k=1,pverp
+      !---------------------------------------------------------------------
+      if (pverp/=nz) call endrun('pverp/=nz not supported by current code')
+ 
+      pver = pverp-1
+
+      ! Define the CLUBB momentum grid (in height, units of m)
+
+      do k=1,nz
          zi_g(k) = real( host_zi(pverp-k+1)-host_zi(pver+1), kind=core_rknd )
       enddo
 
       !  Define the CLUBB thermodynamic grid (in units of m)
-      do k=1,pver
+      do k=1,nz-1
          zt_g(k+1) = real( host_zm(pver-k+1)-host_zi(pver+1), kind=core_rknd )
       enddo
       zt_g(1) = -1._core_rknd*zt_g(2)  ! ghost point is below surface
@@ -42,19 +48,21 @@
       !  Setup CLUBB's z-grid because heights are given by the host model and hence can change
 
       call setup_grid_heights_api(l_implemented, grid_type, zi_g(2), zi_g(1), zi_g, zt_g)
-      call setup_parameters_api(zi_g(2), clubb_params, pverp, grid_type, zi_g, zt_g, err_code)
+      call setup_parameters_api(zi_g(2), clubb_params, nz, grid_type, zi_g, zt_g, err_code)
 
       !----------------------------------
       !----------------------------------
       zt_bot = zt_g(2)  ! lowst thermo level above ground. Used for specifying ustar in single column runs
       sfc_elevation = real( host_zi(pver+1), kind=core_rknd )  ! the elevation of the surface. Input to clubb_core
 
-      !----------------------------------
+      !-------------------------------------------------------------------
+      ! Save zt_g and zi_g using host model's indexing for history output
+      !-------------------------------------------------------------------
       do k=1,pverp
          zt_out_1col(k) = real( zt_g(pverp-k+1), kind=r8 )
          zi_out_1col(k) = real( zi_g(pverp-k+1), kind=r8 )
       enddo
 
-      zi_out_1col(1) = 0._r8
+      zi_out_1col(1) = 0._r8   ! setting the height at TOM? Info ignored anyway?
 
   end subroutine setup_clubb_zgrid_for_1column

@@ -47,7 +47,8 @@
       !------------------------------------------------------------------------------------
       ! Setup CLUBB's z-grid for this column of the host model
       !------------------------------------------------------------------------------------
-      call setup_clubb_zgrid_for_1column( pver, pverp, host_mean%zi(i,:), host_mean%zm(i,:), &
+      nz = pverp
+      call setup_clubb_zgrid_for_1column( nz, pverp, host_mean%zi(i,:), host_mean%zm(i,:),   &
                                           zt_bot, sfc_elevation, zt_out(i,:), zi_out(i,:)    )
 
       !--------------------------------------
@@ -55,7 +56,7 @@
       !--------------------------------------
       ! Allocate memory for derived-type variables
 
-      call clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, pverp, edsclr_dim )
+      call clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, nz, edsclr_dim )
 
       ! Associate pointers for CLUBB's PDF parameters
 
@@ -65,7 +66,7 @@
       ! Now fill those data structures with values
 
       call map_1column_of_info_from_host_to_clubb( i, host_mean, host_mnts, c2h,         &! in
-                                                   pver, pverp, edsclr_dim, lq,          &! in
+                                                   pverp, nz, edsclr_dim, lq,            &! in
                                                    ixq, ixcldliq, ixcldice,              &! in
                                                    macmic_it, clubb_do_adv, do_expldiff, &! in
                                                    core_auxil, core_prog, core_diag,     &! inout
@@ -73,7 +74,78 @@
                                                    pdf_params_zm,                        &! inout
                                                    dz_g, varmu(i)                        )! out
 #include "more_info_to_clubb.inc"
-#include "clubb_timeloop.inc"
+
+
+      !**************************************************************************************
+      ! CLUBB's time-stepping sub-cycles
+      !**************************************************************************************
+      call t_startf('adv_clubb_core_ts_loop')
+      do t=1,n_clubb_core_step    ! do needed number of "sub" timesteps for each CAM step
+
+         !  Increment the statistics then being stats timestep
+         if (l_stats) then
+            time_elapsed = time_elapsed+dtime
+            call stats_begin_timestep_api(time_elapsed, 1, 1)
+         endif
+
+#include "clubb_timestep_init_forcing_and_sfc.inc"
+
+         !--------------------------------------
+         ! Advance CLUBB CORE for one timestep
+         !--------------------------------------
+         call t_startf('advance_clubb_core')
+         call advance_clubb_core_api_eam( nz, dtime, sfc_elevation, fcoriolis, &! in
+                                          core_forcing, core_sfc,     &! in
+                                          clubb_misc,   core_auxil,   &! in
+                                          core_prog,    core_diag,    &! inout or out
+                                          pdf_params,   pdf_params_zm,&! inout or out
+                                          !
+                                          upwp_sfc_pert, vpwp_sfc_pert,      &! intent(in)
+                                          um_pert_col, vm_pert_col,          &!
+                                          upwp_pert_col, vpwp_pert_col       &! intent(inout)
+                                          )
+         call t_stopf('advance_clubb_core')
+
+         !------------------------------------------------------------
+         ! Consider impact of rain evaporation on turbulent moments 
+         !------------------------------------------------------------
+         if (do_rainturb) then
+
+            core_rknd_landfrac     = real( cam_in%landfrac(i), kind=core_rknd )
+            core_rknd_rnevap_effic = real( clubb_rnevap_effic, kind=core_rknd )
+
+            call update_mnts_for_rain_evap( core_prog%rtp2,       core_prog%thlp2,        &! inout
+                                            core_prog%wprtp,      core_prog%wpthlp,       &! inout
+                                            core_prog%rtm,        core_diag%rcm,          &! in
+                                            core_diag%cloud_frac, core_prog%thlm,         &! in
+                                            core_auxil%wm_zt,     core_auxil%exner,       &! in
+                                            clubb_misc%prer_evap, pdf_params,             &! in
+                                            core_rknd_landfrac,   core_rknd_rnevap_effic, &! in
+                                            nz, dtime, clubb_do_deep                      )! in
+         endif
+
+         !-----------------------------------------------
+         ! Consider impact of cloud-top cooling on thlp2
+         !-----------------------------------------------
+         if (do_cldcool) then
+            call enchance_thlp2_for_cloud_top_cooling( core_prog%thlp2,                  &! inout
+                                                       core_diag%rcm, clubb_misc%qrl_zt, &! in
+                                                       core_diag%thlprcp,                &! in
+                                                       nz, dtime                         )
+         endif
+
+         !------------------------------------------------------------------- 
+         !  Check to see if stats should be output, here stats are read into
+         !  output arrays to make them conformable to CAM output
+         !------------------------------------------------------------------- 
+         if (l_stats) call stats_end_timestep_clubb(lchnk,i,out_zt,out_zm, out_radzt,out_radzm,out_sfc)
+
+      enddo  ! end time loop
+      call t_stopf('adv_clubb_core_ts_loop')
+      !**************************************************************************************
+      ! End of CLUBB's time-stepping sub-cycles
+      !**************************************************************************************
+
 #include "info_from_clubb_to_host.inc"
 
       ! Clean up

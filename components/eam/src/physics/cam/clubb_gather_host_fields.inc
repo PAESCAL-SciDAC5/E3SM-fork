@@ -31,8 +31,12 @@
    integer :: ixq, ixcldliq
    character(len=3), dimension(pcnst) :: cnst_type_loc ! local override option for constituents cnst_type
 
-   ncol           = state1%ncol
-   host_mean%ncol = state1%ncol
+   ncol            = state1%ncol
+   host_mean%ncol  = state1%ncol
+   host_mean%lchnk = state1%lchnk
+
+   host_mean%lat   => state1%lat
+   host_mean%lon   => state1%lon
 
    !===================================================================================================
    !  At each CLUBB call, initialize mean momentum and thermo CLUBB state from the host model's state
@@ -88,8 +92,6 @@
    host_mean%omega => state1%omega
    host_mean%q     => state1%q
 
-   host_mean%lat   => state1%lat
-   host_mean%lon   => state1%lon
    
    !=====================================================
    ! Passive tracers:
@@ -224,7 +226,7 @@
   !===============================================================================
   !===============================================================================
   subroutine map_1column_of_info_from_host_to_clubb( i, host_mean, host_mnts, c2h, &
-                                                     pver, pverp, edsclr_dim, lq,ixq, ixcldliq, ixcldice, &
+                                                     pverp, nz, edsclr_dim, lq,ixq, ixcldliq, ixcldice, &
                                                      macmic_it, clubb_do_adv, do_expldiff,      &
                                                      core_auxil, core_prog, core_diag,          &
                                                      core_forcing, core_sfc, clubb_misc,        &
@@ -248,8 +250,9 @@
     type(clubb_mnts_2d_t),intent(in) :: host_mnts
     type(clubb_to_host_t),intent(in) :: c2h
 
-    integer, intent(in) :: i             ! column index 
-    integer, intent(in) :: pver, pverp   ! number of vertical levels in column
+    integer, intent(in) :: i       ! column index 
+    integer, intent(in) :: pverp   ! number of vertical levels in column in the host model
+    integer, intent(in) :: nz      ! number of vertical levels in column in CLUBB 
     integer, intent(in) :: edsclr_dim 
     logical, intent(in) :: lq(:)
     integer, intent(in) :: ixq, ixcldliq, ixcldice
@@ -268,10 +271,23 @@
     real(r8),intent(out) :: dz_g(:)
     real(r8),intent(out) :: varmu
 
+    integer :: pver 
     integer :: icnt, ixind
     integer :: k,kkhost
     real(r8) :: invrs_gravit 
     real(r8) :: thvtmp, dum1
+
+      if (pverp/=nz) call endrun('pverp/=nz not supported by current code')
+
+      pver = pverp-1
+
+      !---------------------------------------------------------------
+      ! Grid column info that is used only for debugging currently
+      !---------------------------------------------------------------
+      core_auxil% icol  = i 
+      core_auxil% lat   = host_mean% lat(i)
+      core_auxil% lon   = host_mean% lon(i)
+      core_auxil% lchnk = host_mean% lchnk
 
       !------------------------------------------------------------------
       invrs_gravit = 1._r8 / gravit
@@ -337,8 +353,8 @@
 
       core_auxil%wm_zm = zt2zm_api( core_auxil%wm_zt )
 
-      !----------
 
+      !---------------------------------------------------------------
       !  Need to flip arrays around for CLUBB core
       do k=1,pverp
 

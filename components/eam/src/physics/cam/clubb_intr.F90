@@ -85,10 +85,6 @@ module clubb_intr
       ts_nudge = 86400._core_rknd, &    ! Time scale for u/v nudging (not used)     [s]
       p0_clubb = 100000._core_rknd
 
-  real(core_rknd), parameter :: &
-      host_dx = 100000._core_rknd, &    ! Host model deltax [m]
-      host_dy = 100000._core_rknd       ! Host model deltay [m]
-
   integer, parameter :: &
     sclr_dim = 0                        ! Higher-order scalars, set to zero
 
@@ -1090,7 +1086,7 @@ end subroutine clubb_init_cnst
   !use co2_cycle,      only: co2_cycle_set_cnst_type
    use camsrfexch,     only: cam_in_t
    use ref_pres,       only: top_lev => trop_cloud_top_lev
-   use time_manager,   only: is_first_step, get_nstep
+   use time_manager,   only: is_first_step
    use cam_abortutils, only: endrun
    use wv_saturation,  only: qsat
    use micro_mg_cam,   only: micro_mg_version
@@ -1098,7 +1094,6 @@ end subroutine clubb_init_cnst
 #ifdef CLUBB_SGS
 
    use scamMOD,                   only: single_column,scm_clubb_iop_name
-   use phys_grid,                 only: get_gcol_p
    use cldfrc2m,                  only: aist_vector
    use cam_history,               only: outfld
    use trb_mtn_stress,            only: compute_tms
@@ -1123,7 +1118,6 @@ end subroutine clubb_init_cnst
         l_output_rad_files, &
         pdf_parameter, &
         stats_begin_timestep_api, &
-        advance_clubb_core_api, &
         zt2zm_api, zm2zt_api
 
    use clubb_intr_types
@@ -1177,22 +1171,16 @@ end subroutine clubb_init_cnst
    integer :: ixcldice, ixcldliq, ixnumliq, ixnumice, ixq
    integer :: itim_old
    integer :: ncol, lchnk                       ! # of columns, and chunk identifier
-   integer :: err_code                          ! Diagnostic, for if some calculation goes amiss.
    integer :: icnt, clubbtop
 
 
    integer :: n_clubb_core_step
 
-  !=====================================================================================
-  ! The variables defined as core_rknd is required by the advance_clubb_core_api()
-  ! subroutine, the changes here is to change the precision in the CLUBB calculation
-  !=====================================================================================
+  !===========================================================================================
+  ! The variables defined as core_rknd is required by the advance_clubb_core_api() subroutine
+  !===========================================================================================
+   integer :: nz
    real(core_rknd) :: dtime                            ! CLUBB time step                              [s]
-
-   real(core_rknd) :: rcm_in_layer_out(pverp)          ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg]
-   real(core_rknd) :: cloud_cover_out(pverp)           ! CLUBB output of in-cloud cloud fraction       [fraction]
-
-
 
    !-----------------
    real(core_rknd) :: zt_bot                  ! height of themo level that is closest to the Earth's surface [m]
@@ -1209,30 +1197,8 @@ end subroutine clubb_init_cnst
    type(core_sfc_t)     :: core_sfc
    type(clubb_misc_t)   :: clubb_misc
 
-   !-----------------
-   real(core_rknd), dimension(sclr_dim) :: sclr_tol    ! Tolerance on passive scalar                   [units vary]
-   real(core_rknd) :: sclrm    (pverp,sclr_dim)        ! Passive scalar mean (thermo. levels)          [units vary]
-   real(core_rknd) :: wpsclrp  (pverp,sclr_dim)        ! w'sclr' (momentum levels)                     [{units vary} m/s]
-   real(core_rknd) :: sclrp2   (pverp,sclr_dim)        ! sclr'^2 (momentum levels)                     [{units vary}^2]
-   real(core_rknd) :: sclrprtp (pverp,sclr_dim)        ! sclr'rt' (momentum levels)                    [{units vary} (kg/kg)]
-   real(core_rknd) :: sclrpthlp(pverp,sclr_dim)        ! sclr'thlp' (momentum levels)                  [{units vary} (K)]
-
-   real(core_rknd) :: wpsclrp_sfc(sclr_dim)            ! Scalar flux at surface                        [{units vary} m/s]
-   real(core_rknd) ::   sclrm_forcing(pverp,sclr_dim)  ! Passive scalar forcing                        [{units vary}/s]
-   real(core_rknd) :: sclrpthvp_inout(pverp,sclr_dim)  ! momentum levels (< sclr' th_v' >)             [units vary]
-
-   !-----------------
-   real(core_rknd) :: rtp3_in(pverp)                   ! thermodynamic levels (r_t'^3 )               [(kg/kg)^3]
-   real(core_rknd) :: thlp3_in(pverp)                  ! thermodynamic levels (th_l'^3)               [K^3]
-
-   real(core_rknd) :: hydromet(pverp,hydromet_dim)
-   real(core_rknd) :: wphydrometp(pverp,hydromet_dim)
-   real(core_rknd) :: wp2hmp(pverp,hydromet_dim)
-   real(core_rknd) :: rtphmp_zt(pverp,hydromet_dim)
-   real(core_rknd) :: thlphmp_zt (pverp,hydromet_dim)
-
-   real(core_rknd) :: radf(pverp)               !input to clubb_core, set to zero 
-   real(core_rknd) :: ice_supersat_frac(pverp)  !output from clubb_core, not used.
+   type(pdf_parameter), pointer :: pdf_params    ! PDF parameters (thermo. levs.) [units vary]
+   type(pdf_parameter), pointer :: pdf_params_zm ! PDF parameters on momentum levs. [units vary]
    !-----------------
 
    real(core_rknd) :: C_10                             ! transfer coefficient                          [-]
@@ -1248,8 +1214,6 @@ end subroutine clubb_init_cnst
    real(core_rknd), pointer, dimension(:) :: upwp_pert_col
    real(core_rknd), pointer, dimension(:) :: vpwp_pert_col
 
-   !===========================================================================================================================
-   ! End of defining the variables for the change of precision in the CLUBB calculation
    !===========================================================================================================================
 
    real(r8) :: apply_const
@@ -1290,7 +1254,6 @@ end subroutine clubb_init_cnst
 
    real(r8) :: edsclr_out(pcols,pverp,edsclr_dim)     ! Scalars to be diffused through CLUBB          [units vary]
 
-   real(r8) :: sclrpthvp(pcols,pverp,sclr_dim)  ! sclr'th_v' (momentum levels)                  [{units vary} K]
    real(r8) :: rcm_in_layer(pcols,pverp)        ! CLUBB in-cloud liquid water mixing ratio      [kg/kg]
    real(r8) :: cloud_cover(pcols,pverp)         ! CLUBB in-cloud cloud fraction                 [fraction]
    real(r8) :: wprcp(pcols,pverp)               ! CLUBB liquid water flux                       [m/s kg/kg]
@@ -1357,8 +1320,6 @@ end subroutine clubb_init_cnst
    real(r8), pointer, dimension(:,:) :: accre_enhan ! accretion enhancement factor              [-]
    real(r8), pointer, dimension(:,:) :: cmeliq
 
-   type(pdf_parameter), pointer :: pdf_params    ! PDF parameters (thermo. levs.) [units vary]
-   type(pdf_parameter), pointer :: pdf_params_zm ! PDF parameters on momentum levs. [units vary]
 
   !real(r8), pointer, dimension(:,:) :: naai
    real(r8), pointer, dimension(:,:) :: prer_evap
@@ -2763,6 +2724,7 @@ end function diag_ustar
 
 #include "clubb_gather_host_fields.inc"
 #include "clubb_setup_zgrid_1col.inc"
+#include "advance_clubb_core_api_eam.inc"
 #include "misc_clubb_intr_subs.inc"
 
 #endif

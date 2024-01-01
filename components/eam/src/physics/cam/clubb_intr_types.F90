@@ -9,6 +9,10 @@ module clubb_intr_types
   type clubb_mean_2d_t
 
    integer :: ncol
+   integer :: lchnk
+
+   real(r8), pointer, dimension(:)   :: lat          ! latitude  [rad]
+   real(r8), pointer, dimension(:)   :: lon          ! longitude [rad]
 
    real(r8), pointer, dimension(:,:) :: um       ! mean east-west wind                          [m/s]
    real(r8), pointer, dimension(:,:) :: vm       ! mean north-south wind                        [m/s]
@@ -25,8 +29,6 @@ module clubb_intr_types
    real(r8), pointer, dimension(:,:) :: zi           ! geopotential height at layer interface       [m]
    real(r8), pointer, dimension(:,:) :: zm           ! geopotential height at layer midpoint        [m]
    real(r8), pointer, dimension(:,:) :: omega        ! vertical velocity in pressure coordinate [Pa/s]
-   real(r8), pointer, dimension(:)   :: lat          ! latitude  [rad]
-   real(r8), pointer, dimension(:)   :: lon          ! longitude [rad]
 
    real(r8), pointer, dimension(:,:,:) :: q          ! tracer mixing ratio  [-]
 
