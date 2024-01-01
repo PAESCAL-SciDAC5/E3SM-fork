@@ -1,16 +1,28 @@
 
       zi_out(i,1) = 0._r8
 
+      !======================================
+      ! Prepare input to advance_clubb_core
+      !======================================
+      ! Allocate memory for derived-type variables
+
       call clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, pverp, edsclr_dim )
 
-      !============================================
-      ! Prepare input to advance_clubb_core
-      !============================================
-      call map_1column_of_info_from_host_to_clubb( i, host_mean, host_mnts, c2h,               &! in
-                                                   pver, pverp, edsclr_dim, lq, ixq, ixcldliq, ixcldice, &! in
-                                                   macmic_it, clubb_do_adv, do_expldiff,       &! in
-                                                   core_auxil, core_prog, core_diag,           &! inout
-                                                   core_forcing, core_sfc, clubb_misc, dz_g, varmu(i)   )! inout
+      ! Associate pointers for CLUBB's PDF parameters
+
+      pdf_params    => pdf_params_chnk(i,lchnk)
+      pdf_params_zm => pdf_params_zm_chnk(i,lchnk)
+
+      ! Now fill those data structures with values
+
+      call map_1column_of_info_from_host_to_clubb( i, host_mean, host_mnts, c2h,         &! in
+                                                   pver, pverp, edsclr_dim, lq,          &! in
+                                                   ixq, ixcldliq, ixcldice,              &! in
+                                                   macmic_it, clubb_do_adv, do_expldiff, &! in
+                                                   core_auxil, core_prog, core_diag,     &! inout
+                                                   core_forcing, core_sfc, clubb_misc,   &! inout
+                                                   pdf_params_zm,                        &! inout
+                                                   dz_g, varmu(i)                        )! out
 
 #include "more_info_to_clubb.inc"
 
@@ -32,13 +44,6 @@
 #include "clubb_timestep_init_forcing_and_sfc.inc"
 
 #include "advance_clubb_core_api_eam.inc"
-
-         !============================================
-         pdf_zm_w_1_inout        = pdf_params_zm%w_1
-         pdf_zm_w_2_inout        = pdf_params_zm%w_2
-         pdf_zm_varnce_w_1_inout = pdf_params_zm%varnce_w_1
-         pdf_zm_varnce_w_2_inout = pdf_params_zm%varnce_w_2
-         pdf_zm_mixt_frac_inout  = pdf_params_zm%mixt_frac
 
          !------------------------------------------------------------
          ! Consider impact of rain evaporation on turbulent moments 

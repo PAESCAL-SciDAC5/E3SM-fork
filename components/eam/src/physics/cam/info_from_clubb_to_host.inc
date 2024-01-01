@@ -84,16 +84,21 @@
           qclvar(i,k)   = real( min( 1._core_rknd, core_diag%qclvar(pverp-k+1) ), kind=r8 )
 
           sclrpthvp(i,k,:)  = real(sclrpthvp_inout(pverp-k+1,:), kind = r8)
-
-          c2h%pdf_zm_w_1(i,k)        = pdf_zm_w_1_inout(pverp-k+1)
-          c2h%pdf_zm_w_2(i,k)        = pdf_zm_w_2_inout(pverp-k+1)
-          c2h%pdf_zm_varnce_w_1(i,k) = pdf_zm_varnce_w_1_inout(pverp-k+1)
-          c2h%pdf_zm_varnce_w_2(i,k) = pdf_zm_varnce_w_2_inout(pverp-k+1)
-          c2h%pdf_zm_mixt_frac(i,k)  = pdf_zm_mixt_frac_inout(pverp-k+1)
-
       enddo
+
 
       edsclr_out(i,:,1:edsclr_dim)     = 0._r8
       do k=1,pverp
          edsclr_out(i,k,1:edsclr_dim) = real( core_prog%edsclr(pverp-k+1,1:edsclr_dim), kind = r8 )
+      enddo
+
+      !----------------------------------------------
+      ! PDF parameters: save to pbuf for BFB restart
+      !----------------------------------------------
+      do k=1,pverp
+          c2h%pdf_zm_w_1       (i,k) = pdf_params_zm%w_1       (pverp-k+1)
+          c2h%pdf_zm_w_2       (i,k) = pdf_params_zm%w_2       (pverp-k+1)
+          c2h%pdf_zm_varnce_w_1(i,k) = pdf_params_zm%varnce_w_1(pverp-k+1)
+          c2h%pdf_zm_varnce_w_2(i,k) = pdf_params_zm%varnce_w_2(pverp-k+1)
+          c2h%pdf_zm_mixt_frac (i,k) = pdf_params_zm%mixt_frac (pverp-k+1)
       enddo

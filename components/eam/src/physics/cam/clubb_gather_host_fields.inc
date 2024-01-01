@@ -198,24 +198,25 @@
 
   !===============================================================================
   !===============================================================================
-  subroutine setup_clubb_to_host_fields( pbuf, c2h )
+  subroutine setup_clubb_to_host_fields( pbuf, c2h, itim_old )
 
    use physics_buffer,  only: physics_buffer_desc, pbuf_get_field
    use clubb_intr_types,only: clubb_to_host_t
 
    type(physics_buffer_desc), pointer :: pbuf(:)
    type(clubb_to_host_t)              :: c2h
+   integer,intent(in)                 :: itim_old
 
    call pbuf_get_field( pbuf, kvm_idx, c2h%khzt )
    call pbuf_get_field( pbuf, kvh_idx, c2h%khzm )
 
-   call pbuf_get_field( pbuf, cloud_frac_idx,        c2h% cloud_frac )
+   call pbuf_get_field( pbuf, cloud_frac_idx,        c2h% cloud_frac       , start=(/1,1,itim_old/), kount=(/pcols,pverp,1/) )
 
-   call pbuf_get_field( pbuf, pdf_zm_w_1_idx,        c2h% pdf_zm_w_1 )
-   call pbuf_get_field( pbuf, pdf_zm_w_2_idx,        c2h% pdf_zm_w_2 )
-   call pbuf_get_field( pbuf, pdf_zm_varnce_w_1_idx, c2h% pdf_zm_varnce_w_1 )
-   call pbuf_get_field( pbuf, pdf_zm_varnce_w_2_idx, c2h% pdf_zm_varnce_w_2 )
-   call pbuf_get_field( pbuf, pdf_zm_mixt_frac_idx,  c2h% pdf_zm_mixt_frac  )
+   call pbuf_get_field( pbuf, pdf_zm_w_1_idx,        c2h% pdf_zm_w_1       , start=(/1,1,itim_old/), kount=(/pcols,pverp,1/) )
+   call pbuf_get_field( pbuf, pdf_zm_w_2_idx,        c2h% pdf_zm_w_2       , start=(/1,1,itim_old/), kount=(/pcols,pverp,1/) )
+   call pbuf_get_field( pbuf, pdf_zm_varnce_w_1_idx, c2h% pdf_zm_varnce_w_1, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/) )
+   call pbuf_get_field( pbuf, pdf_zm_varnce_w_2_idx, c2h% pdf_zm_varnce_w_2, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/) )
+   call pbuf_get_field( pbuf, pdf_zm_mixt_frac_idx,  c2h% pdf_zm_mixt_frac , start=(/1,1,itim_old/), kount=(/pcols,pverp,1/) )
 
   end subroutine setup_clubb_to_host_fields
 
@@ -226,16 +227,22 @@
                                                      pver, pverp, edsclr_dim, lq,ixq, ixcldliq, ixcldice, &
                                                      macmic_it, clubb_do_adv, do_expldiff,      &
                                                      core_auxil, core_prog, core_diag,          &
-                                                     core_forcing, core_sfc, clubb_misc, dz_g, varmu  )
+                                                     core_forcing, core_sfc, clubb_misc,        &
+                                                     pdf_params_zm, dz_g, varmu  )
 
     use shr_kind_mod,     only: r8=>shr_kind_r8
     use clubb_precision,  only: core_rknd
-    use clubb_intr_types, only: clubb_mean_2d_t, clubb_mnts_2d_t, clubb_to_host_t
+
+    use clubb_intr_types,      only: clubb_mean_2d_t, clubb_mnts_2d_t, clubb_to_host_t
     use clubb_intr_core_types, only: core_auxil_t, core_prog_t, core_diag_t
     use clubb_intr_core_types, only: core_forcing_t, core_sfc_t, clubb_misc_t
     use clubb_api_module,      only: zt2zm_api
 
     use physconst,        only: gravit
+
+    use time_manager,     only: is_first_restart_step
+    use model_flags,      only: ipdf_call_placement
+    use advance_clubb_core_module, only: ipdf_post_advance_fields
       
     type(clubb_mean_2d_t),intent(in) :: host_mean
     type(clubb_mnts_2d_t),intent(in) :: host_mnts
@@ -256,6 +263,7 @@
     type(core_forcing_t),intent(inout) :: core_forcing
     type(core_sfc_t    ),intent(inout) :: core_sfc
     type(clubb_misc_t  ),intent(inout) :: clubb_misc
+    type(pdf_parameter), pointer :: pdf_params_zm ! PDF parameters on momentum levs. [units vary]
 
     real(r8),intent(out) :: dz_g(:)
     real(r8),intent(out) :: varmu
@@ -413,6 +421,23 @@
           enddo
         endif
       endif
+
+      !---------------------------------------------------------------------------------------------
+      ! In a restart run, assign values read back from restart file to PDF parameters on zm levels.
+      ! This is necessary when ipdf_call_placement = 2.
+      ! Note the vertical indices need to be flipped.
+      !---------------------------------------------------------------------------------------------
+      if ( is_first_restart_step() .and. ipdf_call_placement .eq. ipdf_post_advance_fields ) then
+
+         do k=1,pverp
+            pdf_params_zm% w_1       (k) = c2h% pdf_zm_w_1       (i,pverp-k+1)
+            pdf_params_zm% w_2       (k) = c2h% pdf_zm_w_2       (i,pverp-k+1)
+            pdf_params_zm% varnce_w_1(k) = c2h% pdf_zm_varnce_w_1(i,pverp-k+1)
+            pdf_params_zm% varnce_w_2(k) = c2h% pdf_zm_varnce_w_2(i,pverp-k+1)
+            pdf_params_zm% mixt_frac (k) = c2h% pdf_zm_mixt_frac (i,pverp-k+1)
+         enddo
+
+      end if
 
       !------------------------
       ! Cloud ice mixing ratio

@@ -1090,7 +1090,7 @@ end subroutine clubb_init_cnst
   !use co2_cycle,      only: co2_cycle_set_cnst_type
    use camsrfexch,     only: cam_in_t
    use ref_pres,       only: top_lev => trop_cloud_top_lev
-   use time_manager,   only: is_first_step, is_first_restart_step, get_nstep
+   use time_manager,   only: is_first_step, get_nstep
    use cam_abortutils, only: endrun
    use wv_saturation,  only: qsat
    use micro_mg_cam,   only: micro_mg_version
@@ -1125,8 +1125,7 @@ end subroutine clubb_init_cnst
         stats_begin_timestep_api, &
         advance_clubb_core_api, &
         zt2zm_api, zm2zt_api
-   use model_flags, only: ipdf_call_placement
-   use advance_clubb_core_module, only: ipdf_post_advance_fields
+
    use clubb_intr_types
    use clubb_intr_core_types, only: core_auxil_t, core_prog_t, core_diag_t, core_forcing_t, core_sfc_t, clubb_misc_t
    use clubb_intr_core_types, only: clubb_core_fld_alloc, clubb_core_fld_dealloc
@@ -1273,12 +1272,6 @@ end subroutine clubb_init_cnst
    real(r8) :: zt_out(pcols,pverp)              ! output for the thermo CLUBB grid              [m]
    real(r8) :: zi_out(pcols,pverp)              ! output for momentum CLUBB grid                [m]
 
-   real(r8) :: pdf_zm_w_1_inout(pverp)          ! work array for pdf_params_zm%w_1
-   real(r8) :: pdf_zm_w_2_inout(pverp)          ! work array for pdf_params_zm%w_2
-   real(r8) :: pdf_zm_varnce_w_1_inout(pverp)   ! work array for pdf_params_zm%varnce_w_1
-   real(r8) :: pdf_zm_varnce_w_2_inout(pverp)   ! work array for pdf_params_zm%varnce_w_2
-   real(r8) :: pdf_zm_mixt_frac_inout(pverp)    ! work array for pdf_params_zm%mixt_frac
-
    ! Variables below are needed to compute energy integrals for conservation
    real(r8) :: te_b
    real(r8) :: clubb_s(pver)
@@ -1341,12 +1334,6 @@ end subroutine clubb_init_cnst
   !real(r8), pointer, dimension(:,:) :: wp2thvp    ! < w'^2 th_v' > (thermodynamic levels)        [m^2/s^2 K]
   !real(r8), pointer, dimension(:,:) :: rtpthvp    ! < r_t'th_v' > (momentum levels)              [kg/kg K]
   !real(r8), pointer, dimension(:,:) :: thlpthvp   ! < th_l'th_v' > (momentum levels)             [K^2]
-
-   real(r8), pointer, dimension(:,:) :: pdf_zm_w_1(:,:)        !work pointer for pdf_params_zm
-   real(r8), pointer, dimension(:,:) :: pdf_zm_w_2(:,:)        !work pointer for pdf_params_zm
-   real(r8), pointer, dimension(:,:) :: pdf_zm_varnce_w_1(:,:) !work pointer for pdf_params_zm
-   real(r8), pointer, dimension(:,:) :: pdf_zm_varnce_w_2(:,:) !work pointer for pdf_params_zm
-   real(r8), pointer, dimension(:,:) :: pdf_zm_mixt_frac(:,:)  !work pointer for pdf_params_zm
 
   !real(r8), pointer, dimension(:,:) :: upwp     ! east-west momentum flux                      [m^2/s^2]
   !real(r8), pointer, dimension(:,:) :: vpwp     ! north-south momentum flux                    [m^2/s^2]

@@ -10,7 +10,7 @@
    call gather_host_fields( cld_macmic_num_steps, macmic_it, itim_old, state1, &! in
                             pbuf, host_mean, host_mnts, apply_const            )! inout, out
 
-   call setup_clubb_to_host_fields( pbuf, c2h )
+   call setup_clubb_to_host_fields( pbuf, c2h, itim_old )
 
 #include "clubb_misc_inout_fields.inc"
 
