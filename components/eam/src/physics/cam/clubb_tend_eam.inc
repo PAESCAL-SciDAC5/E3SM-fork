@@ -166,29 +166,39 @@
       !---------------------------------------------------------------------------------------------------------
       call column_total_energy_fixer( te_b, host_mean%thlm, host_mean%rtm, host_mean%rcm, host_mean%exner_clubb, &! in
                                       host_mean%um, host_mean%vm, host_mnts%wp2, state1, i,                      &! in
-                                      clubb_s                                     )! out
-#include "clubb_ptend_cal.inc"
+                                      clubb_s(i,:)                                                               )! out
 
    enddo  ! end column loop
    call t_stopf('adv_clubb_core_col_loop')
 
-   deallocate( host_mean%exner_clubb )
-   ! ------------------------------------------------------------ !
-   ! Add constant to ghost point so that output is not corrupted
-   ! (Note that this is only done to k = pverp.)
-   ! ------------------------------------------------------------ !
-   if (clubb_do_adv) then
-      if (macmic_it .eq. cld_macmic_num_steps) then
-         host_mnts%     wp3(:,pverp) = host_mnts%     wp3(:,pverp) +     wp3_const
-         host_mnts% rtpthlp(:,pverp) = host_mnts% rtpthlp(:,pverp) + rtpthlp_const
-         host_mnts%  wpthlp(:,pverp) = host_mnts%  wpthlp(:,pverp) +  wpthlp_const
-         host_mnts%   wprtp(:,pverp) = host_mnts%   wprtp(:,pverp) +   wprtp_const
-      endif
-   endif
+   !-------------------------------------------------------------
+   ! Calculate ptend for CLUBB
+   !-------------------------------------------------------------
+   call derive_ptend( host_mean, host_mnts, state1, clubb_s, edsclr_out, hdtime,    &! in
+                      ixq, ixcldliq, clubb_do_adv, macmic_it, cld_macmic_num_steps, &! in
+                      ptend_loc )! inout
 
-   !============================
-   ! Linearization of PBL winds
-   !============================
+   deallocate( host_mean%exner_clubb )
+
+   !===================
+   ! History output
+   !===================
+   call outfld( 'RVMTEND_CLUBB', ptend_loc%q(:,:,ixq), pcols, lchnk)
+   call outfld( 'RCMTEND_CLUBB', ptend_loc%q(:,:,ixcldliq), pcols, lchnk)
+   call outfld( 'RIMTEND_CLUBB', ptend_loc%q(:,:,ixcldice), pcols, lchnk)
+   call outfld( 'TTEND_CLUBB',   ptend_loc%s/cpair,pcols, lchnk)
+   call outfld( 'UTEND_CLUBB',   ptend_loc%u,pcols, lchnk)
+   call outfld( 'VTEND_CLUBB',   ptend_loc%v,pcols, lchnk)
+
+   call pbuf_get_field(pbuf, cmeliq_idx,  cmeliq)
+   cmeliq(:,:) = ptend_loc%q(:,:,ixcldliq)
+   call outfld( 'CMELIQ',        cmeliq, pcols, lchnk)
+
+   if (clubb_do_deep) call outfld( 'MU_CLUBB',      varmu      ,pcols, lchnk)
+
+   ! Linearization of PBL winds: diagnose wsresp and tau_est for history output.
+   ! The outfld calls are in cam_diagnostics.F90
+
    if (linearize_pbl_winds .and. macmic_it == cld_macmic_num_steps) then
       do i = 1, ncol
          wsresp(i) = sfc_v_diff_tau(i) / pert_tau
@@ -202,25 +212,5 @@
       end do
    end if
 
-   !=========
-   ! Output
-   !=========
 #include "clubb_stats_output.inc"
 
-   ! ------------------------------------------------- !
-   ! End column computation of CLUBB, begin to apply   !
-   ! and compute output, etc                           !
-   ! ------------------------------------------------- !
-   !  Output CLUBB tendencies
-   call outfld( 'RVMTEND_CLUBB', ptend_loc%q(:,:,ixq), pcols, lchnk)
-   call outfld( 'RCMTEND_CLUBB', ptend_loc%q(:,:,ixcldliq), pcols, lchnk)
-   call outfld( 'RIMTEND_CLUBB', ptend_loc%q(:,:,ixcldice), pcols, lchnk)
-   call outfld( 'TTEND_CLUBB',   ptend_loc%s/cpair,pcols, lchnk)
-   call outfld( 'UTEND_CLUBB',   ptend_loc%u,pcols, lchnk)
-   call outfld( 'VTEND_CLUBB',   ptend_loc%v,pcols, lchnk)
-
-   call pbuf_get_field(pbuf, cmeliq_idx,  cmeliq)
-   cmeliq(:,:) = ptend_loc%q(:,:,ixcldliq)
-   call outfld( 'CMELIQ',        cmeliq, pcols, lchnk)
-
-   if (clubb_do_deep) call outfld( 'MU_CLUBB',      varmu      ,pcols, lchnk)

@@ -1233,7 +1233,7 @@ end subroutine clubb_init_cnst
 
    ! Variables below are needed to compute energy integrals for conservation
    real(r8) :: te_b
-   real(r8) :: clubb_s(pver)
+   real(r8) :: clubb_s(pcols,pver)
 
   !real(r8) :: exner_clubb(pcols,pverp)         ! Exner function consistent with CLUBB          [-]
 
@@ -2720,6 +2720,7 @@ end function diag_ustar
 
 #include "clubb_gather_host_fields.inc"
 #include "clubb_forcing_and_sfc.inc"
+#include "clubb_ptend_cal.inc"
 
 #include "clubb_setup_zgrid_1col.inc"
 #include "advance_clubb_core_api_eam.inc"
