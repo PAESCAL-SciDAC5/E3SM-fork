@@ -540,3 +540,133 @@
     varmu2  = real( varmu, kind=core_rknd )
 
   end subroutine varmu_cal
+
+  !==============================================
+  subroutine map_1column_of_info_from_clubb_to_host( i, pverp, nz, edsclr_dim, macmic_it, cld_macmic_num_steps, clubb_do_adv, &
+                                                     core_prog, core_diag, pdf_params_zm, &
+                                                     host_mean, host_mnts, c2h, edsclr_out, &
+                                                     wprcp, rcm_in_layer, cloud_cover, qclvar  )
+
+    use shr_kind_mod,     only: r8=>shr_kind_r8
+    use clubb_precision,  only: core_rknd
+
+    use clubb_intr_types,      only: clubb_mean_2d_t, clubb_mnts_2d_t, clubb_to_host_t
+    use clubb_intr_core_types, only: core_prog_t, core_diag_t
+    use clubb_api_module,      only: zm2zt_api
+
+    integer, intent(in) :: i       ! column index 
+    integer, intent(in) :: pverp   ! number of vertical levels in column in the host model
+    integer, intent(in) :: nz      ! number of vertical levels in column in CLUBB 
+    integer, intent(in) :: edsclr_dim 
+    integer, intent(in) :: macmic_it, cld_macmic_num_steps
+    logical, intent(in) :: clubb_do_adv
+
+    type(core_prog_t   ),intent(inout) :: core_prog
+    type(core_diag_t   ),intent(in)    :: core_diag
+    type(pdf_parameter), pointer       :: pdf_params_zm ! PDF parameters on momentum levs. [units vary]
+
+    type(clubb_mean_2d_t),intent(inout) :: host_mean
+    type(clubb_mnts_2d_t),intent(inout) :: host_mnts
+    type(clubb_to_host_t),intent(inout) :: c2h
+
+    real(r8),intent(inout) ::   edsclr_out(:,:,:)
+    real(r8),intent(inout) ::        wprcp(:,:)
+    real(r8),intent(inout) :: rcm_in_layer(:,:)
+    real(r8),intent(inout) ::  cloud_cover(:,:)
+    real(r8),intent(inout) ::       qclvar(:,:)
+
+    integer :: k
+
+    if (pverp/=nz) call endrun('pverp/=nz not supported by current code')
+
+    !-----------------------------------------------------------------------------------------
+    ! If CLUBB's momenmts are advected by the host model, interpolate from zm to zt levels.
+    ! Note that this is done on Fortran arrays that use CLUBB's internal indexing.
+    ! This block of code needs to be placed here before the core_prog% variables are
+    ! mapped to host model data structure blow. 
+    !-----------------------------------------------------------------------------------------
+    if (clubb_do_adv) then
+       if (macmic_it .eq. cld_macmic_num_steps) then
+          core_prog%wp2     = zm2zt_api( core_prog%wp2     )
+          core_prog%wpthlp  = zm2zt_api( core_prog%wpthlp  )
+          core_prog%wprtp   = zm2zt_api( core_prog%wprtp   )
+          core_prog%up2     = zm2zt_api( core_prog%up2     )
+          core_prog%vp2     = zm2zt_api( core_prog%vp2     )
+          core_prog%thlp2   = zm2zt_api( core_prog%thlp2   )
+          core_prog%rtp2    = zm2zt_api( core_prog%rtp2    )
+          core_prog%rtpthlp = zm2zt_api( core_prog%rtpthlp )
+
+          do k=1,pverp
+             core_prog%thlp2(k) = max( thl_tol**2,core_prog%thlp2(k) )
+             core_prog%rtp2 (k) = max( rt_tol**2, core_prog%rtp2 (k) )
+             core_prog%wp2  (k) = max( w_tol_sqd, core_prog%wp2  (k) )
+             core_prog%up2  (k) = max( w_tol_sqd, core_prog%up2  (k) )
+             core_prog%vp2  (k) = max( w_tol_sqd, core_prog%vp2  (k) )
+          enddo
+       endif
+    endif
+
+    !--------------------------------------------------------------------
+    ! Map information from CLUBB's arrays to host model's data structures. 
+    ! The vertical coordinate needs to be "flipped". 
+    !--------------------------------------------------------------------
+    do k=1,pverp
+
+        host_mean% um(i,k)   = real( core_prog%um(pverp-k+1), kind=r8 )
+        host_mean% vm(i,k)   = real( core_prog%vm(pverp-k+1), kind=r8 )
+
+        host_mean% thlm(i,k) = real( core_prog%thlm(pverp-k+1), kind=r8 )
+        host_mean% rtm (i,k) = real( core_prog% rtm(pverp-k+1), kind=r8 )
+        host_mean% rcm (i,k) = real( core_diag% rcm(pverp-k+1), kind=r8 )
+
+        host_mnts% upwp(i,k)     = real(core_prog%upwp(pverp-k+1), kind = r8)
+        host_mnts% vpwp(i,k)     = real(core_prog%vpwp(pverp-k+1), kind = r8)
+
+        host_mnts% wpthvp(i,k)   = real( core_diag%wpthvp  (pverp-k+1), kind = r8)
+        host_mnts% wp2thvp(i,k)  = real( core_diag%wp2thvp (pverp-k+1), kind = r8)
+        host_mnts% rtpthvp(i,k)  = real( core_diag%rtpthvp (pverp-k+1), kind = r8)
+        host_mnts% thlpthvp(i,k) = real( core_diag%thlpthvp(pverp-k+1), kind = r8)
+
+        host_mnts% up2(i,k)      = real(core_prog%up2(pverp-k+1), kind = r8)
+        host_mnts% vp2(i,k)      = real(core_prog%vp2(pverp-k+1), kind = r8)
+        host_mnts% wp2(i,k)      = real(core_prog%wp2(pverp-k+1), kind = r8)
+        host_mnts% wp3(i,k)      = real(core_prog%wp3(pverp-k+1), kind = r8)
+
+        host_mnts% rtp2(i,k)     = real( core_prog%rtp2   (pverp-k+1), kind = r8)
+        host_mnts% thlp2(i,k)    = real( core_prog%thlp2  (pverp-k+1), kind = r8)
+        host_mnts% wprtp(i,k)    = real( core_prog%wprtp  (pverp-k+1), kind = r8)
+        host_mnts% wpthlp(i,k)   = real( core_prog%wpthlp (pverp-k+1), kind = r8)
+        host_mnts% rtpthlp(i,k)  = real( core_prog%rtpthlp(pverp-k+1), kind = r8)
+
+
+        c2h%cloud_frac(i,k)   = min(real(core_diag%cloud_frac(pverp-k+1), kind = r8),1._r8)
+        c2h%khzm(i,k)     = real( core_diag%khzm(pverp-k+1), kind=r8 )
+        c2h%khzt(i,k)     = real( core_diag%khzt(pverp-k+1), kind=r8 )
+
+               wprcp(i,k) = real( core_diag%wprcp(pverp-k+1), kind = r8)
+        rcm_in_layer(i,k) = real( core_diag%rcm_in_layer(pverp-k+1), kind = r8)
+         cloud_cover(i,k) = min(real(core_diag%cloud_cover(pverp-k+1), kind = r8),1._r8)
+              qclvar(i,k) = real( min( 1._core_rknd, core_diag%qclvar(pverp-k+1) ), kind=r8 )
+
+       !sclrpthvp(i,k,:)  = real(sclrpthvp_inout(pverp-k+1,:), kind = r8)
+
+    enddo
+
+    edsclr_out(i,:,1:edsclr_dim)     = 0._r8
+    do k=1,pverp
+       edsclr_out(i,k,1:edsclr_dim) = real( core_prog%edsclr(pverp-k+1,1:edsclr_dim), kind = r8 )
+    enddo
+
+    !---------------------------------------------------------
+    ! PDF parameters: flip and save to pbuf for BFB restart
+    !---------------------------------------------------------
+    do k=1,pverp
+        c2h%pdf_zm_w_1       (i,k) = pdf_params_zm%w_1       (pverp-k+1)
+        c2h%pdf_zm_w_2       (i,k) = pdf_params_zm%w_2       (pverp-k+1)
+        c2h%pdf_zm_varnce_w_1(i,k) = pdf_params_zm%varnce_w_1(pverp-k+1)
+        c2h%pdf_zm_varnce_w_2(i,k) = pdf_params_zm%varnce_w_2(pverp-k+1)
+        c2h%pdf_zm_mixt_frac (i,k) = pdf_params_zm%mixt_frac (pverp-k+1)
+    enddo
+    !----
+
+  end subroutine map_1column_of_info_from_clubb_to_host

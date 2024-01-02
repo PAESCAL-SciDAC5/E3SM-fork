@@ -156,6 +156,14 @@
       ! End of CLUBB's time-stepping sub-cycles
       !**************************************************************************************
 
+      !---------------------------------------------------------------------------------------------------------
+      !---------------------------------------------------------------------------------------------------------
+      call map_1column_of_info_from_clubb_to_host( i, pverp, nz, edsclr_dim,                      &! in
+                                                   macmic_it, cld_macmic_num_steps, clubb_do_adv, &! in
+                                                   core_prog, core_diag, pdf_params_zm,           &! inout
+                                                   host_mean, host_mnts, c2h, edsclr_out,         &! inout
+                                                   wprcp, rcm_in_layer, cloud_cover, qclvar       )! inout
+
 #include "info_from_clubb_to_host.inc"
 
       ! Clean up
