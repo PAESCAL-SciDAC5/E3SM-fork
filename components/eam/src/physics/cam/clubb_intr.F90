@@ -1203,7 +1203,6 @@ end subroutine clubb_init_cnst
 
    real(core_rknd) :: C_10                             ! transfer coefficient                          [-]
 
-   real(core_rknd) :: dum_core_rknd                    ! dummy variable  [units vary]
    real(core_rknd) :: hdtime_core_rknd                 ! host model's cloud macmic timestep in core_rknd
 
    real(core_rknd), pointer :: upwp_sfc_pert    ! u'w' at surface                               [m^2/s^2]
@@ -1218,15 +1217,11 @@ end subroutine clubb_init_cnst
 
    real(r8) :: apply_const
    real(r8) :: newfice(pcols,pver)              ! fraction of ice in cloud at CLUBB start       [-]
-   real(r8) :: bflx22                           ! Variable for buoyancy flux for pbl            [K m/s]
    real(r8) :: invrs_hdtime                     ! Preculate 1/hdtime to reduce divide operations
 
   !real(r8) :: invrs_gravit                     ! Preculate 1/gravit to reduce divide operations
 
-   real(r8) :: ubar                             ! surface wind                                  [m/s]
-   real(r8) :: ustar                            ! surface stress                                [m/s]
    real(r8) :: z0                               ! roughness height                              [m]
-   real(r8) :: zo                               ! roughness height                              [m]
    real(r8) :: dz_g(pver)                       ! thickness of layer                            [m]
    real(r8) :: minqn                            ! minimum total cloud liquid + ice threshold    [kg/kg]
    real(r8) :: tempqn                           ! temporary total cloud liquid + ice            [kg/kg]
@@ -1259,6 +1254,7 @@ end subroutine clubb_init_cnst
    real(r8) :: wprcp(pcols,pverp)               ! CLUBB liquid water flux                       [m/s kg/kg]
    real(r8) :: wpthvp_diag(pcols,pverp)              ! CLUBB buoyancy flux                           [W/m^2]
    real(r8) :: eps                              ! Rv/Rd                                         [-]
+
    real(r8) :: dum1                             ! dummy variable                                [units vary]
 
    integer :: kkhost
@@ -2723,6 +2719,8 @@ end function diag_ustar
  end subroutine column_total_energy_fixer
 
 #include "clubb_gather_host_fields.inc"
+#include "clubb_forcing_and_sfc.inc"
+
 #include "clubb_setup_zgrid_1col.inc"
 #include "advance_clubb_core_api_eam.inc"
 #include "misc_clubb_intr_subs.inc"

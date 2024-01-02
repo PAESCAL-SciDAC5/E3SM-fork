@@ -3,11 +3,12 @@
   !
   !===============================================================================
   subroutine gather_host_fields( cld_macmic_num_steps, macmic_it, itim_old,      &
-                                 state1, pbuf, host_mean, host_mnts, apply_const )
+                                 state1, pbuf, cam_in, host_mean, host_mnts, apply_const )
 
    use constituents,    only: cnst_get_ind
    use physics_types,   only: physics_state
    use physics_buffer,  only: physics_buffer_desc, pbuf_get_field
+   use camsrfexch,      only: cam_in_t
    use clubb_intr_types,only: clubb_mean_2d_t, clubb_mnts_2d_t
 
    use constituents,    only: pcnst, cnst_type
@@ -21,6 +22,7 @@
    
    type(physics_state),target,intent(inout) :: state1
    type(physics_buffer_desc), pointer       :: pbuf(:)
+   type(cam_in_t),target,intent(in)         :: cam_in
    type(clubb_mean_2d_t)                 :: host_mean
    type(clubb_mnts_2d_t)                 :: host_mnts
    real(r8),intent(out)                  :: apply_const
@@ -37,6 +39,15 @@
 
    host_mean%lat   => state1%lat
    host_mean%lon   => state1%lon
+
+   !==========================================================
+   ! Quantities passed from the coupler
+   !==========================================================
+   host_mean%shf  => cam_in%shf
+   host_mean%cflx => cam_in%cflx
+   host_mean%wsx  => cam_in%wsx
+   host_mean%wsy  => cam_in%wsy
+   host_mean%landfrac => cam_in%landfrac
 
    !===================================================================================================
    !  At each CLUBB call, initialize mean momentum and thermo CLUBB state from the host model's state

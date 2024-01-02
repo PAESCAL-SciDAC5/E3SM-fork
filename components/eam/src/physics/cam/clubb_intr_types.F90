@@ -35,6 +35,12 @@ module clubb_intr_types
    real(r8), pointer, dimension(:,:) :: qrl
    real(r8), pointer, dimension(:,:) :: prer_evap 
 
+   real(r8), pointer, dimension(:,:) :: cflx
+   real(r8), pointer, dimension(:)   :: shf
+   real(r8), pointer, dimension(:)   :: wsx
+   real(r8), pointer, dimension(:)   :: wsy
+   real(r8), pointer, dimension(:)   :: landfrac
+
   end type clubb_mean_2d_t
 
   type clubb_mnts_2d_t

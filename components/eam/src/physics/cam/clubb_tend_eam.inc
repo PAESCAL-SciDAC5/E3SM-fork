@@ -8,7 +8,7 @@
    ! Load input (initial and boundary conditions) from host model's data structures
    !-------------------------------------------------------------
    call gather_host_fields( cld_macmic_num_steps, macmic_it, itim_old, state1, &! in
-                            pbuf, host_mean, host_mnts, apply_const            )! inout, out
+                            pbuf, cam_in, host_mean, host_mnts, apply_const    )! inout, out
 
    call setup_clubb_to_host_fields( pbuf, c2h, itim_old )
 
@@ -88,7 +88,17 @@
             call stats_begin_timestep_api(time_elapsed, 1, 1)
          endif
 
-#include "clubb_timestep_init_forcing_and_sfc.inc"
+         !--------------------------------------
+         ! Set forcing terms and surface values
+         !--------------------------------------
+         call set_clubb_forcing_and_sfc( i, pverp, nz, host_mean, core_auxil, &! in
+                                         do_tms, ksrftms,                     &! in
+                                         core_forcing, core_sfc, fcoriolis    )! inout or out
+
+         if (single_column) call set_clubb_sfc_for_scm( scm_clubb_iop_name, &! in
+                                                        i, pver, host_mean, &! in
+                                                        zt_bot, theta0,     &! in
+                                                        core_sfc            )! inout
 
          !--------------------------------------
          ! Advance CLUBB CORE for one timestep
