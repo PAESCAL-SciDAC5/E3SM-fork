@@ -1120,7 +1120,7 @@ end subroutine clubb_init_cnst
         stats_begin_timestep_api, &
         zt2zm_api, zm2zt_api
 
-   use clubb_intr_types
+   use clubb_intr_host_types
    use clubb_intr_core_types, only: core_auxil_t, core_prog_t, core_diag_t, core_forcing_t, core_sfc_t, clubb_misc_t
    use clubb_intr_core_types, only: clubb_core_fld_alloc, clubb_core_fld_dealloc
 #endif

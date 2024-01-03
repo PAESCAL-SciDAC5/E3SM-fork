@@ -4,7 +4,7 @@
                                         core_forcing, core_sfc, fcoriolis       )! inout or out
 
     use physconst,       only: cpair
-    use clubb_intr_types,only: clubb_mean_2d_t
+    use clubb_intr_host_types, only: clubb_mean_2d_t
     use clubb_intr_core_types, only: core_auxil_t, core_forcing_t, core_sfc_t
 
     integer,intent(in) :: icol
@@ -92,7 +92,7 @@
   subroutine set_clubb_sfc_for_scm( scm_clubb_iop_name, icol, pver, host_mean, zt_bot, theta0, core_sfc )
  
     use physconst,             only: gravit 
-    use clubb_intr_types,      only: clubb_mean_2d_t
+    use clubb_intr_host_types, only: clubb_mean_2d_t
     use clubb_intr_core_types, only: core_sfc_t
 
     character(len=*),     intent(in)    :: scm_clubb_iop_name 

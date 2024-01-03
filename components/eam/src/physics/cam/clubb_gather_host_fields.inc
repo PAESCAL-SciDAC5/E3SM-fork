@@ -9,7 +9,8 @@
    use physics_types,   only: physics_state
    use physics_buffer,  only: physics_buffer_desc, pbuf_get_field
    use camsrfexch,      only: cam_in_t
-   use clubb_intr_types,only: clubb_mean_2d_t, clubb_mnts_2d_t
+
+   use clubb_intr_host_types,only: clubb_mean_2d_t, clubb_mnts_2d_t
 
    use constituents,    only: pcnst, cnst_type
    use co2_cycle,       only: co2_cycle_set_cnst_type
@@ -214,7 +215,7 @@
   subroutine setup_clubb_to_host_fields( pbuf, c2h, itim_old, linearize_pbl_winds )
 
    use physics_buffer,  only: physics_buffer_desc, pbuf_get_field
-   use clubb_intr_types,only: clubb_to_host_t
+   use clubb_intr_host_types,only: clubb_to_host_t
 
    type(physics_buffer_desc), pointer :: pbuf(:)
    type(clubb_to_host_t)              :: c2h
@@ -263,7 +264,7 @@
     use shr_kind_mod,     only: r8=>shr_kind_r8
     use clubb_precision,  only: core_rknd
 
-    use clubb_intr_types,      only: clubb_mean_2d_t, clubb_mnts_2d_t, clubb_to_host_t
+    use clubb_intr_host_types, only: clubb_mean_2d_t, clubb_mnts_2d_t, clubb_to_host_t
     use clubb_intr_core_types, only: core_auxil_t, core_prog_t, core_diag_t
     use clubb_intr_core_types, only: core_forcing_t, core_sfc_t, clubb_misc_t
     use clubb_api_module,      only: zt2zm_api
@@ -615,7 +616,7 @@
     use shr_kind_mod,     only: r8=>shr_kind_r8
     use clubb_precision,  only: core_rknd
 
-    use clubb_intr_types,      only: clubb_mean_2d_t, clubb_mnts_2d_t, clubb_to_host_t
+    use clubb_intr_host_types, only: clubb_mean_2d_t, clubb_mnts_2d_t, clubb_to_host_t
     use clubb_intr_core_types, only: core_prog_t, core_diag_t, clubb_misc_t
     use clubb_api_module,      only: zm2zt_api
 

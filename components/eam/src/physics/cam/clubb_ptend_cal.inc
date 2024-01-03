@@ -3,7 +3,7 @@
                            ptend_loc )! inout
   
     use physics_types, only: physics_state, physics_ptend
-    use clubb_intr_types, only: clubb_mean_2d_t, clubb_mnts_2d_t
+    use clubb_intr_host_types, only: clubb_mean_2d_t, clubb_mnts_2d_t
 
     type(clubb_mean_2d_t),intent(in) :: host_mean
     type(clubb_mnts_2d_t),intent(in) :: host_mnts

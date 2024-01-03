@@ -1,4 +1,4 @@
-module clubb_intr_types
+module clubb_intr_host_types
 
   use shr_kind_mod, only: r8 => shr_kind_r8 
 
@@ -101,4 +101,4 @@ module clubb_intr_types
 
   end type clubb_to_host_t
 
-end module clubb_intr_types
+end module clubb_intr_host_types
