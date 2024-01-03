@@ -152,7 +152,7 @@ contains
 
   !------------------------------------------------------ 
   subroutine clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, &
-                                   pverp, ntracer, linearize_pbl_winds )
+                                   nz, ntracer, linearize_pbl_winds )
 
     type(core_auxil_t),  intent(inout) :: core_auxil
     type(core_prog_t),   intent(inout) :: core_prog
@@ -161,7 +161,7 @@ contains
     type(core_sfc_t),    intent(inout) :: core_sfc
     type(clubb_misc_t),  intent(inout) :: clubb_misc
 
-    integer,             intent(in)    :: pverp
+    integer,             intent(in)    :: nz
     integer,             intent(in)    :: ntracer
     logical,             intent(in)    :: linearize_pbl_winds
 
@@ -171,34 +171,34 @@ contains
     !--------------------------------------------------------------------
     ! Auxiliary variables describing the grid-box mean atmospheric state
     !--------------------------------------------------------------------
-    allocate( core_auxil% p_in_Pa         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_auxil% exner           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_auxil% p_in_Pa         (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_auxil% exner           (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_auxil% rho_zt          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_auxil% rho_zm          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_auxil% rho_ds_zt       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_auxil% rho_ds_zm       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_auxil% invrs_rho_ds_zm (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_auxil% invrs_rho_ds_zt (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_auxil% rho_zt          (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_auxil% rho_zm          (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_auxil% rho_ds_zt       (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_auxil% rho_ds_zm       (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_auxil% invrs_rho_ds_zm (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_auxil% invrs_rho_ds_zt (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_auxil% thv_ds_zt       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_auxil% thv_ds_zm       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_auxil% thv_ds_zt       (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_auxil% thv_ds_zm       (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_auxil% wm_zt           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_auxil% wm_zm           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_auxil% wm_zt           (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_auxil% wm_zm           (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     !------------------------------
     ! Misc.
     !------------------------------
-    allocate( clubb_misc% qrl_zt          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( clubb_misc% prer_evap       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( clubb_misc% rfrzm           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( clubb_misc% qrl_zt          (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( clubb_misc% prer_evap       (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( clubb_misc% rfrzm           (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     if (linearize_pbl_winds) then
-       allocate( clubb_misc%   um_pert    (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-       allocate( clubb_misc%   vm_pert    (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-       allocate( clubb_misc% upwp_pert    (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-       allocate( clubb_misc% vpwp_pert    (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       allocate( clubb_misc%   um_pert    (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       allocate( clubb_misc%   vm_pert    (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       allocate( clubb_misc% upwp_pert    (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       allocate( clubb_misc% vpwp_pert    (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
        allocate( clubb_misc% upwp_sfc_pert       , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
        allocate( clubb_misc% upwp_sfc_pert       , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     else
@@ -213,64 +213,64 @@ contains
     !------------------------------
     ! CLUBB's prognostic variables
     !------------------------------
-    allocate( core_prog% um              (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_prog% vm              (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% um              (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% vm              (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_prog% thlm            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_prog% rtm             (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% thlm            (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% rtm             (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_prog% up2             (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_prog% vp2             (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_prog% wp2             (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_prog% wp3             (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% up2             (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% vp2             (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% wp2             (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% wp3             (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_prog% upwp            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_prog% vpwp            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% upwp            (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% vpwp            (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_prog% rtp2            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_prog% thlp2           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_prog% wprtp           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_prog% wpthlp          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_prog% rtpthlp         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% rtp2            (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% thlp2           (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% wprtp           (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% wpthlp          (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% rtpthlp         (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_prog% edsclr  (pverp,ntracer), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_prog% edsclr  (nz,ntracer), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     !------------------------------
     ! CLUBB's diagnostic variables
     !------------------------------
-    allocate( core_diag% wp2thvp         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_diag% wpthvp          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_diag% rtpthvp         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_diag% thlpthvp        (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% wp2thvp         (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% wpthvp          (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% rtpthvp         (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% thlpthvp        (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_diag% wprcp           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_diag% thlprcp         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% wprcp           (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% thlprcp         (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_diag% khzm            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_diag% khzt            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% khzm            (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% khzt            (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_diag% rcm             (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_diag% cloud_frac      (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_diag% qclvar          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_diag% rcm_in_layer    (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_diag% cloud_cover     (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% rcm             (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% cloud_frac      (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% qclvar          (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% rcm_in_layer    (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_diag% cloud_cover     (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     !-------------------------
     ! Forcing terms
     !-------------------------
-    allocate( core_forcing% um            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_forcing% vm            (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% um            (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% vm            (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_forcing% thlm          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_forcing% rtm           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% thlm          (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% rtm           (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_forcing% rtp2          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_forcing% thlp2         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_forcing% wprtp         (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_forcing% wpthlp        (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
-    allocate( core_forcing% rtpthlp       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% rtp2          (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% thlp2         (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% wprtp         (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% wpthlp        (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% rtpthlp       (nz), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
-    allocate( core_forcing% edsclr(pverp,ntracer), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    allocate( core_forcing% edsclr(nz,ntracer), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
 
     !-------------------------
     ! Sfc values
