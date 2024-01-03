@@ -218,5 +218,6 @@
       end do
    end if
 
+#include "clubb_misc_diag_and_outfld.inc"
 #include "clubb_stats_output.inc"
 

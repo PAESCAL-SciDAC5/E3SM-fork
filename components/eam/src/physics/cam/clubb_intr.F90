@@ -1434,7 +1434,7 @@ end subroutine clubb_init_cnst
    ! the updated T after detrainment, so moving the respective lines would result in nonBFB
    ! history output (although model integration should still be BFB).
    !======================================================================================
-#include "clubb_misc_diag_and_outfld.inc"
+#include "clubb_misc_diag_and_outfld_2.inc"
 
    !===================================
    ! Diagnose various cloud fractions
