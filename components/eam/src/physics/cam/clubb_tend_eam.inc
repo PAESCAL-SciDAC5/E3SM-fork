@@ -10,14 +10,13 @@
    call gather_host_fields( cld_macmic_num_steps, macmic_it, itim_old, state1, &! in
                             pbuf, cam_in, host_mean, host_mnts, apply_const    )! inout, out
 
-   call setup_clubb_to_host_fields( pbuf, c2h, itim_old )
+   call setup_clubb_to_host_fields( pbuf, c2h, itim_old, linearize_pbl_winds )
 
-#include "clubb_misc_inout_fields.inc"
-
-   call t_startf('adv_clubb_core_col_loop')
    !----------------------------------------------------------
    !  Loop over all columns in lchnk to advance CLUBB core
    !----------------------------------------------------------
+   call t_startf('adv_clubb_core_col_loop')
+
    do i=1,ncol   ! loop over columns
 
       !-----------------------------------------------------------------
@@ -56,7 +55,8 @@
       !--------------------------------------
       ! Allocate memory for derived-type variables
 
-      call clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, nz, edsclr_dim )
+      call clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, &! inout
+                                 nz, edsclr_dim, linearize_pbl_winds )! in
 
       ! Associate pointers for CLUBB's PDF parameters
 
@@ -69,11 +69,11 @@
                                                    pverp, nz, edsclr_dim, lq,            &! in
                                                    ixq, ixcldliq, ixcldice,              &! in
                                                    macmic_it, clubb_do_adv, do_expldiff, &! in
+                                                   linearize_pbl_winds, pert_tau,        &! in
                                                    core_auxil, core_prog, core_diag,     &! inout
                                                    core_forcing, core_sfc, clubb_misc,   &! inout
                                                    pdf_params_zm,                        &! inout
                                                    dz_g, varmu(i)                        )! out
-#include "more_info_to_clubb.inc"
 
 
       !**************************************************************************************
@@ -108,11 +108,7 @@
                                           core_forcing, core_sfc,     &! in
                                           clubb_misc,   core_auxil,   &! in
                                           core_prog,    core_diag,    &! inout or out
-                                          pdf_params,   pdf_params_zm,&! inout or out
-                                          !
-                                          upwp_sfc_pert, vpwp_sfc_pert,      &! intent(in)
-                                          um_pert_col, vm_pert_col,          &!
-                                          upwp_pert_col, vpwp_pert_col       &! intent(inout)
+                                          pdf_params,   pdf_params_zm &! inout or out
                                           )
          call t_stopf('advance_clubb_core')
 
@@ -160,14 +156,16 @@
       !---------------------------------------------------------------------------------------------------------
       call map_1column_of_info_from_clubb_to_host( i, pverp, nz, edsclr_dim,                      &! in
                                                    macmic_it, cld_macmic_num_steps, clubb_do_adv, &! in
-                                                   core_prog, core_diag, pdf_params_zm,           &! inout
+                                                   linearize_pbl_winds,                           &! in 
+                                                   core_prog, core_diag, pdf_params_zm, clubb_misc, &! inout
                                                    host_mean, host_mnts, c2h, edsclr_out,         &! inout
-                                                   wprcp, rcm_in_layer, cloud_cover, qclvar       )! inout
+                                                   wprcp, rcm_in_layer, cloud_cover, qclvar,      &! inout
+                                                   sfc_v_diff_tau                                 )! inout
 
-#include "info_from_clubb_to_host.inc"
 
       ! Clean up
-      call clubb_core_fld_dealloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc )
+
+      call clubb_core_fld_dealloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, linearize_pbl_winds )
 
       !---------------------------------------------------------------------------------------------------------
       ! After advancing CLUBB in time, apply a total energy fixer by adjusting the ending s (dry static energy)

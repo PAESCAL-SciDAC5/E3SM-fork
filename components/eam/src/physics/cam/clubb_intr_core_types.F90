@@ -107,9 +107,9 @@ module clubb_intr_core_types
 
   end type core_forcing_t
 
-  !-------------------------
-  ! Sfc values
-  !-------------------------
+  !-------------
+  ! Sfc fluxes
+  !-------------
   type core_sfc_t
 
     real(core_rknd) :: upwp
@@ -122,8 +122,9 @@ module clubb_intr_core_types
 
   end type core_sfc_t
 
-  !-------------------------
-  !-------------------------
+  !----------------------------------------------------
+  ! Miscellaneous fields used in optional calculations
+  !----------------------------------------------------
   type clubb_misc_t
 
     real(core_rknd) :: varmu
@@ -132,12 +133,26 @@ module clubb_intr_core_types
     real(core_rknd), dimension(:), allocatable :: prer_evap
     real(core_rknd), dimension(:), allocatable :: rfrzm      ! Total ice-phase water mixing ratio        [kg/kg] 
 
+    !----
+    ! The next 6 variables are for ( linearize_pbl_winds == .true. ).
+    ! The have to be declared as pointers because advance_clubb_core_api does that.
+
+    real(core_rknd), dimension(:), pointer ::   um_pert
+    real(core_rknd), dimension(:), pointer ::   vm_pert
+    real(core_rknd), dimension(:), pointer :: upwp_pert
+    real(core_rknd), dimension(:), pointer :: vpwp_pert
+
+    real(core_rknd), pointer :: upwp_sfc_pert
+    real(core_rknd), pointer :: vpwp_sfc_pert
+    !----
+
   end type clubb_misc_t
 
 contains
 
   !------------------------------------------------------ 
-  subroutine clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, pverp, ntracer )
+  subroutine clubb_core_fld_alloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, &
+                                   pverp, ntracer, linearize_pbl_winds )
 
     type(core_auxil_t),  intent(inout) :: core_auxil
     type(core_prog_t),   intent(inout) :: core_prog
@@ -146,8 +161,9 @@ contains
     type(core_sfc_t),    intent(inout) :: core_sfc
     type(clubb_misc_t),  intent(inout) :: clubb_misc
 
-    integer,           intent(in)    :: pverp
-    integer,           intent(in)    :: ntracer
+    integer,             intent(in)    :: pverp
+    integer,             intent(in)    :: ntracer
+    logical,             intent(in)    :: linearize_pbl_winds
 
     character(len=100) :: routine='clubb_core_fld_alloc'
     integer :: ierr
@@ -177,6 +193,22 @@ contains
     allocate( clubb_misc% qrl_zt          (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     allocate( clubb_misc% prer_evap       (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     allocate( clubb_misc% rfrzm           (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    if (linearize_pbl_winds) then
+       allocate( clubb_misc%   um_pert    (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       allocate( clubb_misc%   vm_pert    (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       allocate( clubb_misc% upwp_pert    (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       allocate( clubb_misc% vpwp_pert    (pverp), stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       allocate( clubb_misc% upwp_sfc_pert       , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       allocate( clubb_misc% upwp_sfc_pert       , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    else
+       nullify( clubb_misc%   um_pert )
+       nullify( clubb_misc%   vm_pert )
+       nullify( clubb_misc% upwp_pert )
+       nullify( clubb_misc% vpwp_pert )
+       nullify( clubb_misc% upwp_sfc_pert )
+       nullify( clubb_misc% vpwp_sfc_pert )
+    end if
 
     !------------------------------
     ! CLUBB's prognostic variables
@@ -249,7 +281,7 @@ contains
   end subroutine clubb_core_fld_alloc
 
   !----------------------------------------------- 
-  subroutine clubb_core_fld_dealloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc )
+  subroutine clubb_core_fld_dealloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, linearize_pbl_winds )
 
     type(core_auxil_t),  intent(inout) :: core_auxil
     type(core_prog_t),   intent(inout) :: core_prog
@@ -257,6 +289,8 @@ contains
     type(core_forcing_t),intent(inout) :: core_forcing
     type(core_sfc_t),    intent(inout) :: core_sfc
     type(clubb_misc_t),  intent(inout) :: clubb_misc
+
+    logical,intent(in) :: linearize_pbl_winds
 
     character(len=100) :: routine='clubb_core_fld_dealloc'
     integer :: ierr
@@ -286,6 +320,15 @@ contains
     deallocate( clubb_misc% qrl_zt         , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( clubb_misc% prer_evap      , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
     deallocate( clubb_misc% rfrzm          , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+
+    if (linearize_pbl_winds) then
+       deallocate( clubb_misc%   um_pert   , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       deallocate( clubb_misc%   vm_pert   , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       deallocate( clubb_misc% upwp_pert   , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       deallocate( clubb_misc% vpwp_pert   , stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       deallocate( clubb_misc%upwp_sfc_pert, stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+       deallocate( clubb_misc%vpwp_sfc_pert, stat=ierr ); if (ierr/=0) call endrun('error in '//trim(routine))
+    end if
 
     !------------------------------
     ! CLUBB's prognostic variables

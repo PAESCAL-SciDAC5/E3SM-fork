@@ -211,7 +211,7 @@
 
   !===============================================================================
   !===============================================================================
-  subroutine setup_clubb_to_host_fields( pbuf, c2h, itim_old )
+  subroutine setup_clubb_to_host_fields( pbuf, c2h, itim_old, linearize_pbl_winds )
 
    use physics_buffer,  only: physics_buffer_desc, pbuf_get_field
    use clubb_intr_types,only: clubb_to_host_t
@@ -219,6 +219,7 @@
    type(physics_buffer_desc), pointer :: pbuf(:)
    type(clubb_to_host_t)              :: c2h
    integer,intent(in)                 :: itim_old
+   logical,intent(in)                 :: linearize_pbl_winds
 
    call pbuf_get_field( pbuf, kvm_idx, c2h%khzt )
    call pbuf_get_field( pbuf, kvh_idx, c2h%khzm )
@@ -231,6 +232,21 @@
    call pbuf_get_field( pbuf, pdf_zm_varnce_w_2_idx, c2h% pdf_zm_varnce_w_2, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/) )
    call pbuf_get_field( pbuf, pdf_zm_mixt_frac_idx,  c2h% pdf_zm_mixt_frac , start=(/1,1,itim_old/), kount=(/pcols,pverp,1/) )
 
+   if (linearize_pbl_winds) then
+      call pbuf_get_field( pbuf,   um_pert_idx, c2h%   um_pert, start=(/1,1/), kount=(/pcols,pverp/) )
+      call pbuf_get_field( pbuf,   vm_pert_idx, c2h%   vm_pert, start=(/1,1/), kount=(/pcols,pverp/) )
+      call pbuf_get_field( pbuf, upwp_pert_idx, c2h% upwp_pert, start=(/1,1/), kount=(/pcols,pverp/) )
+      call pbuf_get_field( pbuf, vpwp_pert_idx, c2h% vpwp_pert, start=(/1,1/), kount=(/pcols,pverp/) )
+
+      call pbuf_get_field( pbuf,  wsresp_idx, c2h% wsresp  )
+      call pbuf_get_field( pbuf, tau_est_idx, c2h% tau_est )
+   else
+      nullify( c2h%   um_pert)
+      nullify( c2h%   vm_pert)
+      nullify( c2h% upwp_pert)
+      nullify( c2h% vpwp_pert)
+   end if
+
   end subroutine setup_clubb_to_host_fields
 
 
@@ -239,6 +255,7 @@
   subroutine map_1column_of_info_from_host_to_clubb( i, host_mean, host_mnts, c2h, &
                                                      pverp, nz, edsclr_dim, lq,ixq, ixcldliq, ixcldice, &
                                                      macmic_it, clubb_do_adv, do_expldiff,      &
+                                                     linearize_pbl_winds, pert_tau,             &
                                                      core_auxil, core_prog, core_diag,          &
                                                      core_forcing, core_sfc, clubb_misc,        &
                                                      pdf_params_zm, dz_g, varmu  )
@@ -270,6 +287,8 @@
     integer, intent(in) :: macmic_it
     logical, intent(in) :: clubb_do_adv
     logical, intent(in) :: do_expldiff
+    logical, intent(in) :: linearize_pbl_winds
+    real(r8),intent(in) :: pert_tau
 
     type(core_auxil_t  ),intent(inout) :: core_auxil
     type(core_prog_t   ),intent(inout) :: core_prog
@@ -277,7 +296,8 @@
     type(core_forcing_t),intent(inout) :: core_forcing
     type(core_sfc_t    ),intent(inout) :: core_sfc
     type(clubb_misc_t  ),intent(inout) :: clubb_misc
-    type(pdf_parameter), pointer :: pdf_params_zm ! PDF parameters on momentum levs. [units vary]
+
+    type(pdf_parameter), pointer :: pdf_params_zm        ! PDF parameters on momentum levs. [units vary]
 
     real(r8),intent(out) :: dz_g(:)
     real(r8),intent(out) :: varmu
@@ -451,8 +471,8 @@
 
       !---------------------------------------------------------------------------------------------
       ! In a restart run, assign values read back from restart file to PDF parameters on zm levels.
-      ! This is necessary when ipdf_call_placement = 2.
-      ! Note the vertical indices need to be flipped.
+      ! This is necessary when ipdf_call_placement = 2. Note the vertical indices need to be flipped.
+      ! Also note this block of code is missing precision conversion for the case where r8 /= core_rknd.
       !---------------------------------------------------------------------------------------------
       if ( is_first_restart_step() .and. ipdf_call_placement .eq. ipdf_post_advance_fields ) then
 
@@ -463,6 +483,50 @@
             pdf_params_zm% varnce_w_2(k) = c2h% pdf_zm_varnce_w_2(i,pverp-k+1)
             pdf_params_zm% mixt_frac (k) = c2h% pdf_zm_mixt_frac (i,pverp-k+1)
          enddo
+
+      end if
+
+      !-----------------------------------------------------------------------------
+      ! If (linearize_pbl_winds), assign (retrieve) values for perturbed variables.
+      !-----------------------------------------------------------------------------
+      ! Note:
+      !  1. This block of code is missing precision conversion for the case where r8 /= core_rknd.
+      !  2. When CLUBB and the host model have different thicknesses for the bottom
+      !     layer, one needs to be careful about the use of rho here.
+      !-----------------------------------------------------------------------------
+      if (linearize_pbl_winds) then
+
+         ! At the beginning of "physics" time step (macmic_it==1), 
+         ! reset the perturbed variables to be equal to the unperturbed values.
+
+         if (macmic_it == 1) then
+            c2h%  um_pert(i,:) = core_prog%um
+            c2h%  vm_pert(i,:) = core_prog%vm
+            c2h%upwp_pert(i,:) = core_prog%upwp
+            c2h%vpwp_pert(i,:) = core_prog%vpwp
+         end if
+
+         ! When macmic_it/=1, get the values saved in pbuf
+
+         clubb_misc%   um_pert = c2h%   um_pert(i,:)
+         clubb_misc%   vm_pert = c2h%   vm_pert(i,:)
+         clubb_misc% upwp_pert = c2h% upwp_pert(i,:)
+         clubb_misc% vpwp_pert = c2h% vpwp_pert(i,:)
+
+         ! Prefer to perturb wind/stress in the direction of the existing stress.
+         ! However, if there's no existing surface stress, just perturb zonal  wind/stress.
+
+         if ( abs(host_mean%wsx(i)) < 1.e-12 .and. abs(host_mean%wsy(i)) < 1.e-12) then
+            clubb_misc% upwp_sfc_pert = core_sfc%upwp + pert_tau / core_auxil%rho_ds_zm(1)
+            clubb_misc% vpwp_sfc_pert = core_sfc%vpwp
+         else
+            clubb_misc% upwp_sfc_pert = core_sfc%upwp + host_mean%wsx(i) * &
+                                        (pert_tau / ( core_auxil%rho_ds_zm(1) &
+                                                     *hypot( host_mean%wsx(i),host_mean%wsy(i) ) ) )
+            clubb_misc% vpwp_sfc_pert = core_sfc%vpwp + host_mean%wsy(i) * &
+                                        (pert_tau / ( core_auxil%rho_ds_zm(1) &
+                                                     *hypot( host_mean%wsx(i),host_mean%wsy(i) ) ) )
+         end if
 
       end if
 
@@ -543,15 +607,16 @@
 
   !==============================================
   subroutine map_1column_of_info_from_clubb_to_host( i, pverp, nz, edsclr_dim, macmic_it, cld_macmic_num_steps, clubb_do_adv, &
-                                                     core_prog, core_diag, pdf_params_zm, &
+                                                     linearize_pbl_winds, &
+                                                     core_prog, core_diag, pdf_params_zm, clubb_misc, &
                                                      host_mean, host_mnts, c2h, edsclr_out, &
-                                                     wprcp, rcm_in_layer, cloud_cover, qclvar  )
+                                                     wprcp, rcm_in_layer, cloud_cover, qclvar, sfc_v_diff_tau )
 
     use shr_kind_mod,     only: r8=>shr_kind_r8
     use clubb_precision,  only: core_rknd
 
     use clubb_intr_types,      only: clubb_mean_2d_t, clubb_mnts_2d_t, clubb_to_host_t
-    use clubb_intr_core_types, only: core_prog_t, core_diag_t
+    use clubb_intr_core_types, only: core_prog_t, core_diag_t, clubb_misc_t
     use clubb_api_module,      only: zm2zt_api
 
     integer, intent(in) :: i       ! column index 
@@ -560,10 +625,12 @@
     integer, intent(in) :: edsclr_dim 
     integer, intent(in) :: macmic_it, cld_macmic_num_steps
     logical, intent(in) :: clubb_do_adv
+    logical, intent(in) :: linearize_pbl_winds
 
     type(core_prog_t   ),intent(inout) :: core_prog
     type(core_diag_t   ),intent(in)    :: core_diag
-    type(pdf_parameter), pointer       :: pdf_params_zm ! PDF parameters on momentum levs. [units vary]
+    type(pdf_parameter ),pointer       :: pdf_params_zm ! PDF parameters on momentum levs. [units vary]
+    type(clubb_misc_t  ),intent(in)    :: clubb_misc
 
     type(clubb_mean_2d_t),intent(inout) :: host_mean
     type(clubb_mnts_2d_t),intent(inout) :: host_mnts
@@ -574,6 +641,7 @@
     real(r8),intent(inout) :: rcm_in_layer(:,:)
     real(r8),intent(inout) ::  cloud_cover(:,:)
     real(r8),intent(inout) ::       qclvar(:,:)
+    real(r8),intent(inout) :: sfc_v_diff_tau(:)
 
     integer :: k
 
@@ -658,7 +726,8 @@
     enddo
 
     !---------------------------------------------------------
-    ! PDF parameters: flip and save to pbuf for BFB restart
+    ! PDF parameters: flip and save to pbuf for BFB restart.
+    ! Note: precision conversion is missing.
     !---------------------------------------------------------
     do k=1,pverp
         c2h%pdf_zm_w_1       (i,k) = pdf_params_zm%w_1       (pverp-k+1)
@@ -667,6 +736,25 @@
         c2h%pdf_zm_varnce_w_2(i,k) = pdf_params_zm%varnce_w_2(pverp-k+1)
         c2h%pdf_zm_mixt_frac (i,k) = pdf_params_zm%mixt_frac (pverp-k+1)
     enddo
-    !----
+
+    !--------------------------------------------------------------------------
+    ! When linearize_pbl_winds == .true., save the perturbed variables to pbuf
+    ! Note: precision conversion is missing.
+    !--------------------------------------------------------------------------
+     if (linearize_pbl_winds) then
+
+        c2h%   um_pert(i,:) = clubb_misc%   um_pert
+        c2h%   vm_pert(i,:) = clubb_misc%   vm_pert
+        c2h% upwp_pert(i,:) = clubb_misc% upwp_pert
+        c2h% vpwp_pert(i,:) = clubb_misc% vpwp_pert
+
+         if (abs(host_mean%wsx(i)) < 1.e-12 .and. abs(host_mean%wsy(i)) < 1.e-12) then
+            sfc_v_diff_tau(i) = c2h% um_pert(i,2) - core_prog%um(2)
+         else
+            sfc_v_diff_tau(i) = ( (c2h% um_pert(i,2) - core_prog%um(2))*host_mean%wsx(i)   &
+                                 +(c2h% vm_pert(i,2) - core_prog%vm(2))*host_mean%wsy(i) ) &
+                                / hypot(host_mean%wsx(i),host_mean%wsy(i))
+         end if
+      end if
 
   end subroutine map_1column_of_info_from_clubb_to_host

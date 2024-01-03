@@ -4,11 +4,7 @@
                                          core_forcing, core_sfc,     &! in
                                          clubb_misc,   core_auxil,   &! in
                                          core_prog,    core_diag,    &! inout or out
-                                         pdf_params,   pdf_params_zm,&! inout or out
-                                         !
-                                         upwp_sfc_pert, vpwp_sfc_pert,      &! intent(in)
-                                         um_pert_col, vm_pert_col,          &! 
-                                         upwp_pert_col, vpwp_pert_col       &! intent(inout)
+                                         pdf_params,   pdf_params_zm &! inout or out
                                          )
 
      use clubb_intr_core_types, only: core_auxil_t, core_prog_t, core_diag_t, core_forcing_t, core_sfc_t, clubb_misc_t
@@ -36,16 +32,6 @@
 
      type(pdf_parameter) :: pdf_params    ! PDF parameters (thermo. levs.)   [units vary]
      type(pdf_parameter) :: pdf_params_zm ! PDF parameters on momentum levs. [units vary]
-
-     !---------------------------
-     ! For linearize_pbl_winds
-
-     real(core_rknd), pointer :: upwp_sfc_pert    ! u'w' at surface                               [m^2/s^2]
-     real(core_rknd), pointer :: vpwp_sfc_pert    ! v'w' at surface                               [m^2/s^2]
-     real(core_rknd), pointer, dimension(:) :: um_pert_col ! Pointer to a particular column of um
-     real(core_rknd), pointer, dimension(:) :: vm_pert_col
-     real(core_rknd), pointer, dimension(:) :: upwp_pert_col
-     real(core_rknd), pointer, dimension(:) :: vpwp_pert_col
 
      !----------------------------------------------------------------------------------------------
      ! l_implemented = .true. is declared and set in clubb_intr.F90
@@ -200,9 +186,12 @@
               core_diag%rcm_in_layer, &! intent(out)
               core_diag%cloud_cover,  &! intent(out)
               !
-              upwp_sfc_pert, vpwp_sfc_pert,      &! intent(in)
-              um_pert_col, vm_pert_col,          &! 
-              upwp_pert_col, vpwp_pert_col)       ! intent(inout)
+              clubb_misc% upwp_sfc_pert, &! intent(in)
+              clubb_misc% vpwp_sfc_pert, &! intent(in)
+              clubb_misc%       um_pert, &!
+              clubb_misc%       vm_pert, &! 
+              clubb_misc%     upwp_pert, &!
+              clubb_misc%     vpwp_pert  )! intent(inout)
 
          if ( err_code == clubb_fatal_error ) then
             write(fstderr,*) "Fatal error in CLUBB: at timestep ", get_nstep(), &
