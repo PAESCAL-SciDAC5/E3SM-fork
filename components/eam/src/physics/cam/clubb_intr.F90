@@ -1216,17 +1216,10 @@ end subroutine clubb_init_cnst
    !===========================================================================================================================
 
    real(r8) :: apply_const
-   real(r8) :: newfice(pcols,pver)              ! fraction of ice in cloud at CLUBB start       [-]
    real(r8) :: invrs_hdtime                     ! Preculate 1/hdtime to reduce divide operations
 
-  !real(r8) :: invrs_gravit                     ! Preculate 1/gravit to reduce divide operations
 
-   real(r8) :: z0                               ! roughness height                              [m]
    real(r8) :: dz_g(pver)                       ! thickness of layer                            [m]
-   real(r8) :: minqn                            ! minimum total cloud liquid + ice threshold    [kg/kg]
-   real(r8) :: tempqn                           ! temporary total cloud liquid + ice            [kg/kg]
-   real(r8) :: relvarmax,relvarmin
-   real(r8) :: qmin
    real(r8) :: varmu(pcols)
    real(r8) :: zt_out(pcols,pverp)              ! output for the thermo CLUBB grid              [m]
    real(r8) :: zi_out(pcols,pverp)              ! output for momentum CLUBB grid                [m]
@@ -1235,12 +1228,8 @@ end subroutine clubb_init_cnst
    real(r8) :: te_b
    real(r8) :: clubb_s(pcols,pver)
 
-  !real(r8) :: exner_clubb(pcols,pverp)         ! Exner function consistent with CLUBB          [-]
-
-   real(r8) :: wpthlp_output(pcols,pverp)       ! Heat flux output variable                     [W/m2]
    real(r8) :: wprtp_output(pcols,pverp)        ! Total water flux output variable              [W/m2]
-   real(r8) :: wp3_output(pcols,pverp)          ! wp3 output                                    [m^3/s^3]
-   real(r8) :: rtpthlp_output(pcols,pverp)      ! rtpthlp ouptut                                [K kg/kg]
+   real(r8) :: wpthlp_output(pcols,pverp)       ! Heat flux output variable                     [W/m2]
    real(r8) :: qt_output(pcols,pver)            ! Total water mixing ratio for output           [kg/kg]
    real(r8) :: thetal_output(pcols,pver)        ! Liquid water potential temperature output     [K]
    real(r8) :: sl_output(pcols,pver)            ! Liquid water static energy                    [J/kg]
@@ -1263,13 +1252,11 @@ end subroutine clubb_init_cnst
    real(r8) :: tautmsx(pcols)                   ! U component of turbulent mountain stress      [N/m2]
    real(r8) :: tautmsy(pcols)                   ! V component of turbulent mountain stress      [N/m2]
 
-   real(r8) :: tmp_array(state%ncol,pverp)
+   real(r8) :: tmp_array(pcols,pverp)
 
    integer                               :: time_elapsed                ! time keep track of stats          [s]
    character(len=200)                    :: temp1, sub                  ! Strings needed for CLUBB output
    logical                               :: l_Lscale_plume_centered, l_use_ice_latent
-  !character(len=3), dimension(pcnst)    :: cnst_type_loc               ! local override option for constituents cnst_type
-
 
    ! --------------- !
    ! Pointers        !
@@ -1279,61 +1266,21 @@ end subroutine clubb_init_cnst
    type(clubb_mnts_2d_t) :: host_mnts
    type(clubb_to_host_t) :: c2h
 
-  !real(r8), pointer, dimension(:,:) :: wp2      ! vertical velocity variance                   [m^2/s^2]
-  !real(r8), pointer, dimension(:,:) :: wp3      ! third moment of vertical velocity            [m^3/s^3]
-  !real(r8), pointer, dimension(:,:) :: wpthlp   ! turbulent flux of thetal                     [m/s K]
-  !real(r8), pointer, dimension(:,:) :: wprtp    ! turbulent flux of moisture                   [m/s kg/kg]
-  !real(r8), pointer, dimension(:,:) :: rtpthlp  ! covariance of thetal and qt                  [kg/kg K]
-  !real(r8), pointer, dimension(:,:) :: rtp2     ! moisture variance                            [kg^2/kg^2]
-  !real(r8), pointer, dimension(:,:) :: thlp2    ! temperature variance                         [K^2]
-  !real(r8), pointer, dimension(:,:) :: up2      ! east-west wind variance                      [m^2/s^2]
-  !real(r8), pointer, dimension(:,:) :: vp2      ! north-south wind variance                    [m^2/s^2]
-
-  !real(r8), pointer, dimension(:,:) :: wpthvp     ! < w'th_v' > (momentum levels)                [m/s K]
-  !real(r8), pointer, dimension(:,:) :: wp2thvp    ! < w'^2 th_v' > (thermodynamic levels)        [m^2/s^2 K]
-  !real(r8), pointer, dimension(:,:) :: rtpthvp    ! < r_t'th_v' > (momentum levels)              [kg/kg K]
-  !real(r8), pointer, dimension(:,:) :: thlpthvp   ! < th_l'th_v' > (momentum levels)             [K^2]
-
-  !real(r8), pointer, dimension(:,:) :: upwp     ! east-west momentum flux                      [m^2/s^2]
-  !real(r8), pointer, dimension(:,:) :: vpwp     ! north-south momentum flux                    [m^2/s^2]
    real(r8), pointer, dimension(:,:) :: um_pert  ! perturbed meridional wind                    [m/s]
    real(r8), pointer, dimension(:,:) :: vm_pert  ! perturbed zonal wind                         [m/s]
    real(r8), pointer, dimension(:,:) :: upwp_pert! perturbed meridional wind flux               [m^2/s^2]
    real(r8), pointer, dimension(:,:) :: vpwp_pert! perturbed zonal wind flux                    [m^2/s^2]
 
-  !real(r8), pointer, dimension(:,:) :: um       ! mean east-west wind                          [m/s]
-  !real(r8), pointer, dimension(:,:) :: vm       ! mean north-south wind                        [m/s]
-  !real(r8), pointer, dimension(:,:) :: thlm     ! mean temperature                             [K]
-  !real(r8), pointer, dimension(:,:) :: rtm      ! mean moisture mixing ratio                   [kg/kg]
-  !real(r8), pointer, dimension(:,:) :: rcm        ! CLUBB cloud water mixing ratio               [kg/kg]
-
    real(r8) :: qclvar(pcols,pverp)              ! cloud water variance                          [kg^2/kg^2]
    real(r8), pointer, dimension(:,:) :: cloud_frac ! CLUBB cloud fraction                       [-]
 
    real(r8), pointer, dimension(:) :: pblh     ! planetary boundary layer height                [m]
-   real(r8), pointer, dimension(:,:) :: tke      ! turbulent kinetic energy                     [m^2/s^2]
-   real(r8), pointer, dimension(:,:) :: relvar   ! relative cloud water variance                [-]
-   real(r8), pointer, dimension(:,:) :: accre_enhan ! accretion enhancement factor              [-]
-   real(r8), pointer, dimension(:,:) :: cmeliq
 
-
-  !real(r8), pointer, dimension(:,:) :: naai
-   real(r8), pointer, dimension(:,:) :: prer_evap
-   real(r8), pointer, dimension(:,:) :: qrl
-   real(r8), pointer, dimension(:,:) :: radf_clubb
-!PMA
-   real(r8)  relvarc(pcols,pver)
-  !logical :: lqice(pcnst)  ! det
-
-   integer :: ixorg
-
-   intrinsic :: selected_real_kind, max
+  logical :: l_pbl_winds_diag
 
   ! for linearize_pbl_winds 
    real(r8) :: sfc_v_diff_tau(pcols) ! Response to tau perturbation, m/s
    real(r8), parameter :: pert_tau = 0.1_r8 ! tau perturbation, Pa
-   real(r8), pointer :: wsresp(:)
-   real(r8), pointer :: tau_est(:)
 
 !PMA adds gustiness and tpert
    real(r8), pointer :: prec_dp(:)                 ! total precipitation from ZM convection
@@ -1431,7 +1378,8 @@ end subroutine clubb_init_cnst
    !======================================================================================
    ! Some diagnostics from CLUBB
    ! NOTE: a few variables diagnosed here are multiplied by rho which is calculated with
-   ! the updated T after detrainment, so moving the respective lines would result in nonBFB
+   ! the updated T after detrainment, and some are diagnosed from state1%t,
+   !  so moving the respective lines would result in nonBFB
    ! history output (although model integration should still be BFB).
    !======================================================================================
 #include "clubb_misc_diag_and_outfld_2.inc"
@@ -2721,6 +2669,7 @@ end function diag_ustar
 #include "clubb_gather_host_fields.inc"
 #include "clubb_forcing_and_sfc.inc"
 #include "clubb_ptend_cal.inc"
+#include "clubb_misc_diag_and_outfld.inc"
 
 #include "clubb_setup_zgrid_1col.inc"
 #include "advance_clubb_core_api_eam.inc"

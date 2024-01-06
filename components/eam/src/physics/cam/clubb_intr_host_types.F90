@@ -95,8 +95,8 @@ module clubb_intr_host_types
 
     ! The next 2 variables are saved in pbuf so that they can be passed to cam_diagnostics.F90 for history output?
 
-    real(r8), pointer, dimension(:,:) ::  wsresp   ! First order response of winds to stress
-    real(r8), pointer, dimension(:,:) ::  tau_est  ! Estimated equilibrium wind stress
+    real(r8), pointer, dimension(:) ::  wsresp   ! First order response of winds to stress
+    real(r8), pointer, dimension(:) ::  tau_est  ! Estimated equilibrium wind stress
     !------- 
 
   end type clubb_to_host_t

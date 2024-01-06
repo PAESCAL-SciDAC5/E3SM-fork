@@ -186,38 +186,14 @@
 
    deallocate( host_mean%exner_clubb )
 
-   !===================
-   ! History output
-   !===================
-   call outfld( 'RVMTEND_CLUBB', ptend_loc%q(:,:,ixq), pcols, lchnk)
-   call outfld( 'RCMTEND_CLUBB', ptend_loc%q(:,:,ixcldliq), pcols, lchnk)
-   call outfld( 'RIMTEND_CLUBB', ptend_loc%q(:,:,ixcldice), pcols, lchnk)
-   call outfld( 'TTEND_CLUBB',   ptend_loc%s/cpair,pcols, lchnk)
-   call outfld( 'UTEND_CLUBB',   ptend_loc%u,pcols, lchnk)
-   call outfld( 'VTEND_CLUBB',   ptend_loc%v,pcols, lchnk)
+   !-------------------------------------------------------------
+   ! Diagnostics and output
+   !-------------------------------------------------------------
+   l_pbl_winds_diag = linearize_pbl_winds .and. (macmic_it == cld_macmic_num_steps)
+   call clubb_related_diags_on_host_grid( pbuf, ptend_loc, host_mean, host_mnts, c2h,      &! in
+                                          qclvar, deep_scheme, clubb_do_deep, varmu,       &! in
+                                          l_pbl_winds_diag, sfc_v_diff_tau, pert_tau,      &! in
+                                          apply_const, zi_out, zt_out, rcm_in_layer, wprcp )
 
-   call pbuf_get_field(pbuf, cmeliq_idx,  cmeliq)
-   cmeliq(:,:) = ptend_loc%q(:,:,ixcldliq)
-   call outfld( 'CMELIQ',        cmeliq, pcols, lchnk)
-
-   if (clubb_do_deep) call outfld( 'MU_CLUBB',      varmu      ,pcols, lchnk)
-
-   ! Linearization of PBL winds: diagnose wsresp and tau_est for history output.
-   ! The outfld calls are in cam_diagnostics.F90
-
-   if (linearize_pbl_winds .and. macmic_it == cld_macmic_num_steps) then
-      do i = 1, ncol
-         wsresp(i) = sfc_v_diff_tau(i) / pert_tau
-         ! Estimated tau in balance with wind is the tau we just used.
-         if (cam_in%wsx(i) == 0._r8 .or. cam_in%wsy(i) == 0._r8) then
-            ! Work around an odd FPE issue with intel compiler.
-            tau_est(i) = abs(cam_in%wsx(i)) + abs(cam_in%wsy(i))
-         else
-            tau_est(i) = hypot(cam_in%wsx(i), cam_in%wsy(i))
-         end if
-      end do
-   end if
-
-#include "clubb_misc_diag_and_outfld.inc"
 #include "clubb_stats_output.inc"
 
