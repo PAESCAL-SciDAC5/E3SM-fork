@@ -1,20 +1,19 @@
-
    !-----------------------------
    ! Initialize ptend for CLUBB
    !-----------------------------
    call physics_ptend_init(ptend_loc, state1%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
 
-   !-------------------------------------------------------------
+   !----------------------------------------------------------------------------------
    ! Load input (initial and boundary conditions) from host model's data structures
-   !-------------------------------------------------------------
+   !----------------------------------------------------------------------------------
    call gather_host_fields( cld_macmic_num_steps, macmic_it, itim_old, state1, &! in
                             pbuf, cam_in, host_mean, host_mnts, apply_const    )! inout, out
 
    call setup_clubb_to_host_fields( pbuf, c2h, itim_old, linearize_pbl_winds )
 
-   !----------------------------------------------------------
+   !===========================================================================================
    !  Loop over all columns in lchnk to advance CLUBB core
-   !----------------------------------------------------------
+   !===========================================================================================
    call t_startf('adv_clubb_core_col_loop')
 
    do i=1,ncol   ! loop over columns
@@ -152,8 +151,9 @@
       ! End of CLUBB's time-stepping sub-cycles
       !**************************************************************************************
 
-      !---------------------------------------------------------------------------------------------------------
-      !---------------------------------------------------------------------------------------------------------
+      !-------------------------------------------------------------------------------
+      ! Transfer information from local column arrays to host model's data structures
+      !-------------------------------------------------------------------------------
       call map_1column_of_info_from_clubb_to_host( i, pverp, nz, edsclr_dim,                      &! in
                                                    macmic_it, cld_macmic_num_steps, clubb_do_adv, &! in
                                                    linearize_pbl_winds,                           &! in 
@@ -161,8 +161,6 @@
                                                    host_mean, host_mnts, c2h, edsclr_out,         &! inout
                                                    wprcp, rcm_in_layer, cloud_cover, qclvar,      &! inout
                                                    sfc_v_diff_tau                                 )! inout
-
-
       ! Clean up
 
       call clubb_core_fld_dealloc( core_auxil, core_prog, core_diag, core_forcing, core_sfc, clubb_misc, linearize_pbl_winds )
@@ -176,6 +174,9 @@
 
    enddo  ! end column loop
    call t_stopf('adv_clubb_core_col_loop')
+   !===========================================================================================
+   ! End of column loop
+   !===========================================================================================
 
    !-------------------------------------------------------------
    ! Calculate ptend for CLUBB
@@ -195,5 +196,6 @@
                                           l_pbl_winds_diag, sfc_v_diff_tau, pert_tau,      &! in
                                           apply_const, zi_out, zt_out, rcm_in_layer, wprcp )
 
-#include "clubb_stats_output.inc"
+   !  Output CLUBB's statistics
+   call clubb_stats_output(pcols,lchnk)
 

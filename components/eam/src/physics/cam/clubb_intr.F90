@@ -1103,19 +1103,18 @@ end subroutine clubb_init_cnst
    use macrop_driver_with_clubb,  only: deepcu_detrainment_tend
 
    use clubb_api_module, only: &
-        cleanup_clubb_core_api, &
         w_tol_sqd, &
         rt_tol, &
         thl_tol, &
         l_stats, &
         stats_tsamp, &
         stats_tout, &
-        stats_zt, &
-        stats_sfc, &
-        stats_zm, &
-        stats_rad_zt, &
-        stats_rad_zm, &
-        l_output_rad_files, &
+       !stats_zt, &
+       !stats_sfc, &
+       !stats_zm, &
+       !stats_rad_zt, &
+       !stats_rad_zm, &
+       !l_output_rad_files, &
         pdf_parameter, &
         stats_begin_timestep_api, &
         zt2zm_api, zm2zt_api
@@ -2670,6 +2669,7 @@ end function diag_ustar
 #include "clubb_forcing_and_sfc.inc"
 #include "clubb_ptend_cal.inc"
 #include "clubb_misc_diag_and_outfld.inc"
+#include "clubb_stats_output.inc"
 
 #include "clubb_setup_zgrid_1col.inc"
 #include "advance_clubb_core_api_eam.inc"

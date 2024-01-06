@@ -1,6 +1,19 @@
+  subroutine clubb_stats_output(pcols,lchnk)
 
-   !  Output CLUBB history here
-   if (l_stats) then
+    use cam_history,      only: outfld
+    use clubb_api_module, only: l_stats, stats_tout, stats_zt, stats_sfc, &
+                                stats_zm, stats_rad_zt, stats_rad_zm, l_output_rad_files
+
+    ! The following variables module variables in clubb_intr.F90:
+    !  out_zt, out_zm, out_sfc, out_radzt, out_radzm.
+
+    integer, intent(in) :: pcols, lchnk
+
+    integer :: i
+    character(len=200) :: temp1, sub                  ! Strings needed for CLUBB output
+
+    !-------- 
+    if (l_stats) then
 
       do i=1,stats_zt%num_output_fields
 
@@ -34,4 +47,7 @@
          call outfld(trim(stats_sfc%file%var(i)%name), out_sfc(:,:,i), pcols, lchnk)
       enddo
 
-   endif
+    end if
+    !-------- 
+
+  end subroutine clubb_stats_output
