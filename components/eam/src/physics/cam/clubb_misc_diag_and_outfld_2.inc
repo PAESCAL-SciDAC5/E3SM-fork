@@ -1,6 +1,9 @@
    !-------------------------------
    ! Diagnose some output variables
    !-------------------------------
+   call pbuf_get_field(pbuf, wpthlp_idx,  wpthlp,  start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+   call pbuf_get_field(pbuf, wprtp_idx,   wprtp,   start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+
    !-------------
    ! k = 1,pverp     
    !-------------
@@ -10,11 +13,11 @@
    call outfld( 'RHO_CLUBB',        rho,                     pcols, lchnk )
 
    ! liquid water potential temperature flux
-   wpthlp_output(:ncol,:pverp)  = (host_mnts%wpthlp(:ncol,:pverp)-(apply_const*wpthlp_const))*rho(:ncol,:pverp)*cpair
+   wpthlp_output(:ncol,:pverp)  = (wpthlp(:ncol,:pverp)-(apply_const*wpthlp_const))*rho(:ncol,:pverp)*cpair
    call outfld( 'WPTHLP_CLUBB',     wpthlp_output,           pcols, lchnk )
  
    ! total water mixig ratio flux
-   wprtp_output(:ncol,:pverp) = (host_mnts%wprtp(:ncol,:pverp)-(apply_const*wprtp_const))*rho(:ncol,:pverp)*latvap
+   wprtp_output(:ncol,:pverp) = (wprtp(:ncol,:pverp)-(apply_const*wprtp_const))*rho(:ncol,:pverp)*latvap
    call outfld( 'WPRTP_CLUBB',      wprtp_output,            pcols, lchnk )
 
 
@@ -25,9 +28,9 @@
    eps = rair/rh2o
    
    wpthvp_diag(:,:) = 0.0_r8
-   wpthvp_diag(:ncol,:pver) = ( host_mnts% wpthlp(:ncol,:pver)-(apply_const*wpthlp_const) ) &
+   wpthvp_diag(:ncol,:pver) = ( wpthlp(:ncol,:pver)-(apply_const*wpthlp_const) ) &
                              +  ((1._r8-eps)/eps)*real(theta0, kind = r8)                   &
-                               *(host_mnts% wprtp(:ncol,:pver)-(apply_const*wprtp_const))   &
+                               *(wprtp(:ncol,:pver)-(apply_const*wprtp_const))   &
                              +  ((latvap/cpair)*state1%exner(:ncol,:pver)-(1._r8/eps)*real(theta0, kind = r8)) &
                                *wprcp(:ncol,:pver)
    tmp_array = wpthvp_diag(:ncol,:)*cpair

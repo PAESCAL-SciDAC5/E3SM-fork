@@ -1,3 +1,102 @@
+  subroutine clubb_tend_eam( ptend_loc, state1, pbuf, cam_in, lq, hdtime,   &! in
+                             itim_old, cld_macmic_num_steps, macmic_it,     &! in
+                             ixq, ixcldliq, ixcldice,                       &! in
+                             do_tms, ksrftms, linearize_pbl_winds,          &! in
+                             apply_const,  dz_g, wprcp                      &! out
+                            )
+
+   use scamMOD,        only: single_column,scm_clubb_iop_name
+   use perf_mod,       only: t_startf, t_stopf
+   use physics_types,  only: physics_state
+   use physics_types,  only: physics_ptend, physics_ptend_init
+   use camsrfexch,     only: cam_in_t
+   use physics_buffer, only: physics_buffer_desc
+
+   use clubb_intr_host_types, only: clubb_mean_2d_t, clubb_mnts_2d_t, clubb_to_host_t
+   use clubb_intr_core_types
+   use clubb_api_module, only:  pdf_parameter
+   use clubb_api_module, only:  stats_tsamp, stats_tout, l_stats, stats_begin_timestep_api
+
+   !------------------
+   ! Arguments
+   !------------------
+   type(physics_ptend),intent(inout)  :: ptend_loc
+   type(physics_state),intent(inout)  :: state1
+   type(physics_buffer_desc), pointer :: pbuf(:)
+   type(cam_in_t),      intent(in)    :: cam_in
+
+   real(r8),intent(in) :: hdtime                          ! Host model macmic coupling timestep [s]
+   integer, intent(in) :: itim_old
+   integer, intent(in) :: cld_macmic_num_steps, macmic_it
+   integer, intent(in) :: ixq, ixcldliq, ixcldice
+
+   logical, intent(in) :: lq(:)
+
+   logical, intent(in) :: do_tms
+   real(r8),intent(in) :: ksrftms(:)
+
+   logical, intent(in) :: linearize_pbl_winds
+
+   real(r8),intent(out) :: apply_const
+   real(r8),intent(out) :: dz_g(:)
+
+   real(r8),intent(out) :: wprcp(pcols,pverp)   ! CLUBB liquid water flux                       [m/s kg/kg]
+
+   real(r8) ::       qclvar(pcols,pverp)        ! cloud water variance [kg^2/kg^2]
+   real(r8) :: rcm_in_layer(pcols,pverp)        ! CLUBB in-cloud liquid water mixing ratio      [kg/kg]
+   real(r8) ::  cloud_cover(pcols,pverp)        ! CLUBB in-cloud cloud fraction                 [fraction]
+
+   !------------------
+   ! Local variables
+   !------------------
+   integer :: i,ncol, lchnk
+   real(r8) :: te_b
+   real(r8) :: clubb_s(pcols,pver)
+
+   real(r8) :: varmu(pcols)
+   real(r8) :: edsclr_out(pcols,pverp,edsclr_dim)     ! Scalars to be diffused through CLUBB [units vary]
+
+   type(clubb_mean_2d_t) :: host_mean
+   type(clubb_mnts_2d_t) :: host_mnts
+   type(clubb_to_host_t) :: c2h
+
+   type(core_prog_t )   :: core_prog
+   type(core_diag_t )   :: core_diag
+   type(core_auxil_t)   :: core_auxil
+   type(core_forcing_t) :: core_forcing
+   type(core_sfc_t)     :: core_sfc
+   type(clubb_misc_t)   :: clubb_misc
+
+   type(pdf_parameter), pointer :: pdf_params    ! PDF parameters (thermo. levs.) [units vary]
+   type(pdf_parameter), pointer :: pdf_params_zm ! PDF parameters on momentum levs. [units vary]
+
+   integer :: t   ! loop index of CLUBB's timestep loop
+   integer :: nz
+
+   real(core_rknd) :: hdtime_core_rknd          ! host model's cloud macmic timestep in core_rknd [s]
+   real(core_rknd) :: core_dtime                ! CLUBB time step [s]
+   integer         :: n_clubb_core_step
+
+   real(core_rknd) :: core_rknd_landfrac
+   real(core_rknd) :: core_rknd_rnevap_effic
+
+   real(core_rknd) :: zt_bot
+   real(core_rknd) :: fcoriolis           ! Coriolis forcing [s^-1]
+   real(core_rknd) :: sfc_elevation       ! Elevation of ground [m AMSL]
+
+   integer :: time_elapsed                ! time keep track of stats [s]
+
+   logical :: l_pbl_winds_diag
+   real(r8) :: sfc_v_diff_tau(pcols)      ! Response to tau perturbation, m/s
+   real(r8), parameter :: pert_tau = 0.1_r8 ! tau perturbation, Pa
+
+   real(r8) :: zt_out(pcols,pverp)              ! output for the thermo CLUBB grid              [m]
+   real(r8) :: zi_out(pcols,pverp)              ! output for momentum CLUBB grid                [m]
+
+   !------------------
+   ncol  = state1%ncol
+   lchnk = state1%lchnk
+
    !-----------------------------
    ! Initialize ptend for CLUBB
    !-----------------------------
@@ -33,13 +132,13 @@
       ! But we place the call here (meaning repeating the calculation every timestep and
       ! in each grid column), as we are preparing for the implementation of AMR.
       !------------------------------------------------------------------------------------
-      call determine_clubb_dtime( hdtime, clubb_timestep, hdtime_core_rknd, dtime, n_clubb_core_step ) ! 2xin, 3xout
+      call determine_clubb_dtime( hdtime, clubb_timestep, hdtime_core_rknd, core_dtime, n_clubb_core_step ) ! 2xin, 3xout
 
       ! Set time_elapsed to host model time step, this is for CLUBB's budget stats
       time_elapsed = hdtime_core_rknd
 
       ! Set stats output and increment equal to CLUBB and host dt
-      stats_tsamp = dtime
+      stats_tsamp = core_dtime
       stats_tout  = hdtime_core_rknd
 
       !------------------------------------------------------------------------------------
@@ -79,11 +178,11 @@
       ! CLUBB's time-stepping sub-cycles
       !**************************************************************************************
       call t_startf('adv_clubb_core_ts_loop')
-      do t=1,n_clubb_core_step    ! do needed number of "sub" timesteps for each CAM step
+      do t=1,n_clubb_core_step    ! do needed number of "sub" timesteps for each macmic step
 
          !  Increment the statistics then being stats timestep
          if (l_stats) then
-            time_elapsed = time_elapsed+dtime
+            time_elapsed = time_elapsed+core_dtime
             call stats_begin_timestep_api(time_elapsed, 1, 1)
          endif
 
@@ -103,7 +202,7 @@
          ! Advance CLUBB CORE for one timestep
          !--------------------------------------
          call t_startf('advance_clubb_core')
-         call advance_clubb_core_api_eam( nz, dtime, sfc_elevation, fcoriolis, &! in
+         call advance_clubb_core_api_eam( nz, core_dtime, sfc_elevation, fcoriolis, &! in
                                           core_forcing, core_sfc,     &! in
                                           clubb_misc,   core_auxil,   &! in
                                           core_prog,    core_diag,    &! inout or out
@@ -126,7 +225,7 @@
                                             core_auxil%wm_zt,     core_auxil%exner,       &! in
                                             clubb_misc%prer_evap, pdf_params,             &! in
                                             core_rknd_landfrac,   core_rknd_rnevap_effic, &! in
-                                            nz, dtime, clubb_do_deep                      )! in
+                                            nz, core_dtime, clubb_do_deep                 )! in
          endif
 
          !-----------------------------------------------
@@ -136,7 +235,7 @@
             call enchance_thlp2_for_cloud_top_cooling( core_prog%thlp2,                  &! inout
                                                        core_diag%rcm, clubb_misc%qrl_zt, &! in
                                                        core_diag%thlprcp,                &! in
-                                                       nz, dtime                         )
+                                                       nz, core_dtime                    )
          endif
 
          !------------------------------------------------------------------- 
@@ -199,3 +298,4 @@
    !  Output CLUBB's statistics
    call clubb_stats_output(pcols,lchnk)
 
+  end subroutine clubb_tend_eam

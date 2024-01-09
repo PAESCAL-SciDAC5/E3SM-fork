@@ -1068,13 +1068,14 @@ end subroutine clubb_init_cnst
 ! Author: Cheryl Craig, March 2011
 ! Modifications: Pete Bogenschutz, March 2011 and onward
 ! Origin: Based heavily on UWM clubb_init.F90
+! Update in December 2023 - January 2024: contents organized into subroutines by Hui Wan.
 ! References:
 !   None
 !-------------------------------------------------------------------------------
 
    use physics_types,  only: physics_state, physics_ptend, &
                              physics_state_copy, physics_ptend_init, &
-                             physics_ptend_sum !, set_dry_to_wet
+                             physics_ptend_sum
 
    use physics_update_mod, only: physics_update
 
@@ -1083,45 +1084,17 @@ end subroutine clubb_init_cnst
 
    use ppgrid,         only: pver, pverp, pcols
    use constituents,   only: cnst_get_ind, cnst_type
-  !use co2_cycle,      only: co2_cycle_set_cnst_type
    use camsrfexch,     only: cam_in_t
-   use ref_pres,       only: top_lev => trop_cloud_top_lev
-   use time_manager,   only: is_first_step
    use cam_abortutils, only: endrun
-   use wv_saturation,  only: qsat
-   use micro_mg_cam,   only: micro_mg_version
 
 #ifdef CLUBB_SGS
-
-   use scamMOD,                   only: single_column,scm_clubb_iop_name
-   use cldfrc2m,                  only: aist_vector
    use cam_history,               only: outfld
    use trb_mtn_stress,            only: compute_tms
    use macrop_driver_with_clubb,  only: ice_supersat_adj_tend
    use macrop_driver_with_clubb,  only: pblh_diag
    use macrop_driver_with_clubb,  only: gustiness
    use macrop_driver_with_clubb,  only: deepcu_detrainment_tend
-
-   use clubb_api_module, only: &
-        w_tol_sqd, &
-        rt_tol, &
-        thl_tol, &
-        l_stats, &
-        stats_tsamp, &
-        stats_tout, &
-       !stats_zt, &
-       !stats_sfc, &
-       !stats_zm, &
-       !stats_rad_zt, &
-       !stats_rad_zm, &
-       !l_output_rad_files, &
-        pdf_parameter, &
-        stats_begin_timestep_api, &
-        zt2zm_api, zm2zt_api
-
-   use clubb_intr_host_types
-   use clubb_intr_core_types, only: core_auxil_t, core_prog_t, core_diag_t, core_forcing_t, core_sfc_t, clubb_misc_t
-   use clubb_intr_core_types, only: clubb_core_fld_alloc, clubb_core_fld_dealloc
+   use clubb_api_module,          only: w_tol_sqd, rt_tol, thl_tol 
 #endif
 
    implicit none
@@ -1160,7 +1133,6 @@ end subroutine clubb_init_cnst
    ! --------------- !
    ! Local Variables !
    ! --------------- !
-
 #ifdef CLUBB_SGS
 
    type(physics_state),target :: state1                ! Local copy of state variable
@@ -1170,122 +1142,39 @@ end subroutine clubb_init_cnst
    integer :: ixcldice, ixcldliq, ixnumliq, ixnumice, ixq
    integer :: itim_old
    integer :: ncol, lchnk                       ! # of columns, and chunk identifier
-   integer :: icnt, clubbtop
 
-
-   integer :: n_clubb_core_step
-
-  !===========================================================================================
-  ! The variables defined as core_rknd is required by the advance_clubb_core_api() subroutine
-  !===========================================================================================
-   integer :: nz
-   real(core_rknd) :: dtime                            ! CLUBB time step                              [s]
-
-   !-----------------
-   real(core_rknd) :: zt_bot                  ! height of themo level that is closest to the Earth's surface [m]
-   real(core_rknd) :: core_rknd_landfrac
-   real(core_rknd) :: core_rknd_rnevap_effic
-
-   real(core_rknd) :: fcoriolis                        ! Coriolis forcing                              [s^-1]
-   real(core_rknd) :: sfc_elevation                    ! Elevation of ground                           [m AMSL]
-
-   type(core_auxil_t)   :: core_auxil
-   type(core_prog_t)    :: core_prog
-   type(core_diag_t)    :: core_diag
-   type(core_forcing_t) :: core_forcing
-   type(core_sfc_t)     :: core_sfc
-   type(clubb_misc_t)   :: clubb_misc
-
-   type(pdf_parameter), pointer :: pdf_params    ! PDF parameters (thermo. levs.) [units vary]
-   type(pdf_parameter), pointer :: pdf_params_zm ! PDF parameters on momentum levs. [units vary]
-   !-----------------
-
-   real(core_rknd) :: C_10                             ! transfer coefficient                          [-]
-
-   real(core_rknd) :: hdtime_core_rknd                 ! host model's cloud macmic timestep in core_rknd
-
-   real(core_rknd), pointer :: upwp_sfc_pert    ! u'w' at surface                               [m^2/s^2]
-   real(core_rknd), pointer :: vpwp_sfc_pert    ! v'w' at surface                               [m^2/s^2]
-   ! Pointers to temporary copies of particular columns of um_pert/upwp_pert fields
-   real(core_rknd), pointer, dimension(:) :: um_pert_col ! Pointer to a particular column of um
-   real(core_rknd), pointer, dimension(:) :: vm_pert_col
-   real(core_rknd), pointer, dimension(:) :: upwp_pert_col
-   real(core_rknd), pointer, dimension(:) :: vpwp_pert_col
-
-   !===========================================================================================================================
 
    real(r8) :: apply_const
-   real(r8) :: invrs_hdtime                     ! Preculate 1/hdtime to reduce divide operations
-
-
    real(r8) :: dz_g(pver)                       ! thickness of layer                            [m]
-   real(r8) :: varmu(pcols)
-   real(r8) :: zt_out(pcols,pverp)              ! output for the thermo CLUBB grid              [m]
-   real(r8) :: zi_out(pcols,pverp)              ! output for momentum CLUBB grid                [m]
 
-   ! Variables below are needed to compute energy integrals for conservation
-   real(r8) :: te_b
-   real(r8) :: clubb_s(pcols,pver)
-
+   !+++ For diagnostic output +++
    real(r8) :: wprtp_output(pcols,pverp)        ! Total water flux output variable              [W/m2]
    real(r8) :: wpthlp_output(pcols,pverp)       ! Heat flux output variable                     [W/m2]
    real(r8) :: qt_output(pcols,pver)            ! Total water mixing ratio for output           [kg/kg]
    real(r8) :: thetal_output(pcols,pver)        ! Liquid water potential temperature output     [K]
    real(r8) :: sl_output(pcols,pver)            ! Liquid water static energy                    [J/kg]
    real(r8) :: rho(pcols,pverp)                 ! Midpoint density in CAM                       [kg/m^3]
-   real(r8) :: thv(pcols,pver)                        ! virtual potential temperature                 [K]
-
-   real(r8) :: edsclr_out(pcols,pverp,edsclr_dim)     ! Scalars to be diffused through CLUBB          [units vary]
-
-   real(r8) :: rcm_in_layer(pcols,pverp)        ! CLUBB in-cloud liquid water mixing ratio      [kg/kg]
-   real(r8) :: cloud_cover(pcols,pverp)         ! CLUBB in-cloud cloud fraction                 [fraction]
    real(r8) :: wprcp(pcols,pverp)               ! CLUBB liquid water flux                       [m/s kg/kg]
    real(r8) :: wpthvp_diag(pcols,pverp)              ! CLUBB buoyancy flux                           [W/m^2]
    real(r8) :: eps                              ! Rv/Rd                                         [-]
-
-   real(r8) :: dum1                             ! dummy variable                                [units vary]
-
-   integer :: kkhost
+   real(r8) :: tmp_array(pcols,pverp)
+   !--- For diagnostic output ---
 
    real(r8) :: ksrftms(pcols)                   ! Turbulent mountain stress surface drag        [kg/s/m2]
    real(r8) :: tautmsx(pcols)                   ! U component of turbulent mountain stress      [N/m2]
    real(r8) :: tautmsy(pcols)                   ! V component of turbulent mountain stress      [N/m2]
 
-   real(r8) :: tmp_array(pcols,pverp)
-
-   integer                               :: time_elapsed                ! time keep track of stats          [s]
-   character(len=200)                    :: temp1, sub                  ! Strings needed for CLUBB output
-   logical                               :: l_Lscale_plume_centered, l_use_ice_latent
-
-   ! --------------- !
-   ! Pointers        !
-   ! --------------- !
-
-   type(clubb_mean_2d_t) :: host_mean
-   type(clubb_mnts_2d_t) :: host_mnts
-   type(clubb_to_host_t) :: c2h
-
-   real(r8), pointer, dimension(:,:) :: um_pert  ! perturbed meridional wind                    [m/s]
-   real(r8), pointer, dimension(:,:) :: vm_pert  ! perturbed zonal wind                         [m/s]
-   real(r8), pointer, dimension(:,:) :: upwp_pert! perturbed meridional wind flux               [m^2/s^2]
-   real(r8), pointer, dimension(:,:) :: vpwp_pert! perturbed zonal wind flux                    [m^2/s^2]
-
-   real(r8) :: qclvar(pcols,pverp)              ! cloud water variance                          [kg^2/kg^2]
    real(r8), pointer, dimension(:,:) :: cloud_frac ! CLUBB cloud fraction                       [-]
-
    real(r8), pointer, dimension(:) :: pblh     ! planetary boundary layer height                [m]
-
-  logical :: l_pbl_winds_diag
-
-  ! for linearize_pbl_winds 
-   real(r8) :: sfc_v_diff_tau(pcols) ! Response to tau perturbation, m/s
-   real(r8), parameter :: pert_tau = 0.1_r8 ! tau perturbation, Pa
 
 !PMA adds gustiness and tpert
    real(r8), pointer :: prec_dp(:)                 ! total precipitation from ZM convection
    real(r8), pointer :: snow_dp(:)                 ! snow precipitation from ZM convection
    real(r8), pointer :: vmag_gust(:)
    real(r8), pointer :: tpert(:)
+   real(r8), pointer, dimension(:,:) :: wpthlp
+   real(r8), pointer, dimension(:,:) :: wprtp
+   real(r8), pointer, dimension(:,:) :: up2, vp2, thlp2
 
 #endif
 
@@ -1351,7 +1240,10 @@ end subroutine clubb_init_cnst
    !==========================
    ! CLUBB
    !==========================
-#include "clubb_tend_eam.inc"
+   call clubb_tend_eam( ptend_loc, state1, pbuf,                                        &! out, inout, inout
+                        cam_in, lq, hdtime, itim_old, cld_macmic_num_steps, macmic_it,  &! in
+                        ixq, ixcldliq, ixcldice, do_tms, ksrftms, linearize_pbl_winds,  &! in
+                        apply_const,  dz_g, wprcp                                       ) ! out
 
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)   !  Accumulate tendencies for output
    call physics_update(state1,ptend_loc,hdtime)       !  Update the tmp state - state1; ptend_loc is reset to zero after the call
@@ -1375,11 +1267,11 @@ end subroutine clubb_init_cnst
    end do
 
    !======================================================================================
-   ! Some diagnostics from CLUBB
+   ! Some diagnostics from CLUBB.
    ! NOTE: a few variables diagnosed here are multiplied by rho which is calculated with
    ! the updated T after detrainment, and some are diagnosed from state1%t,
-   !  so moving the respective lines would result in nonBFB
-   ! history output (although model integration should still be BFB).
+   ! so moving this block of lines into clubb_tend_eam would result in nonBFB
+   ! history output, although model integration should still be BFB.
    !======================================================================================
 #include "clubb_misc_diag_and_outfld_2.inc"
 
@@ -1387,14 +1279,14 @@ end subroutine clubb_init_cnst
    ! Diagnose various cloud fractions
    !===================================
    call cloudfrac_diags( state1, cam_in, cmfmc, itim_old, liqcf_fix, &! in
-                         pbuf, cloud_frac,            &! inout
-                         alst_o                       )! out 
+                         pbuf, cloud_frac,                           &! inout
+                         alst_o                                      )! out 
 
    !======================
    ! Diagnose PBL height
    !======================
    call t_startf('pbl_depth_diag')
-   call pbuf_get_field(pbuf, pblh_idx,    pblh)
+   call pbuf_get_field(pbuf, pblh_idx, pblh)
    call pblh_diag( state1, cam_in, cloud_frac, dz_g(pver), use_sgv, pblh ) ! 5xin, 1xout
    call outfld('PBLH', pblh, pcols, lchnk)
    call t_stopf('pbl_depth_diag')
@@ -1406,10 +1298,13 @@ end subroutine clubb_init_cnst
    call pbuf_get_field(pbuf, snow_dp_idx,   snow_dp)
    call pbuf_get_field(pbuf, vmag_gust_idx, vmag_gust)
    call pbuf_get_field(pbuf, tpert_idx,     tpert)
+   call pbuf_get_field(pbuf, thlp2_idx,     thlp2,   start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+   call pbuf_get_field(pbuf, up2_idx,       up2,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+   call pbuf_get_field(pbuf, vp2_idx,       vp2,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
 
-   call gustiness( use_sgv, state1, cam_in, host_mnts%up2(:,pver), host_mnts%vp2(:,pver), &! in
-                   prec_dp, snow_dp, pblh, host_mnts%thlp2,                               &! in
-                   vmag_gust, tpert                                                       )! out
+   call gustiness( use_sgv, state1, cam_in, up2(:,pver), vp2(:,pver), &! in
+                   prec_dp, snow_dp, pblh, thlp2,                     &! in
+                   vmag_gust, tpert                                   )! out
 
    return
 #endif
@@ -2665,6 +2560,8 @@ end function diag_ustar
 
  end subroutine column_total_energy_fixer
 
+#include "clubb_tend_eam.inc"
+
 #include "clubb_gather_host_fields.inc"
 #include "clubb_forcing_and_sfc.inc"
 #include "clubb_ptend_cal.inc"
@@ -2674,6 +2571,7 @@ end function diag_ustar
 #include "clubb_setup_zgrid_1col.inc"
 #include "advance_clubb_core_api_eam.inc"
 #include "misc_clubb_intr_subs.inc"
+
 
 #endif
 
