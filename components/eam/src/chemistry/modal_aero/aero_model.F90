@@ -86,6 +86,7 @@ module aero_model
 
   integer :: ndx_h2so4
   character(len=fieldname_len) :: dgnum_name(ntot_amode)
+  character(len=fieldname_len) :: strtmp, nametmp
 
   !For aero_model_wetdep subroutine
   integer :: strt_loop, end_loop, stride_loop !loop indices for the lphase loop
@@ -613,8 +614,10 @@ contains
 
        if  ( solsym(m)(1:3) == 'num') then
           unit_basename = ' 1'  ! Units 'kg' or '1' 
+          strtmp = '1/kmol-air'
        else
           unit_basename = 'kg'  ! Units 'kg' or '1' 
+          strtmp = 'mol/mol-air'
        end if
 
        call addfld( 'GS_'//trim(solsym(m)),horiz_only,  'A', unit_basename//'/m2/s ', &
@@ -650,6 +653,13 @@ contains
         endif
        endif
 
+       ! amicphys_intr inouts
+
+       nametmp = adjustl(solsym(m))
+       call addfld('i_vmr_'//trim(nametmp)//'_preGsChem',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR before gas-phase chemistry')
+       call addfld('i_vmr_'//trim(nametmp)//'_preAqChem',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR before aqueous chemistry')
+       call addfld('i_vmr_'//trim(nametmp)//'_preAerMic',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR before aerosol microphysics')
+       call addfld('o_vmr_'//trim(nametmp)//'_pstAerMic',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR after aerosol microphysics')
     enddo
 
     do n = 1,pcnst
@@ -657,8 +667,10 @@ contains
 
           if (cnst_name_cw(n)(1:3) == 'num') then
              unit_basename = ' 1'
+             strtmp = '1/kmol-air'
           else
              unit_basename = 'kg'  
+             strtmp = 'mol/mol-air'
           endif
 
           call addfld( cnst_name_cw(n), (/ 'lev' /), 'A',                unit_basename//'/kg ', &
@@ -693,6 +705,13 @@ contains
              call add_default (trim(cnst_name_cw(n))//'SFWET', 1, ' ') 
              call add_default (trim(cnst_name_cw(n))//'DDF', 1, ' ')
           endif
+
+          ! amicphys_intr inouts
+          nametmp = adjustl(cnst_name_cw(n))
+          call addfld('i_vmr_'//trim(nametmp)//'_preAqChem',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR before aerosol microphysics')
+          call addfld('i_vmr_'//trim(nametmp)//'_preAerMic',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR before aerosol microphysics')
+          call addfld('o_vmr_'//trim(nametmp)//'_pstAerMic',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR after aerosol microphysics')
+
        endif
     enddo
 
@@ -703,7 +722,23 @@ contains
        if ( history_aerosol .and. history_verbose ) then 
           call add_default( dgnum_name(n), 1, ' ' )
        endif
+
+       ! amicphys_intr inouts
+       write(strtmp,'(a,i1)') 'a',n
+       call addfld('i_'//trim(adjustl(strtmp))//'_dgnum',   (/'lev'/), 'A','m',    'Mode '//trim(adjustl(strtmp))//' dry diameter')
+       call addfld('i_'//trim(adjustl(strtmp))//'_dgnumwet',(/'lev'/), 'A','m',    'Mode '//trim(adjustl(strtmp))//' wet diameter')
+       call addfld('i_'//trim(adjustl(strtmp))//'_wetdens', (/'lev'/), 'A','kg/m3','Mode '//trim(adjustl(strtmp))//' wet density')
     end do
+
+    ! amicphys_intr inouts
+    call addfld('i_T',    (/'lev'/), 'A','K', 'air temperature input to aerosol microphysics')
+    call addfld('i_pmid', (/'lev'/), 'A','Pa','pressure input to aerosol microphysics')
+    call addfld('i_pdel', (/'lev'/), 'A','Pa','pressure layer thickness input to aerosol microphysics')
+    call addfld('i_zm',   (/'lev'/), 'A','m', 'geopotential height input to aerosol microphysics')
+    call addfld('i_pblh', horiz_only,'A','m', 'PBL height input to aerosol microphysics')
+    call addfld('i_qh2o', (/'lev'/), 'A','kg/kg','specific humidity input to aerosol microphysics')
+    call addfld('i_cldfr',(/'lev'/), 'A','-', 'cloud fraction input to aerosol microphysics')
+    !----
 
     ndx_h2so4 = get_spc_ndx('H2SO4')
 
@@ -2584,6 +2619,44 @@ do_lphase2_conditional: &
        ! note that:
        !     vmr0 holds vmr before gas-phase chemistry
        !     dvmrdt and dvmrcwdt hold vmr and vmrcw before aqueous chemistry
+
+       !-----------------------------------------
+       ! Send amicphys input to history buffer
+       !-----------------------------------------
+       ! Atmospheric conditions
+
+       call outfld('i_T',    tfld (1:ncol,:), ncol, lchnk)
+       call outfld('i_pmid', pmid (1:ncol,:), ncol, lchnk)
+       call outfld('i_pdel', pdel (1:ncol,:), ncol, lchnk)
+       call outfld('i_zm',   zm   (1:ncol,:), ncol, lchnk)
+       call outfld('i_pblh', pblh (1:ncol),   ncol, lchnk)
+       call outfld('i_qh2o', qh2o (1:ncol,:), ncol, lchnk)
+       call outfld('i_cldfr',cldfr(1:ncol,:), ncol, lchnk)
+
+       ! Gases and interstitial aerosols
+       do m = 1,gas_pcnst
+          call outfld('i_vmr_'//trim(adjustl(solsym(m)))//'_preGsChem',   vmr0(1:ncol,:,m), ncol, lchnk )
+          call outfld('i_vmr_'//trim(adjustl(solsym(m)))//'_preAqChem', dvmrdt(1:ncol,:,m), ncol, lchnk )
+          call outfld('i_vmr_'//trim(adjustl(solsym(m)))//'_preAerMic',    vmr(1:ncol,:,m), ncol, lchnk )
+       end do
+
+       ! Cloud-borne aerosols
+       do m = 1,gas_pcnst
+          if( cnst_name_cw(m+loffset)/=' ' ) then
+            call outfld('i_vmr_'//trim(adjustl(cnst_name_cw(m+loffset)))//'_preAqChem',dvmrcwdt(1:ncol,:,m), ncol, lchnk )
+            call outfld('i_vmr_'//trim(adjustl(cnst_name_cw(m+loffset)))//'_preAerMic',   vmrcw(1:ncol,:,m), ncol, lchnk )
+          end if
+       end do
+
+       ! Particle sizes and densities
+       do n = 1,ntot_amode
+          write(name,'(a,i1)') 'a',n
+          call outfld('i_'//trim(adjustl(name))//'_dgnum',    dgnum   (1:ncol,:,n), ncol, lchnk )
+          call outfld('i_'//trim(adjustl(name))//'_dgnumwet', dgnumwet(1:ncol,:,n), ncol, lchnk )
+          call outfld('i_'//trim(adjustl(name))//'_wetdens',  wetdens (1:ncol,:,n), ncol, lchnk )
+       end do
+       !----------------------------------------------
+
        call modal_aero_amicphys_intr(                &
             1,                  1,                   &
             1,                  1,                   &
@@ -2613,6 +2686,21 @@ do_lphase2_conditional: &
 !           dgncur_a,           dgncur_awet,         &
 !           wetdens_host,                            &
 !           qaerwat                                  )
+
+       !-----------------------------------------
+       ! Send amicphys output to history buffer
+       !-----------------------------------------
+       ! Gases and interstitial aerosols
+       do m = 1,gas_pcnst
+          call outfld('o_vmr_'//trim(adjustl(solsym(m)))//'_pstAerMic', vmr(1:ncol,:,m), ncol, lchnk )
+       end do
+
+       ! Cloud-borne aerosols
+       do m = 1,gas_pcnst
+          if( cnst_name_cw(m+loffset)/=' ' ) &
+          call outfld('o_vmr_'//trim(adjustl(cnst_name_cw(m+loffset)))//'_pstAerMic', vmrcw(1:ncol,:,m), ncol, lchnk )
+       end do
+       !---------------------
 
        call t_stopf('modal_aero_amicphys')
 
