@@ -500,6 +500,19 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         case('SST')
            arrayout(1:ncol,1) = cam_in%sst(1:ncol)
 
+        case('LNDFRAC')
+           arrayout(1:ncol,1) = cam_in%landfrac(1:ncol)
+
+        case('ICEFRAC')
+           arrayout(1:ncol,1) = cam_in%icefrac(1:ncol)
+
+        case('OCNFRAC')
+           arrayout(1:ncol,1) = cam_in%ocnfrac(1:ncol)
+
+        case('SSQ')
+           arrayout(1:ncol,1) = cam_in%ssq(1:ncol)
+
+
         !----------
         ! cam_out
         !----------
@@ -509,6 +522,36 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
         case('NETSW')
            arrayout(1:ncol,1) = cam_out%netsw(1:ncol)
+
+        case('TBOT')
+           arrayout(1:ncol,1) = cam_out%tbot(1:ncol)
+
+        case('ZBOT')
+           arrayout(1:ncol,1) = cam_out%zbot(1:ncol)
+
+        case('UBOT')
+           arrayout(1:ncol,1) = cam_out%ubot(1:ncol)
+
+        case('VBOT')
+           arrayout(1:ncol,1) = cam_out%vbot(1:ncol)
+
+        case('QBOT')
+           arrayout(1:ncol,1) = cam_out%qbot(1:ncol,1)
+
+        case('PBOT')
+           arrayout(1:ncol,1) = cam_out%pbot(1:ncol)
+
+        case('RHOBOT')
+           arrayout(1:ncol,1) = cam_out%rho(1:ncol)
+
+        case('THBOT')
+           arrayout(1:ncol,1) = cam_out%thbot(1:ncol)
+
+        case('PSL')
+           arrayout(1:ncol,1) = cam_out%psl(1:ncol)
+
+        case('UGUST')
+           arrayout(1:ncol,1) = cam_out%ugust(1:ncol)
 
         !----------
         ! pbuf
