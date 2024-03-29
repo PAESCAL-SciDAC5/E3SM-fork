@@ -660,6 +660,7 @@ contains
        call addfld('i_vmr_'//trim(nametmp)//'_preAqChem',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR before aqueous chemistry')
        call addfld('i_vmr_'//trim(nametmp)//'_preAerMic',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR before aerosol microphysics')
        call addfld('o_vmr_'//trim(nametmp)//'_pstAerMic',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR after aerosol microphysics')
+       call addfld('d_vmr_'//trim(nametmp)//'_AerMic',   (/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR change due to aerosol microphysics')
     enddo
 
     do n = 1,pcnst
@@ -711,6 +712,7 @@ contains
           call addfld('i_vmr_'//trim(nametmp)//'_preAqChem',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR before aerosol microphysics')
           call addfld('i_vmr_'//trim(nametmp)//'_preAerMic',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR before aerosol microphysics')
           call addfld('o_vmr_'//trim(nametmp)//'_pstAerMic',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR after aerosol microphysics')
+          call addfld('d_vmr_'//trim(nametmp)//'_AerMic',   (/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR change due to aerosol microphysics')
 
        endif
     enddo
@@ -2456,6 +2458,11 @@ do_lphase2_conditional: &
     real(r8) :: dvmrdt(ncol,pver,gas_pcnst)
     real(r8) :: vmrcw(ncol,pver,gas_pcnst)            ! cloud-borne aerosol (vmr)
 
+    ! vmr change due to amicphys +
+    real(r8) ::   dvmr_amic(ncol,pver,gas_pcnst)            ! interstitial aerosol
+    real(r8) :: dvmrcw_amic(ncol,pver,gas_pcnst)            ! cloud-borne aerosol
+    ! ---- 
+
     real(r8), pointer :: fldcw(:,:)
 
     logical :: use_ECPP
@@ -2638,6 +2645,7 @@ do_lphase2_conditional: &
           call outfld('i_vmr_'//trim(adjustl(solsym(m)))//'_preGsChem',   vmr0(1:ncol,:,m), ncol, lchnk )
           call outfld('i_vmr_'//trim(adjustl(solsym(m)))//'_preAqChem', dvmrdt(1:ncol,:,m), ncol, lchnk )
           call outfld('i_vmr_'//trim(adjustl(solsym(m)))//'_preAerMic',    vmr(1:ncol,:,m), ncol, lchnk )
+          dvmr_amic(1:ncol,:,m) = vmr(1:ncol,:,m)  ! save pre-amicphys values
        end do
 
        ! Cloud-borne aerosols
@@ -2645,6 +2653,7 @@ do_lphase2_conditional: &
           if( cnst_name_cw(m+loffset)/=' ' ) then
             call outfld('i_vmr_'//trim(adjustl(cnst_name_cw(m+loffset)))//'_preAqChem',dvmrcwdt(1:ncol,:,m), ncol, lchnk )
             call outfld('i_vmr_'//trim(adjustl(cnst_name_cw(m+loffset)))//'_preAerMic',   vmrcw(1:ncol,:,m), ncol, lchnk )
+            dvmrcw_amic(1:ncol,:,m) = vmrcw(1:ncol,:,m)  ! save pre-amicphys values
           end if
        end do
 
@@ -2692,13 +2701,18 @@ do_lphase2_conditional: &
        !-----------------------------------------
        ! Gases and interstitial aerosols
        do m = 1,gas_pcnst
-          call outfld('o_vmr_'//trim(adjustl(solsym(m)))//'_pstAerMic', vmr(1:ncol,:,m), ncol, lchnk )
+          dvmr_amic(1:ncol,:,m) = vmr(1:ncol,:,m) - dvmr_amic(1:ncol,:,m)  ! diagnose changes due to amicphys
+          call outfld('d_vmr_'//trim(adjustl(solsym(m)))//'_AerMic',    dvmr_amic(1:ncol,:,m), ncol, lchnk )
+          call outfld('o_vmr_'//trim(adjustl(solsym(m)))//'_pstAerMic',       vmr(1:ncol,:,m), ncol, lchnk )
        end do
 
        ! Cloud-borne aerosols
        do m = 1,gas_pcnst
-          if( cnst_name_cw(m+loffset)/=' ' ) &
-          call outfld('o_vmr_'//trim(adjustl(cnst_name_cw(m+loffset)))//'_pstAerMic', vmrcw(1:ncol,:,m), ncol, lchnk )
+        if( cnst_name_cw(m+loffset)/=' ' ) then
+          dvmrcw_amic(1:ncol,:,m) = vmrcw(1:ncol,:,m) - dvmrcw_amic(1:ncol,:,m)  ! diagnose changes due to amicphys
+          call outfld('d_vmr_'//trim(adjustl(cnst_name_cw(m+loffset)))//'_AerMic', dvmrcw_amic(1:ncol,:,m), ncol, lchnk )
+          call outfld('o_vmr_'//trim(adjustl(cnst_name_cw(m+loffset)))//'_pstAerMic',    vmrcw(1:ncol,:,m), ncol, lchnk )
+        end if
        end do
        !---------------------
 
