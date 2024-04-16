@@ -411,8 +411,15 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            !--- update transfer coeffs at 10m and neutral stability ---
            rdn = sqrt(cdn(u10n))
            ren = 0.0346_R8 !cexcd
-           rhn = (1.0_R8-stable)*0.0327_R8 + stable * 0.018_R8
-                 !(1.0_R8-stable) * chxcdu + stable * chxcds
+
+           !--- C1 regularization of rhn based on third degree polynomial ---
+           if (hol > 0.5) then
+               rhn = 0.018
+           else if (hol > -0.5) then
+               rhn = 0.018 + (0.0327 - 0.018)/(-2.0*0.5) * (hol - 0.5)
+           else 
+               rhn = 0.0327
+           end if
 
            !--- shift all coeffs to measurement height and stability ---
            rd = rdn / max(1.0_R8 + rdn/loc_karman*(alz-psimh), 1.e-3_r8)
