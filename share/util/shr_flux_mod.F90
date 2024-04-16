@@ -254,6 +254,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
    real(R8)    :: tau_diff ! difference in tau across iterations (Pa)
    real(R8)    :: prev_tau_diff ! previous value of tau_diff (Pa)
    real(R8)    :: wind_adj ! iteration-adjusted wind speed (m/s)
+   real(R8)    :: eps_reg ! regularization width for rhn
 !!++ COARE only
    real(R8)    :: zo,zot,zoq      ! roughness lengths
    real(R8)    :: hsb,hlb         ! sens & lat heat flxs at zbot
@@ -320,6 +321,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
   !--- for cold air outbreak calc --------------------------------
    tdiff= tbot - ts
 
+
+
 !!.................................................................
 !! ocn_surface_flux_scheme = 0 : Default CESM1.2
 !!                         = 1 : COARE algorithm
@@ -330,6 +333,15 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
    if (ocn_surface_flux_scheme .eq. 0) then
 
    al2 = log(zref/ztref)
+
+  !--- set regularization width (Large only) ---
+  ! takes the form:
+  !    rhn = 0.018,                       if hol > eps_reg
+  !        = 0.018 + m * (hol - eps_reg), if -eps_reg <= hol <= eps_reg
+  !        = 0.0327,                      if hol < -eps_reg
+  ! where m = (0.0327 - 0.018)/(-2.0*eps_reg)
+  eps_reg = 0.5
+
    DO n=1,nMax
      if (mask(n) /= 0) then
 
