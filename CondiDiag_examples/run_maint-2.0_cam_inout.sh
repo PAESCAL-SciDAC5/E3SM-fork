@@ -108,9 +108,9 @@ readonly OLD_EXECUTABLE=""
 
 # --- Toggle flags for what to do ----
 do_fetch_code=false
-do_create_newcase=false
+do_create_newcase=true
 do_case_setup=true
-do_case_build=false
+do_case_build=true
 do_case_submit=true
 
 # --- Now, do the work ---
@@ -171,9 +171,9 @@ history_budget      = .false.
  
  qoi_chkpt = 'MCTCPL'
 
- qoi_name = 'ZBOT','UBOT','VBOT','UGUST','TBOT','THBOT','QBOT',
+ qoi_name = 'ZBOT','UBOT','VBOT','UGUST','TBOT','THBOT','QBOT','RHOBOT','PSL',
             'TS',  'SST', 'SSQ', 'LNDFRAC', 'ICEFRAC','OCNFRAC','LHF','SHF'
- qoi_nver =  1,     1,     1,     1,      1,     1,     1,
+ qoi_nver =  1,     1,     1,     1,      1,     1,     1,       1,    1,
              1,     1,     1,     1,      1,     1,     1,       1,    1 
 
  l_output_state = .true.
