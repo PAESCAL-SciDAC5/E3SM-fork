@@ -403,6 +403,11 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
      call pbuf_get_field(pbuf, hu_nm1_idx,      hu_nm1 )
      call pbuf_get_field(pbuf, tm1_idx,         tm1 )
      call pbuf_get_field(pbuf, qm1_idx,         qm1 )
+     if ( is_first_step()) then
+        qm1(:ncol,:pver) =  state%q(:ncol,:pver,1)
+        tm1(:ncol,:pver) =  state%t(:ncol,:pver)
+     end if 
+
    if(trigmem)then
      if ( is_first_step() .or. is_first_restart_step() ) then
        hu_nm1(:ncol,:pver) = cpair*state%t(:ncol,:pver) + gravit*state%zm(:ncol,:pver)   &

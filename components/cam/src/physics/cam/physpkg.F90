@@ -2294,6 +2294,12 @@ end if
 
     call physics_update(state, ptend, ztodt, tend)
 
+    do k=1,pver
+        qm1(:ncol,k) = state%q(:ncol,k,1)
+        tm1(:ncol,k) = state%t(:ncol,k)
+    enddo
+
+
     call pbuf_get_field(pbuf, prec_dp_idx, prec_dp )
     call pbuf_get_field(pbuf, snow_dp_idx, snow_dp )
     call pbuf_get_field(pbuf, prec_sh_idx, prec_sh )
