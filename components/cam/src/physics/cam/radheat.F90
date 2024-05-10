@@ -26,7 +26,8 @@ public  &
    radheat_readnl,        &!
    radheat_init,          &!
    radheat_timestep_init, &!
-   radheat_tend            ! return net radiative heating
+   radheat_tend,          &! return net radiative heating
+   radheat_tend_add_subtract
 
 !===============================================================================
 contains
@@ -117,4 +118,55 @@ subroutine radheat_tend(state, pbuf,  ptend, qrl, qrs, fsns, &
    end do
 
 end subroutine radheat_tend
+
+!================================================================================================
+subroutine radheat_tend_add_subtract( factor, qrl, qrs, state, ptend, &
+                                      fsns, fsnt, flns, flnt, net_flx )
+
+#if ( defined OFFLINE_DYN )
+   use metdata, only: met_rlx, met_srf_feedback
+#endif
+!-----------------------------------------------------------------------
+! Compute net radiative heating and the associated net boundary flux
+! that will be added (if factor = 1.) or subtracted (if factor = -1.)
+!-----------------------------------------------------------------------
+
+! Arguments
+   real(r8),            intent(in)  :: factor            !
+   real(r8),            intent(in)  :: qrl(pcols,pver)   ! longwave heating
+   real(r8),            intent(in)  :: qrs(pcols,pver)   ! shortwave heating
+   type(physics_state), intent(in)  :: state             ! Physics state variables
+   type(physics_ptend), intent(out) :: ptend             ! indivdual parameterization tendencie
+   real(r8),            intent(in)  :: fsns(pcols)       ! Surface solar absorbed flux
+   real(r8),            intent(in)  :: fsnt(pcols)       ! Net column abs solar flux at model top
+   real(r8),            intent(in)  :: flns(pcols)       ! Srf longwave cooling (up-down) flux
+   real(r8),            intent(in)  :: flnt(pcols)       ! Net outgoing lw flux at model top
+   real(r8),            intent(out) :: net_flx(pcols)  
+
+! Local variables
+   integer :: i, k
+   integer :: ncol
+!-----------------------------------------------------------------------
+
+   ncol = state%ncol
+
+   call physics_ptend_init(ptend,state%psetcols, 'radheat_add_subtract', ls=.true.)
+
+#if ( defined OFFLINE_DYN )
+   ptend%s(:ncol,:) = 0._r8
+   do k = 1,pver
+     if (met_rlx(k) < 1._r8 .or. met_srf_feedback) then
+       ptend%s(:ncol,k) = factor * (qrs(:ncol,k) + qrl(:ncol,k))
+     endif
+   enddo 
+#else
+   ptend%s(:ncol,:) = factor * (qrs(:ncol,:) + qrl(:ncol,:))
+#endif
+
+   do i = 1, ncol
+      net_flx(i) = factor * (fsnt(i) - fsns(i) - flnt(i) + flns(i) )
+   end do
+
+end subroutine radheat_tend_add_subtract
+
 end module radheat

@@ -47,6 +47,8 @@ public :: &
    radiation_init,        &! calls radini
    radiation_tend          ! moved from radctl.F90
 
+public :: get_saved_qrl_qrs
+
 integer,public, allocatable :: cosp_cnt(:)       ! counter for cosp
 integer,public              :: cosp_cnt_init = 0 !initial value for cosp counter
 
@@ -63,6 +65,8 @@ integer :: ld_idx       = 0
 integer :: cldfsnow_idx = 0 
 integer :: cld_idx      = 0 
 integer :: concld_idx   = 0
+
+logical  :: conserve_energy = .true.       ! flag to carry (QRS,QRL)*dp across time steps
 
 ! Default values for namelist variables
 
@@ -887,7 +891,6 @@ end function radiation_nextsw_cday
     real(r8) :: clat(pcols)                   ! current latitudes(radians)
     real(r8) :: clon(pcols)                   ! current longitudes(radians)
     real(r8) coszrs(pcols)                     ! Cosine solar zenith angle
-    logical  :: conserve_energy = .true.       ! flag to carry (QRS,QRL)*dp across time steps
 
     ! Local variables from radctl
     integer :: i, k, iseed, ilchnk                  ! index
@@ -1570,6 +1573,50 @@ end function radiation_nextsw_cday
     endif
 
  end subroutine radiation_tend
+
+!======================================================
+subroutine get_saved_qrl_qrs( state, pbuf, &! in
+                              qrl, qrs     )! out
+
+    !----------------------------------------------------------------------- 
+    ! Revision history:
+    !  Hui Wan, Feb 2021
+    !-----------------------------------------------------------------------
+    use physics_buffer, only: physics_buffer_desc, pbuf_get_field
+    use physics_types,  only: physics_state
+
+    ! Arguments
+    type(physics_state), intent(in), target :: state
+    type(physics_buffer_desc), pointer      :: pbuf(:)
+    real(r8), intent(out) :: qrl(pcols,pver)             ! longwave heating 
+    real(r8), intent(out) :: qrs(pcols,pver)             ! shortwave heating 
+
+    ! Local variables
+
+    integer :: ncol
+
+    ! heating rate saved in pbuf. might have been scaled by pdel for energy
+    ! conservation.
+    real(r8), pointer, dimension(:,:) :: qrl_in_pbuf  ! longwave  radiative heating rate 
+    real(r8), pointer, dimension(:,:) :: qrs_in_pbuf  ! shortwave radiative heating rate
+
+    !------------------------------------------------------
+    ncol = state%ncol
+
+    call pbuf_get_field(pbuf, qrl_idx, qrl_in_pbuf)
+    call pbuf_get_field(pbuf, qrs_idx, qrs_in_pbuf)
+
+    if (conserve_energy) then
+    ! Values saved in pbuf are from Q*dp. Convert to Q.
+       qrl(:ncol,:pver) = qrl_in_pbuf(:ncol,:pver)/state%pdel(:ncol,:pver)
+       qrs(:ncol,:pver) = qrs_in_pbuf(:ncol,:pver)/state%pdel(:ncol,:pver)
+    else
+       qrl(:ncol,:pver) = qrl_in_pbuf(:ncol,:pver)
+       qrs(:ncol,:pver) = qrs_in_pbuf(:ncol,:pver)
+    end if
+
+end subroutine get_saved_qrl_qrs
+
 
 !===============================================================================
 

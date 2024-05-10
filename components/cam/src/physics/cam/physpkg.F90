@@ -1828,7 +1828,7 @@ subroutine tphysbc (ztodt,               &
     use microp_aero,     only: microp_aero_run
     use macrop_driver,   only: macrop_driver_tend
     use physics_types,   only: physics_state, physics_tend, physics_ptend, physics_ptend_copy, &
-         physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale
+         physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale, physics_state_copy
     use cam_diagnostics, only: diag_conv_tend_ini, diag_phys_writeout, diag_conv, diag_export, diag_state_b4_phys_write
     use cam_history,     only: outfld, fieldname_len
     use physconst,       only: cpair, latvap, gravit, rga
@@ -1846,7 +1846,8 @@ subroutine tphysbc (ztodt,               &
     use aero_model,      only: aero_model_wetdep
     use carma_intr,      only: carma_wetdep_tend, carma_timestep_tend
     use carma_flags_mod, only: carma_do_detrain, carma_do_cldice, carma_do_cldliq,  carma_do_wetdep
-    use radiation,       only: radiation_tend
+    use radiation,       only: radiation_tend, get_saved_qrl_qrs 
+    use radheat,         only: radheat_tend_add_subtract
     use cloud_diagnostics, only: cloud_diagnostics_calc
     use perf_mod
     use mo_gas_phase_chemdr,only: map2chm
@@ -2031,6 +2032,13 @@ subroutine tphysbc (ztodt,               &
     logical :: l_dribble                  ! local variabel to determine if tendency dribbling is applied in macmic loop
     type(physics_ptend) :: ptend_dribble  ! local array to save tendencies to be dribbled into mac-mic subcyles
 
+    integer :: radheat_cpl_opt            ! options for when to apply radheat
+    integer,parameter :: RADHEAT_SEQ = 1
+    integer,parameter :: RADHEAT_PAR_SFC_DYN_DCU = 2
+    integer,parameter :: RADHEAT_PAR_DCU = 3
+    real(r8):: zqrl(pcols,pver)           ! longwave heating
+    real(r8):: zqrs(pcols,pver)           ! shortwave heating
+    type(physics_state) :: state_deep_in  ! input to deep cu
 
     call phys_getopts( microp_scheme_out      = microp_scheme, &
                        macrop_scheme_out      = macrop_scheme, &
@@ -2044,6 +2052,7 @@ subroutine tphysbc (ztodt,               &
                       ,l_rad_out              = l_rad              &
                       ,cld_cpl_opt_out        = cld_cpl_opt        &
                       ,dribble_start_step_out = dribble_start_step &
+                      ,radheat_cpl_opt_out    = radheat_cpl_opt    &
                       )
     
     !-----------------------------------------------------------------------
@@ -2287,6 +2296,35 @@ if (l_dry_adj) then
     call t_stopf('dry_adjustment')
 
 end if
+
+    !====================================================================================
+    ! If radheat_cpl_opt == RADHEAT_PAR_DCU, hide radiative heating from deep convection
+    !====================================================================================
+    call physics_state_copy( state, state_deep_in )
+
+if (l_rad .and. (nstep > dyn_time_lvls-1) ) then
+      
+    select case (radheat_cpl_opt)  
+    case (RADHEAT_SEQ, RADHEAT_PAR_SFC_DYN_DCU)
+
+      continue
+      
+    case (RADHEAT_PAR_DCU)
+      
+      ! Subtract radiative heating from deep convection's input state
+   
+      call get_saved_qrl_qrs( state_deep_in, pbuf, zqrl, zqrs )                 ! in, in, out, out
+      call radheat_tend_add_subtract(-1._r8, zqrl, zqrs, state_deep_in, ptend, &! 4x in, 1x out
+                                      fsns, fsnt, flns, flnt, net_flx          )! 4x in, 1x out
+    
+      call physics_update(state_deep_in, ptend, ztodt) ! Note: no "tend" here, as we are updating a tmp state 
+    
+    case default
+      call endrun("tphysbc, before macmic: unknown choice of radheat_cpl_opt.")
+    end select
+         
+end if   
+    !===============
     !
     !===================================================
     ! Moist convection
@@ -2302,7 +2340,7 @@ end if
          dlf,        pflx,    zdu,       &
          rliq,    &
          ztodt,   &
-         state,   ptend, cam_in%landfrac, pbuf, mu, eu, du, md, ed, dp,   &
+         state_deep_in, ptend, cam_in%landfrac, pbuf, mu, eu, du, md, ed, dp,   &
          dsubcld, jt, maxg, ideep, lengath) 
     call t_stopf('convect_deep_tend')
 
@@ -2385,6 +2423,34 @@ if (l_tracer_aero) then
     call t_stopf('carma_timestep_tend')
 
 end if
+
+    !===================================================================
+    ! Apply radiative heating calculated in the previous time step      
+    !===================================================================
+if (l_rad .and. (nstep > dyn_time_lvls-1) ) then
+      
+    select case (radheat_cpl_opt)  
+    case (RADHEAT_SEQ, RADHEAT_PAR_DCU)
+      continue  ! Default model using sequential splitting. No action needed here.
+      
+    case (RADHEAT_PAR_SFC_DYN_DCU)
+      
+      ! Apply radiative heating calculated in the previous time step
+    
+      call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )                    ! in, in, out, out
+      call radheat_tend_add_subtract( 1._r8, zqrl, zqrs, state, ptend,    &! 4x in, 1x out
+                                      fsns, fsnt, flns, flnt, net_flx     )! 4x in, 1x out
+    
+      call physics_update(state, ptend, ztodt) ! Note: no "tend" here, as rad is parallel to dyn.
+      call check_energy_chng(state, tend, "radheat_add_before_macmic", nstep, ztodt, &
+                             zero, zero, zero, net_flx)
+    
+    case default
+      call endrun("tphysbc, before macmic: unknown choice of radheat_cpl_opt.")
+    end select
+         
+end if   
+    !===============
 
 
     if( microp_scheme == 'RK' ) then
@@ -2739,13 +2805,38 @@ if (l_rad) then
          fsns,    fsnt, flns,    flnt,  &
          fsds, net_flx,is_cmip6_volc)
 
-    ! Set net flux used by spectral dycores
-    do i=1,ncol
-       tend%flx_net(i) = net_flx(i)
-    end do
-    call physics_update(state, ptend, ztodt, tend)
-    call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
+    !------------------------------------
+    ! Apply radiative heating?
+    !------------------------------------
+    select case (radheat_cpl_opt)
+    case (RADHEAT_SEQ, RADHEAT_PAR_DCU) !------ Apply ----------------------------
+  
+      ! Set net flux used by spectral dycores. This is NOT needed by the SE dycore.
+      tend%flx_net(:ncol) = net_flx(:ncol)
 
+      ! Update temperature, dry static energy, geopotential height etc.
+      call physics_update(state, ptend, ztodt, tend)
+      call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
+  
+    case (RADHEAT_PAR_SFC_DYN_DCU) !----- Do not apply yet ------------------------------
+
+      ! Set net flux used by spectral dycores
+      tend%flx_net(:ncol) = 0._r8 
+  
+      ! Destruct ptend. QRL and QRS have been saved to pbuf and will be used later.
+      call physics_ptend_dealloc(ptend)
+    
+      ptend%name  = "none"
+      ptend%lq(:) = .false.       
+      ptend%ls    = .false.
+      ptend%lu    = .false. 
+      ptend%lv    = .false.
+      ptend%psetcols = 0
+
+    case default
+      call endrun("tphysbc, after rad: unknown choice of radheat_cpl_opt")
+    end select !-----------------------------------------------------------------
+       
     call t_stopf('radiation')
 
 end if ! l_rad
