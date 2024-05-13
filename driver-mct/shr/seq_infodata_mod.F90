@@ -524,8 +524,8 @@ CONTAINS
        flux_diurnal          = .false.
        ocn_surface_flux_scheme = 0
        coldair_outbreak_mod = .false.
-       flux_convergence      = 0.0_SHR_KIND_R8
-       flux_max_iteration    = 2
+       flux_convergence      = 1.e-13_SHR_KIND_R8
+       flux_max_iteration    = 100
        glc_renormalize_smb   = 'on_if_glc_coupled_fluxes'
        wall_time_limit       = -1.0
        force_stop_at         = 'month'

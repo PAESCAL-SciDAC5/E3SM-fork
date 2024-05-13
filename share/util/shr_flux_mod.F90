@@ -232,9 +232,11 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
    real(R8)    :: rh     ! sqrt of exchange coefficient (heat)
    real(R8)    :: re     ! sqrt of exchange coefficient (water)
    real(R8)    :: ustar  ! ustar
-   real(r8)     :: ustar_prev
+   real(r8)    :: ustar_prev
    real(R8)    :: qstar  ! qstar
+   real(R8)    :: qstar_prev  
    real(R8)    :: tstar  ! tstar
+   real(R8)    :: tstar_prev
    real(R8)    :: hol    ! H (at zbot) over L
    real(R8)    :: xsq    ! ?
    real(R8)    :: xqq    ! ?
@@ -383,6 +385,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         tstar = rhn * delt
         qstar = ren * delq
         ustar_prev = ustar*2.0_R8
+        tstar_prev = tstar*2.0_R8
+        qstar_prev = qstar*2.0_R8
         if (present(wsresp) .and. present(tau_est)) prev_tau = tau_est(n)
         tau_diff = 1.e100_R8
         wind_adj = wind0
@@ -402,10 +406,14 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         end if
         iter = 0
         do while( (abs((ustar - ustar_prev)/ustar) > flux_con_tol .or. &
+             (abs((tstar - tstar_prev)/tstar) > flux_con_tol .or. &
+             (abs((qstar - qstar_prev)/qstar) > flux_con_tol .or. &
              abs(tau_diff) > dtaumin) .and. &
              iter < flux_con_max_iter)
            iter = iter + 1
            ustar_prev = ustar
+           tstar_prev = tstar
+           qstar_prev = qstar
            !--- compute stability & evaluate all stability functions ---
            hol  = loc_karman*loc_g*zbot(n)*  &
                 (tstar/thbot(n)+qstar/(1.0_R8/loc_zvir+qbot(n)))/ustar**2
@@ -428,7 +436,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            if (hol > 0.5) then
                rhn = 0.018
            else if (hol > -0.5) then
-               rhn = 0.018 + (0.0327 - 0.018)/(-2.0*0.5) * (hol - 0.5)
+               rhn = 0.018 + (0.0327 - 0.018)/(-2.0*eps_reg) * (hol - eps_reg)
            else 
                rhn = 0.0327
            end if
