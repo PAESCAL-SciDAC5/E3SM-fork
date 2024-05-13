@@ -406,8 +406,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         end if
         iter = 0
         do while( (abs((ustar - ustar_prev)/ustar) > flux_con_tol .or. &
-             (abs((tstar - tstar_prev)/tstar) > flux_con_tol .or. &
-             (abs((qstar - qstar_prev)/qstar) > flux_con_tol .or. &
+             abs((tstar - tstar_prev)/tstar) > flux_con_tol .or. &
+             abs((qstar - qstar_prev)/qstar) > flux_con_tol .or. &
              abs(tau_diff) > dtaumin) .and. &
              iter < flux_con_max_iter)
            iter = iter + 1
