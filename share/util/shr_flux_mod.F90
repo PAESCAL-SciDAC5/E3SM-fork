@@ -405,6 +405,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            tau_diff = 0._R8
         end if
         iter = 0
+
+        print *, "Printing from sfc iteration!", tau_diff, flux_con_tol, flux_con_max_iter
         do while( (abs((ustar - ustar_prev)/ustar) > flux_con_tol .or. &
              abs((tstar - tstar_prev)/tstar) > flux_con_tol .or. &
              abs((qstar - qstar_prev)/qstar) > flux_con_tol .or. &
