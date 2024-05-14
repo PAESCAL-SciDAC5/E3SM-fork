@@ -344,6 +344,10 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
   ! where m = (0.0327 - 0.018)/(-2.0*eps_reg)
   eps_reg = 0.5
 
+  !--- temporary hard-coding change of max iters and convergence ---
+  flux_con_tol = 1.e-13_R8
+  flux_con_max_iter = 100
+
    DO n=1,nMax
      if (mask(n) /= 0) then
 
