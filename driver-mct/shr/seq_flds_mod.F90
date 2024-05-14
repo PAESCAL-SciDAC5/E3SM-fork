@@ -1465,6 +1465,24 @@ contains
     attname  = 'So_ustar'
     call metadata_set(attname, longname, stdname, units)
 
+    ! Temperature turbulence parameter in ocean
+    call seq_flds_add(xao_states,"So_tstar")
+    call seq_flds_add(x2a_states,"So_tstar")
+    longname = 'Temperature turbulence parameter in ocean'
+    stdname  = 'temperature_turbulence_parameter'
+    units    = 'K'
+    attname  = 'So_tstar'
+    call metadata_set(attname, longname, stdname, units)
+
+    ! Humidity turbulence parameter in ocean
+    call seq_flds_add(xao_states,"So_qstar")
+    call seq_flds_add(x2a_states,"So_qstar")
+    longname = 'Humidity turbulence parameter in ocean'
+    stdname  = 'humidity_turbulence_parameter'
+    units    = 'kg kg-1'
+    attname  = 'So_qstar'
+    call metadata_set(attname, longname, stdname, units)
+
     ! Water temperature heat flux from ocean
     call seq_flds_add(o2x_fluxes, "Faoo_h2otemp")
     call seq_flds_add(x2a_fluxes, "Faoo_h2otemp")

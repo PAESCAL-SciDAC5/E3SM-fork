@@ -115,6 +115,8 @@ contains
           ! fields needed to calculate water isotopes to ocean evaporation processes
           !
           cam_in(c)%ustar(i) = x2a(index_x2a_So_ustar,ig)
+          cam_in(c)%tstar(i) = x2a(index_x2a_So_tstar,ig)
+          cam_in(c)%qstar(i) = x2a(index_x2a_So_qstar,ig)
           cam_in(c)%re(i)    = x2a(index_x2a_So_re   ,ig)
           cam_in(c)%ssq(i)   = x2a(index_x2a_So_ssq  ,ig)
           !
