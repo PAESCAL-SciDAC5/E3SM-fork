@@ -156,10 +156,11 @@ cat << EOF >> user_nl_eam
 ! h0: monthly mean
 ! h1: instantaneous output every 5 days; 4 months (4x30/5=24 time slices) per file
 
-nhtfrq          =  0,-120
-mfilt           =  1,24
-avgflag_pertape = 'A','I'
+nhtfrq          =  0,
+mfilt           =  1,
+avgflag_pertape = 'A',
 
+history_amwg        = .true.
 history_aerosol     = .false.
 history_aero_optics = .false.
 history_budget      = .false.
