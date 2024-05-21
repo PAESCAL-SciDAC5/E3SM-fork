@@ -410,7 +410,6 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         end if
         iter = 0
 
-        print *, "Printing from sfc iteration!", tau_diff, flux_con_tol, flux_con_max_iter
         do while( (abs((ustar - ustar_prev)/ustar) > flux_con_tol .or. &
              abs((tstar - tstar_prev)/tstar) > flux_con_tol .or. &
              abs((qstar - qstar_prev)/qstar) > flux_con_tol .or. &
@@ -473,6 +472,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            write(s_logunit,*) ustar,ustar_prev,flux_con_tol,flux_con_max_iter
            call shr_sys_abort('No iterations performed ' // errMsg(sourcefile, __LINE__))
         end if
+
         !------------------------------------------------------------
         ! compute the fluxes
         !------------------------------------------------------------
@@ -487,6 +487,14 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         sen (n) =          cp * tau * tstar / ustar
         lat (n) =  loc_latvap * tau * qstar / ustar
         lwup(n) = -loc_stebol * ts(n)**4
+
+
+        print *, "Number of iterations performed: ", iter, ", Wind speed: ", ubot(n), " and ", &
+               vbot(n), ", theta_a: ", thbot(n), ", theta_s: ", ts(n), ", density: ", rbot(n), &
+               ", height: ", zbot(n), ", q_a: ", qbot(n), ", q_s: ", ssq, ", ustar: ", ustar, &
+               ", tstar: ", tstar, ", qstar: ", qstar, ", tau: ", tau, "sen: ", sen(n), &
+               ", lat: ", lat(n), ", res1: ", abs((ustar - ustar_prev)/ustar), ", res2: ", &
+               abs((tstar - tstar_prev)/tstar), ", res3: ", abs((qstar - qstar_prev)/qstar)
 
         !--- water flux ---
         evap(n) = lat(n)/loc_latvap
