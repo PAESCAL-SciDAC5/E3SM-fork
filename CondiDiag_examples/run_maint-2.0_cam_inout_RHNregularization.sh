@@ -25,7 +25,7 @@ readonly PROJECT="m4359"
 readonly COMPSET="F2010"
 readonly RESOLUTION="ne30pg2_oECv3"
 # BEFORE RUNNING : CHANGE the following CASE_NAME to desired value
-readonly CASE_NAME="EAMv2_RHNreg_sfc_inout_"$RESOLUTION
+readonly CASE_NAME="EAMv2_RHNreg_fullconvergence_printiteration_sfc_inout_"$RESOLUTION
 # If this is part of a simulation campaign, ask your group lead about using a case_group label
 # readonly CASE_GROUP=""
 
