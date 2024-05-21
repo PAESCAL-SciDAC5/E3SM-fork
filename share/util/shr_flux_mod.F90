@@ -410,6 +410,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         end if
         iter = 0
 
+        print *, "Initial iteration...ustar: ", ustar, " tstar: ", tstar, " qstar: " qstar
+
         do while( (abs((ustar - ustar_prev)/ustar) > flux_con_tol .or. &
              abs((tstar - tstar_prev)/tstar) > flux_con_tol .or. &
              abs((qstar - qstar_prev)/qstar) > flux_con_tol .or. &
@@ -490,7 +492,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
 
 
         print *, "Number of iterations performed: ", iter, ", Wind speed: ", ubot(n), " and ", &
-               vbot(n), ", Gustiness: ", ugust(n), ", Effective wind speed: ", vmag, &
+               vbot(n), ", Effective wind speed: ", vmag, &
                ", theta_a: ", thbot(n), ", theta_s: ", ts(n), ", density: ", rbot(n), &
                ", height: ", zbot(n), ", q_a: ", qbot(n), ", q_s: ", ssq, ", ustar: ", ustar, &
                ", tstar: ", tstar, ", qstar: ", qstar, ", tau: ", tau, "sen: ", sen(n), &
