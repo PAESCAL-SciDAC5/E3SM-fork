@@ -410,7 +410,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         end if
         iter = 0
 
-        print *, "Initial iteration...ustar: ", ustar, " tstar: ", tstar, " qstar: " qstar
+        print *, "Initial iteration...ustar: ", ustar, " tstar: ", tstar, " qstar: ", qstar
 
         do while( (abs((ustar - ustar_prev)/ustar) > flux_con_tol .or. &
              abs((tstar - tstar_prev)/tstar) > flux_con_tol .or. &
