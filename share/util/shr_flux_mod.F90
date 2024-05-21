@@ -490,7 +490,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
 
 
         print *, "Number of iterations performed: ", iter, ", Wind speed: ", ubot(n), " and ", &
-               vbot(n), ", theta_a: ", thbot(n), ", theta_s: ", ts(n), ", density: ", rbot(n), &
+               vbot(n), ", Gustiness: ", ugust(n), ", Effective wind speed: ", vmag, &
+               ", theta_a: ", thbot(n), ", theta_s: ", ts(n), ", density: ", rbot(n), &
                ", height: ", zbot(n), ", q_a: ", qbot(n), ", q_s: ", ssq, ", ustar: ", ustar, &
                ", tstar: ", tstar, ", qstar: ", qstar, ", tau: ", tau, "sen: ", sen(n), &
                ", lat: ", lat(n), ", res1: ", abs((ustar - ustar_prev)/ustar), ", res2: ", &
