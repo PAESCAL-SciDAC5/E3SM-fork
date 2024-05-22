@@ -435,6 +435,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            rd   = rdn / max(1.0_R8 + rdn/loc_karman*(alz-psimh), 1.e-3_r8)
            u10n = vmag * rd / rdn
 
+           print *, "Shifting wind speed...RD: ", rd, ", RDN: ", rdn, ", u10n: ", u10n
+
            !--- update transfer coeffs at 10m and neutral stability ---
            rdn = sqrt(cdn(u10n))
            ren = 0.0346_R8 !cexcd
