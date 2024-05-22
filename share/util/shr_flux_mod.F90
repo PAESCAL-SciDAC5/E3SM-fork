@@ -442,9 +442,9 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            ren = 0.0346_R8 !cexcd
 
            !--- C1 regularization of rhn based on third degree polynomial ---
-           if (hol > 0.5) then
+           if (hol > eps_reg) then
                rhn = 0.018
-           else if (hol > -0.5) then
+           else if (hol > -eps_reg) then
                rhn = 0.018 + (0.0327 - 0.018)/(-2.0*eps_reg) * (hol - eps_reg)
            else 
                rhn = 0.0327
@@ -465,7 +465,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
                   ", theta_a: ", thbot(n), ", theta_s: ", ts(n), ", density: ", rbot(n), &
                   ", height: ", zbot(n), ", q_a: ", qbot(n), ", q_s: ", ssq, ", ustar: ", ustar, &
                   ", tstar: ", tstar, ", qstar: ", qstar, &
-                  ", Zeta: ", hol, ", u10n: ", u10n
+                  ", Zeta: ", hol, ", u10n: ", u10n, ", RHN: ", rhn, ", RH: ", rh
 
            if (present(wsresp) .and. present(tau_est)) then
               ! Update stress and magnitude of mean wind.
