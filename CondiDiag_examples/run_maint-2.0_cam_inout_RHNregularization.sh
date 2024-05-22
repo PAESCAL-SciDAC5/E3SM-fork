@@ -62,8 +62,8 @@ readonly CASE_ARCHIVE_DIR=${CASE_ROOT}/archive
 #  short tests: 'XS_2x5_ndays', 'XS_1x10_ndays', 'S_1x10_ndays',
 #               'M_1x10_ndays', 'M2_1x10_ndays', 'M80_1x10_ndays', 'L_1x10_ndays'
 #  or 'production' for full simulation
-#readonly run='XS_1x1_nmonths'
-readonly run='production'
+readonly run='XS_1x1_nmonths'
+# readonly run='production'
 if [ "${run}" != "production" ]; then
 
   # Short test simulations
