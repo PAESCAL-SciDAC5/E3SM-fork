@@ -342,7 +342,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
   !        = 0.018 + m * (hol - eps_reg), if -eps_reg <= hol <= eps_reg
   !        = 0.0327,                      if hol < -eps_reg
   ! where m = (0.0327 - 0.018)/(-2.0*eps_reg)
-  eps_reg = 0.5
+  eps_reg = 0.5_R8
 
   !--- temporary hard-coding change of max iters and convergence ---
   flux_con_tol = 1.e-13_R8
@@ -441,13 +441,13 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            rdn = sqrt(cdn(u10n))
            ren = 0.0346_R8 !cexcd
 
-           !--- C1 regularization of rhn based on third degree polynomial ---
+           !--- C0 regularization of rhn based on linear function ---
            if (hol > eps_reg) then
-               rhn = 0.018
+               rhn = 0.018_R8
            else if (hol > -eps_reg) then
-               rhn = 0.018 + (0.0327 - 0.018)/(-2.0*eps_reg) * (hol - eps_reg)
+               rhn = 0.018_R8 + (0.0327_R8 - 0.018_R8)/(-2.0_R8*eps_reg) * (hol - eps_reg)
            else 
-               rhn = 0.0327
+               rhn = 0.0327_R8
            end if
 
            !--- shift all coeffs to measurement height and stability ---
