@@ -458,6 +458,13 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            tstar = rh * delt
            qstar = re * delq
 
+           print *, "Number of iterations performed: ", iter, ", Wind speed: ", ubot(n), " and ", &
+                  vbot(n), ", Effective wind speed: ", vmag, &
+                  ", theta_a: ", thbot(n), ", theta_s: ", ts(n), ", density: ", rbot(n), &
+                  ", height: ", zbot(n), ", q_a: ", qbot(n), ", q_s: ", ssq, ", ustar: ", ustar, &
+                  ", tstar: ", tstar, ", qstar: ", qstar, &
+                  ", Zeta: ", hol, ", u10n: ", u10n
+
            if (present(wsresp) .and. present(tau_est)) then
               ! Update stress and magnitude of mean wind.
               tau = rbot(n) * ustar * rd * wind_adj
@@ -491,13 +498,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         lwup(n) = -loc_stebol * ts(n)**4
 
 
-        print *, "Number of iterations performed: ", iter, ", Wind speed: ", ubot(n), " and ", &
-               vbot(n), ", Effective wind speed: ", vmag, &
-               ", theta_a: ", thbot(n), ", theta_s: ", ts(n), ", density: ", rbot(n), &
-               ", height: ", zbot(n), ", q_a: ", qbot(n), ", q_s: ", ssq, ", ustar: ", ustar, &
-               ", tstar: ", tstar, ", qstar: ", qstar, ", tau: ", tau, "sen: ", sen(n), &
-               ", lat: ", lat(n), ", res1: ", abs((ustar - ustar_prev)/ustar), ", res2: ", &
-               abs((tstar - tstar_prev)/tstar), ", res3: ", abs((qstar - qstar_prev)/qstar)
+
 
         !--- water flux ---
         evap(n) = lat(n)/loc_latvap
