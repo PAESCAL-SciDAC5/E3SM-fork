@@ -409,9 +409,6 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            tau_diff = 0._R8
         end if
         iter = 0
-
-        print *, "Initial iteration...ustar: ", ustar, " tstar: ", tstar, " qstar: ", qstar
-
         do while( (abs((ustar - ustar_prev)/ustar) > flux_con_tol .or. &
              abs((tstar - tstar_prev)/tstar) > flux_con_tol .or. &
              abs((qstar - qstar_prev)/qstar) > flux_con_tol .or. &
@@ -435,8 +432,6 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            rd   = rdn / max(1.0_R8 + rdn/loc_karman*(alz-psimh), 1.e-3_r8)
            u10n = vmag * rd / rdn
 
-           print *, "Shifting wind speed...RD: ", rd, ", RDN: ", rdn, ", u10n: ", u10n
-
            !--- update transfer coeffs at 10m and neutral stability ---
            rdn = sqrt(cdn(u10n))
            ren = 0.0346_R8 !cexcd
@@ -459,13 +454,6 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            ustar = rd * vmag
            tstar = rh * delt
            qstar = re * delq
-
-           print *, "Number of iterations performed: ", iter, ", Wind speed: ", ubot(n), " and ", &
-                  vbot(n), ", Effective wind speed: ", vmag, &
-                  ", theta_a: ", thbot(n), ", theta_s: ", ts(n), ", density: ", rbot(n), &
-                  ", height: ", zbot(n), ", q_a: ", qbot(n), ", q_s: ", ssq, ", ustar: ", ustar, &
-                  ", tstar: ", tstar, ", qstar: ", qstar, &
-                  ", Zeta: ", hol, ", u10n: ", u10n, ", RHN: ", rhn, ", RH: ", rh
 
            if (present(wsresp) .and. present(tau_est)) then
               ! Update stress and magnitude of mean wind.
