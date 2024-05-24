@@ -150,7 +150,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            &               taux  ,tauy  ,tref  ,qref  ,   &
            &               ocn_surface_flux_scheme, &
            &               duu10n,  ustar_sv   tstar_sv, qstar_sv, &
-           &               re_sv ,ssq_sv,   &
+           &               zeta_sv, re_sv ,ssq_sv,   &
            &               missval, wsresp, tau_est, ugust)
 
 ! !USES:
@@ -199,6 +199,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
    real(R8),intent(out),optional :: ustar_sv(nMax) ! diag: ustar
    real(R8),intent(out),optional :: tstar_sv(nMax) ! diag: tstar
    real(R8),intent(out),optional :: qstar_sv(nMax) ! diag: qstar
+   real(R8),intent(out),optional :: zeta_sv (nMax) ! diag: z/L
    real(R8),intent(out),optional :: re_sv   (nMax) ! diag: sqrt of exchange coefficient (water)
    real(R8),intent(out),optional :: ssq_sv  (nMax) ! diag: sea surface humidity  (kg/kg)
 
@@ -491,6 +492,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         if (present(ustar_sv)) ustar_sv(n) = ustar
         if (present(tstar_sv)) tstar_sv(n) = tstar
         if (present(qstar_sv)) qstar_sv(n) = qstar
+        if (present(zeta_sv )) zeta_sv(n)  = hol
         if (present(re_sv   )) re_sv(n)    = re
         if (present(ssq_sv  )) ssq_sv(n)   = ssq
 
@@ -514,6 +516,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         if (present(ustar_sv)) ustar_sv(n) = spval
         if (present(tstar_sv)) tstar_sv(n) = spval
         if (present(qstar_sv)) qstar_sv(n) = spval
+        if (present(zeta_sv )) zeta_sv (n) = spval
         if (present(re_sv   )) re_sv   (n) = spval
         if (present(ssq_sv  )) ssq_sv  (n) = spval
      endif
@@ -622,6 +625,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         if (present(ustar_sv)) ustar_sv(n) = spval
         if (present(tstar_sv)) tstar_sv(n) = spval
         if (present(qstar_sv)) qstar_sv(n) = spval
+        if (present(zeta_sv )) zeta_sv (n) = spval
         if (present(re_sv   )) re_sv   (n) = spval
         if (present(ssq_sv  )) ssq_sv  (n) = spval
      endif
@@ -673,7 +677,7 @@ SUBROUTINE shr_flux_atmOcn_UA(   &
            &               evap  ,evap_16O, evap_HDO, evap_18O, &
            &               taux  ,tauy  ,tref  ,qref  ,   &
            &               duu10n,  ustar_sv   ,tstar_sv, qstar_sv, &
-           &               re_sv ,ssq_sv,   &
+           &               zeta_sv, re_sv ,ssq_sv,   &
            &               missval, wsresp, tau_est)
 
 
@@ -722,6 +726,7 @@ SUBROUTINE shr_flux_atmOcn_UA(   &
    real(R8),intent(out),optional :: ustar_sv(nMax) ! diag: ustar
    real(R8),intent(out),optional :: tstar_sv(nMax) ! diag: tstar
    real(R8),intent(out),optional :: qstar_sv(nMax) ! diag: qstar
+   real(R8),intent(out),optional :: zeta_sv (nMax) ! diag: z/L
    real(R8),intent(out),optional :: re_sv   (nMax) ! diag: sqrt of exchange coefficient (water)
    real(R8),intent(out),optional :: ssq_sv  (nMax) ! diag: sea surface humidity  (kg/kg)
 
@@ -1101,6 +1106,7 @@ SUBROUTINE shr_flux_atmOcn_UA(   &
         if (present(ustar_sv)) ustar_sv(n) = ustar
         if (present(tstar_sv)) tstar_sv(n) = tstar
         if (present(qstar_sv)) qstar_sv(n) = qstar
+        if (present(zeta_sv )) zeta_sv(n)  = zeta
         if (present(ssq_sv  )) ssq_sv(n)   = ssq
         if (present(re_sv   )) re_sv(n)    = re
 
@@ -1126,6 +1132,7 @@ SUBROUTINE shr_flux_atmOcn_UA(   &
         if (present(ustar_sv)) ustar_sv(n) = spval
         if (present(tstar_sv)) tstar_sv(n) = spval
         if (present(qstar_sv)) qstar_sv(n) = spval
+        if (present(zeta_sv )) zeta_sv (n) = spval
         if (present(re_sv   )) re_sv   (n) = spval
         if (present(ssq_sv  )) ssq_sv  (n) = spval
 
@@ -1266,7 +1273,7 @@ SUBROUTINE shr_flux_atmOcn_diurnal &
                            tBulk, tSkin, tSkin_day, tSkin_night,           &
                            cSkin, cSkin_night, secs ,dt,                   &
                            duu10n,  ustar_sv   ,tstar_sv, qstar_sv,        &
-                           re_sv ,ssq_sv,             &
+                           zeta_sv, re_sv ,ssq_sv,             &
                            missval, cold_start, wsresp, tau_est )
 ! !USES:
 
@@ -1357,6 +1364,7 @@ SUBROUTINE shr_flux_atmOcn_diurnal &
    real(R8),intent(out),optional :: ustar_sv(nMax) ! diag: ustar
    real(R8),intent(out),optional :: tstar_sv(nMax) ! diag: tstar
    real(R8),intent(out),optional :: qstar_sv(nMax) ! diag: qstar
+   real(R8),intent(out),optional :: zeta_sv (nMax) ! diag: z/L
    real(R8),intent(out),optional :: re_sv   (nMax) ! diag: sqrt of exchange coefficient (water)
    real(R8),intent(out),optional :: ssq_sv  (nMax) ! diag: sea surface humidity  (kg/kg)
 
@@ -2000,6 +2008,7 @@ SUBROUTINE shr_flux_atmOcn_diurnal &
             if (present(ustar_sv)) ustar_sv(n) = ustar
             if (present(tstar_sv)) tstar_sv(n) = tstar
             if (present(qstar_sv)) qstar_sv(n) = qstar
+            if (present(zeta_sv )) zeta_sv (n) = hol
             if (present(re_sv   )) re_sv   (n) = re
             if (present(ssq_sv  )) ssq_sv  (n) = ssq
 
@@ -2044,6 +2053,7 @@ SUBROUTINE shr_flux_atmOcn_diurnal &
             if (present(ustar_sv)) ustar_sv(n) = spval
             if (present(tstar_sv)) tstar_sv(n) = spval
             if (present(qstar_sv)) qstar_sv(n) = spval
+            if (present(zeta_sv )) zeta_sv (n) = spval
             if (present(re_sv   )) re_sv   (n) = spval
             if (present(ssq_sv  )) ssq_sv  (n) = spval
 

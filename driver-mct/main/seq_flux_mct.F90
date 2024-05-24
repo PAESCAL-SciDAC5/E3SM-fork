@@ -105,6 +105,7 @@ module seq_flux_mct
   real(r8), allocatable ::  ustar(:)  ! saved ustar
   real(r8), allocatable ::  tstar(:)  ! saved tstar
   real(r8), allocatable ::  qstar(:)  ! saved qstar
+  real(r8), allocatable ::  zeta (:)  ! saved z/L
   real(r8), allocatable ::  re   (:)  ! saved re
   real(r8), allocatable ::  ssq  (:)  ! saved sq
 
@@ -171,6 +172,7 @@ module seq_flux_mct
   integer :: index_xao_So_ustar
   integer :: index_xao_So_tstar
   integer :: index_xao_So_qstar
+  integer :: index_xao_So_zeta
   integer :: index_xao_So_re
   integer :: index_xao_So_ssq
   integer :: index_xao_So_duu10n
@@ -291,6 +293,9 @@ contains
     allocate(qstar(nloc),stat=ier)
     if(ier/=0) call mct_die(subName,'allocate qstar',ier)
     qstar = 0.0_r8
+    allocate(zeta(nloc),stat=ier)
+    if(ier/=0) call mct_die(subName,'allocate zeta',ier)
+    zeta = 0.0_r8
     allocate(re(nloc), stat=ier)
     if(ier/=0) call mct_die(subName,'allocate re',ier)
     re = 0.0_r8
@@ -999,6 +1004,7 @@ contains
     integer(in) :: index_ustar
     integer(in) :: index_tstar
     integer(in) :: index_qstar
+    integer(in) :: index_zeta
     integer(in) :: index_ssq
     integer(in) :: index_re
     integer(in) :: index_u10
@@ -1150,7 +1156,7 @@ contains
             warmMaxInc, windMaxInc, qSolInc, windInc, nInc, &
             tbulk, tskin, tskin_day, tskin_night, &
             cskin, cskin_night, tod, dt,          &
-            duu10n,ustar, tstar, qstar, re  , ssq , missval = 0.0_r8, &
+            duu10n,ustar, tstar, qstar, zeta, re  , ssq , missval = 0.0_r8, &
             cold_start=cold_start, wsresp=wsresp, tau_est=tau_est)
     else if (ocn_surface_flux_scheme.eq.2) then
        call shr_flux_atmOcn_UA(nloc_a2o , zbot , ubot, vbot, thbot, &
@@ -1158,7 +1164,7 @@ contains
             uocn, vocn , tocn , emask, sen , lat , lwup , &
             roce_16O, roce_HDO, roce_18O,    &
             evap , evap_16O, evap_HDO, evap_18O, taux, tauy, tref, qref , &
-            duu10n,ustar, tstar, qstar, re  , ssq , missval = 0.0_r8, &
+            duu10n,ustar, tstar, qstar, zeta, re  , ssq , missval = 0.0_r8, &
             wsresp=wsresp, tau_est=tau_est)
     else
 
@@ -1169,7 +1175,7 @@ contains
             roce_16O, roce_HDO, roce_18O,    &
             evap , evap_16O, evap_HDO, evap_18O, taux, tauy, tref, qref , &
             ocn_surface_flux_scheme, &
-            duu10n,ustar, tstar, qstar, re  , ssq , missval = 0.0_r8, &
+            duu10n,ustar, tstar, qstar, zeta, re  , ssq , missval = 0.0_r8, &
             wsresp=wsresp, tau_est=tau_est, ugust=ugust)
     endif
 
@@ -1191,6 +1197,7 @@ contains
     index_ustar  = mct_aVect_indexRA(xaop_ae,"So_ustar")
     index_tstar  = mct_aVect_indexRA(xaop_ae,"So_tstar")
     index_qstar  = mct_aVect_indexRA(xaop_ae,"So_qstar")
+    index_zeta   = mct_aVect_indexRA(xaop_ae,"So_zeta")
     index_ssq    = mct_aVect_indexRA(xaop_ae,"So_ssq")
     index_re     = mct_aVect_indexRA(xaop_ae,"So_re")
     index_u10    = mct_aVect_indexRA(xaop_ae,"So_u10")
@@ -1228,6 +1235,7 @@ contains
        xaop_oe%rAttr(index_ustar ,io) = xaop_oe%rAttr(index_ustar ,io) + ustar(n)*wt   ! friction velocity
        xaop_oe%rAttr(index_tstar ,io) = xaop_oe%rAttr(index_tstar ,io) + tstar(n)*wt   ! temperature turbulence parameter
        xaop_oe%rAttr(index_qstar, io) = xaop_oe%rAttr(index_qstar ,io) + qstar(n)*wt   ! humidity turbulence parameter
+       xaop_oe%rAttr(index_zeta , io) = xaop_oe%rAttr(index_zeta  ,io) + zeta(n)*wt    ! z/L
        xaop_oe%rAttr(index_re    ,io) = xaop_oe%rAttr(index_re    ,io) + re(n)  * wt   ! reynolds number
        xaop_oe%rAttr(index_ssq   ,io) = xaop_oe%rAttr(index_ssq   ,io) + ssq(n) * wt   ! s.hum. saturation at Ts
        xaop_oe%rAttr(index_lwup  ,io) = xaop_oe%rAttr(index_lwup  ,io) + lwup(n)* wt
@@ -1381,6 +1389,7 @@ contains
        index_xao_So_ustar  = mct_aVect_indexRA(xao,'So_ustar')
        index_xao_So_tstar  = mct_aVect_indexRA(xao,'So_tstar')
        index_xao_So_qstar  = mct_aVect_indexRA(xao,'So_qstar')
+       index_xao_So_zeta   = mct_aVect_indexRA(cao,'So_zeta')
        index_xao_So_re     = mct_aVect_indexRA(xao,'So_re')
        index_xao_So_ssq    = mct_aVect_indexRA(xao,'So_ssq')
        index_xao_So_u10    = mct_aVect_indexRA(xao,'So_u10')
@@ -1615,7 +1624,7 @@ contains
             warmMaxInc, windMaxInc, qSolInc, windInc, nInc, &
             tbulk, tskin, tskin_day, tskin_night, &
             cskin, cskin_night, tod, dt,          &
-            duu10n,ustar, tstar, qstar, re  , ssq, &
+            duu10n,ustar, tstar, qstar, zeta, re  , ssq, &
                                 !missval should not be needed if flux calc
                                 !consistent with mrgx2a fraction
                                 !duu10n,ustar, re  , ssq, missval = 0.0_r8 )
@@ -1626,7 +1635,8 @@ contains
             uocn, vocn , tocn , emask, sen , lat , lwup , &
             roce_16O, roce_HDO, roce_18O,    &
             evap , evap_16O, evap_HDO, evap_18O, taux , tauy, tref, qref , &
-            duu10n,ustar, tstar, qstar, re, ssq, wsresp=wsresp, tau_est=tau_est)
+            duu10n,ustar, tstar, qstar, zeta, re, ssq, wsresp=wsresp, &
+            tau_est=tau_est)
     else
        call shr_flux_atmocn (nloc , zbot , ubot, vbot, thbot, &
             shum , shum_16O , shum_HDO, shum_18O, dens , tbot, uocn, vocn , &
@@ -1635,7 +1645,7 @@ contains
             roce_16O, roce_HDO, roce_18O,    &
             evap , evap_16O, evap_HDO, evap_18O, taux , tauy, tref, qref , &
             ocn_surface_flux_scheme, &
-            duu10n,ustar, tstar, qstar, re  , ssq, &
+            duu10n,ustar, tstar, qstar, zeta, re  , ssq, &
             wsresp=wsresp, tau_est=tau_est, ugust=ugust_atm)
        !missval should not be needed if flux calc
        !consistent with mrgx2a fraction
@@ -1657,6 +1667,7 @@ contains
           xao%rAttr(index_xao_So_ustar ,n) = ustar(n)  ! friction velocity
           xao%rAttr(index_xao_So_tstar ,n) = tstar(n)  ! temp turb parameter
           xao%rAttr(index_xao_So_qstar ,n) = qstar(n)  ! humidity turb param
+          xao%rAttr(index_xao_So_zeta  ,n) = zeta(n)   ! z/L
           xao%rAttr(index_xao_So_re    ,n) = re(n)     ! reynolds number
           xao%rAttr(index_xao_So_ssq   ,n) = ssq(n)    ! s.hum. saturation at Ts
           xao%rAttr(index_xao_Faox_lwup,n) = lwup(n)

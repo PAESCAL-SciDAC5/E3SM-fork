@@ -83,6 +83,7 @@ module cam_cpl_indices
   integer :: index_x2a_So_ustar	       ! surface friction velocity in ocean
   integer :: index_x2a_So_tstar        ! temperature turbulence parameter
   integer :: index_x2a_So_qstar        ! humidity turbulence parameter
+  integer :: index_x2a_So_zeta         ! z/L
   integer :: index_x2a_So_re           ! square of atm/ocn exch. coeff 
   integer :: index_x2a_So_ssq          ! surface saturation specific humidity in ocean 
   integer :: index_x2a_Sl_ddvel        ! dry deposition velocities from land
@@ -132,6 +133,7 @@ contains
     index_x2a_So_ustar      = mct_avect_indexra(x2a,'So_ustar')
     index_x2a_So_tstar      = mct_avect_indexra(x2a,'So_tstar')
     index_x2a_So_qstar      = mct_avect_indexra(x2a,'So_qstar')
+    index_x2a_So_zeta       = mct_avect_indexra(x2a,'So_zeta')
     index_x2a_So_re         = mct_avect_indexra(x2a,'So_re')
     index_x2a_So_ssq        = mct_avect_indexra(x2a,'So_ssq')
     index_x2a_Sl_fv         = mct_avect_indexra(x2a,'Sl_fv')

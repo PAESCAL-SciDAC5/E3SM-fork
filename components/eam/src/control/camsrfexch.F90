@@ -120,6 +120,7 @@ module camsrfexch
      real(r8), allocatable :: ustar(:)      ! atm/ocn saved version of ustar
      real(r8), allocatable :: tstar(:)      ! atm/ocn saved version of tstar
      real(r8), allocatable :: qstar(:)      ! atm/ocn saved version of qstar
+     real(r8), allocatable :: zeta(:)       ! atm/ocn saved version of z/L
      real(r8), allocatable :: re(:)         ! atm/ocn saved version of re
      real(r8), allocatable :: ssq(:)        ! atm/ocn saved version of ssq
      real(r8), pointer, dimension(:,:) :: depvel   ! deposition velocities
@@ -274,6 +275,9 @@ CONTAINS
 
        allocate (cam_in(c)%qstar(pcols), stat=ierror)
        if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error qstar')
+
+       allocate (cam_in(c)%zeta(pcols), stat=ierror)
+       if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error zeta')
 
        allocate (cam_in(c)%re(pcols), stat=ierror)
        if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error re')
