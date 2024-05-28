@@ -25,7 +25,7 @@ readonly PROJECT="m4359"
 readonly COMPSET="F2010"
 readonly RESOLUTION="ne30pg2_oECv3"
 # BEFORE RUNNING : CHANGE the following CASE_NAME to desired value
-readonly CASE_NAME="EAMv2_RHNreg_fullconvergence_printiteration_sfc_inout_"$RESOLUTION
+readonly CASE_NAME="EAMv2_RHNreg_fullconvergence_eps0.5_basicfpi_sfc_inout_"$RESOLUTION
 # If this is part of a simulation campaign, ask your group lead about using a case_group label
 # readonly CASE_GROUP=""
 
@@ -62,8 +62,8 @@ readonly CASE_ARCHIVE_DIR=${CASE_ROOT}/archive
 #  short tests: 'XS_2x5_ndays', 'XS_1x10_ndays', 'S_1x10_ndays',
 #               'M_1x10_ndays', 'M2_1x10_ndays', 'M80_1x10_ndays', 'L_1x10_ndays'
 #  or 'production' for full simulation
-readonly run='XS_1x1_nmonths'
-# readonly run='production'
+# readonly run='XS_1x1_nmonths'
+readonly run='production'
 if [ "${run}" != "production" ]; then
 
   # Short test simulations

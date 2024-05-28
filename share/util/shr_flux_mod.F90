@@ -247,6 +247,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
    real(R8)    :: alz    ! ln(zbot/zref)
    real(R8)    :: al2    ! ln(zref/ztref)
    real(R8)    :: u10n   ! 10m neutral wind
+   real(R8)    :: u10n_prev
    real(R8)    :: tau    ! stress at zbot
    real(R8)    :: cp     ! specific heat of moist air
    real(R8)    :: fac    ! vertical interpolation factor
@@ -257,6 +258,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
    real(R8)    :: prev_tau_diff ! previous value of tau_diff (Pa)
    real(R8)    :: wind_adj ! iteration-adjusted wind speed (m/s)
    real(R8)    :: eps_reg ! regularization width for rhn
+   real(R8)    :: alpha_iter ! relaxation parameter for fixed point iteration
 !!++ COARE only
    real(R8)    :: zo,zot,zoq      ! roughness lengths
    real(R8)    :: hsb,hlb         ! sens & lat heat flxs at zbot
@@ -343,6 +345,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
   !        = 0.0327,                      if hol < -eps_reg
   ! where m = (0.0327 - 0.018)/(-2.0*eps_reg)
   eps_reg = 0.5_R8
+  alpha_iter = 1.0_R8
 
   !--- temporary hard-coding change of max iters and convergence ---
   flux_con_tol = 1.e-13_R8
@@ -391,6 +394,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         ustar_prev = ustar*2.0_R8
         tstar_prev = tstar*2.0_R8
         qstar_prev = qstar*2.0_R8
+        u10n = vmag 
+
         if (present(wsresp) .and. present(tau_est)) prev_tau = tau_est(n)
         tau_diff = 1.e100_R8
         wind_adj = wind0
@@ -418,6 +423,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            ustar_prev = ustar
            tstar_prev = tstar
            qstar_prev = qstar
+           u10n_prev = u10n
            !--- compute stability & evaluate all stability functions ---
            hol  = loc_karman*loc_g*zbot(n)*  &
                 (tstar/thbot(n)+qstar/(1.0_R8/loc_zvir+qbot(n)))/ustar**2
@@ -430,10 +436,10 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
 
            !--- shift wind speed using old coefficient ---
            rd   = rdn / max(1.0_R8 + rdn/loc_karman*(alz-psimh), 1.e-3_r8)
-           u10n = vmag * rd / rdn
+           u10n = alpha_iter * (vmag * rd / rdn) + (1.0_R8 - alpha_iter) * u10n_prev
 
            !--- update transfer coeffs at 10m and neutral stability ---
-           rdn = sqrt(cdn(u10n))
+           rdn = sqrt(cdn(u10n_prev))
            ren = 0.0346_R8 !cexcd
 
            !--- C0 regularization of rhn based on linear function ---
@@ -451,9 +457,9 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
            re = ren / (1.0_R8 + ren/loc_karman*(alz-psixh))
 
            !--- update ustar, tstar, qstar using updated, shifted coeffs --
-           ustar = rd * vmag
-           tstar = rh * delt
-           qstar = re * delq
+           ustar = alpha_iter * (rd * vmag) + (1.0_R8 - alpha_iter) * ustar
+           tstar = alpha_iter * (rh * delt) + (1.0_R8 - alpha_iter) * tstar
+           qstar = alpha_iter * (re * delq) + (1.0_R8 - alpha_iter) * qstar
 
            if (present(wsresp) .and. present(tau_est)) then
               ! Update stress and magnitude of mean wind.
