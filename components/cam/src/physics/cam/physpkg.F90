@@ -95,6 +95,10 @@ module physpkg
   logical           :: pergro_mods = .false.
   logical           :: is_cmip6_volc !true if cmip6 style volcanic file is read otherwise false
 
+  integer,parameter :: RADHEAT_SEQ             = 1
+  integer,parameter :: RADHEAT_PAR_SFC_DYN_DCU = 2
+  integer,parameter :: RADHEAT_PAR_DCU         = 3
+  integer,parameter :: RADHEAT_PAR_DYN_DCU     = 4
   !======================================================================= 
 contains
 
@@ -1157,6 +1161,7 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
 
     use cam_diagnostics,only: diag_deallocate, diag_surf
     use comsrf,         only: trefmxav, trefmnav, sgh, sgh30, fsds 
+    use comsrf,         only: fsns, fsnt, flns, flnt
     use physconst,      only: stebol, latvap
     use carma_intr,     only: carma_accumulate_stats
 #if ( defined OFFLINE_DYN )
@@ -1249,7 +1254,7 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
        call tphysac(ztodt, cam_in(c),  &
             sgh(1,c), sgh30(1,c), cam_out(c),                              &
             phys_state(c), phys_tend(c), phys_buffer_chunk,&
-            fsds(1,c))
+            fsds(1,c), fsns(1,c), fsnt(1,c), flns(1,c), flnt(1,c))
     end do                    ! Chunk loop
 
     !call t_adj_detailf(-1)
@@ -1308,7 +1313,7 @@ end subroutine phys_final
 subroutine tphysac (ztodt,   cam_in,  &
        sgh,     sgh30,                                     &
        cam_out,  state,   tend,    pbuf,            &
-       fsds    )
+       fsds, fsns, fsnt, flns, flnt    )
     !----------------------------------------------------------------------- 
     ! 
     ! Purpose: 
@@ -1326,6 +1331,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     ! 
     !-----------------------------------------------------------------------
     use physics_buffer, only: physics_buffer_desc, pbuf_set_field, pbuf_get_index, pbuf_get_field, pbuf_old_tim_idx
+    use physics_buffer, only: dyn_time_lvls
     use shr_kind_mod,       only: r8 => shr_kind_r8
     use chemistry,          only: chem_is_active, chem_timestep_tend, chem_emissions
     use cam_diagnostics,    only: diag_phys_tend_writeout
@@ -1363,6 +1369,8 @@ subroutine tphysac (ztodt,   cam_in,  &
     use unicon_cam,         only: unicon_cam_org_diags
     use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
     use phys_control,       only: use_qqflx_fixer
+    use radiation,          only: get_saved_qrl_qrs
+    use radheat,            only: radheat_tend_add_subtract
 
     implicit none
 
@@ -1371,6 +1379,11 @@ subroutine tphysac (ztodt,   cam_in,  &
     !
     real(r8), intent(in) :: ztodt                  ! Two times model timestep (2 delta-t)
     real(r8), intent(in) :: fsds(pcols)            ! down solar flux
+    real(r8), intent(in) :: fsns(pcols)            ! Surface solar absorbed flux
+    real(r8), intent(in) :: fsnt(pcols)            ! Net column abs solar flux at model top
+    real(r8), intent(in) :: flns(pcols)            ! Srf longwave cooling (up-down) flux
+    real(r8), intent(in) :: flnt(pcols)            ! Net outgoing lw flux at model top
+
     real(r8), intent(in) :: sgh(pcols)             ! Std. deviation of orography for gwd
     real(r8), intent(in) :: sgh30(pcols)           ! Std. deviation of 30s orography for tms
 
@@ -1433,6 +1446,12 @@ subroutine tphysac (ztodt,   cam_in,  &
     logical :: l_rayleigh
     logical :: l_gw_drag
     logical :: l_ac_energy_chk
+    logical :: l_rad
+    integer :: radheat_cpl_opt
+
+    real(r8):: zqrl(pcols,pver) ! longwave heating
+    real(r8):: zqrs(pcols,pver) ! shortwave heating
+    real(r8):: net_flx(pcols)
 
     !
     !-----------------------------------------------------------------------
@@ -1449,6 +1468,8 @@ subroutine tphysac (ztodt,   cam_in,  &
                       ,l_rayleigh_out         = l_rayleigh         &
                       ,l_gw_drag_out          = l_gw_drag          &
                       ,l_ac_energy_chk_out    = l_ac_energy_chk    &
+                      ,l_rad_out              = l_rad              &
+                      ,radheat_cpl_opt_out    = radheat_cpl_opt    &
                      )
 
     ! Adjust the surface fluxes to reduce instabilities in near sfc layer
@@ -1689,6 +1710,35 @@ if (l_gw_drag) then
 
 end if ! l_gw_drag
 
+    !========================================================================
+    ! If radheat_cpl_opt == RADHEAT_PAR_DYN_DCU,
+    ! Undo the radiative heating applied after radiative_tend.
+    ! (Will be added back again before macmic in the next call of tphysbc.)
+    !========================================================================
+if (l_rad .and. (nstep > dyn_time_lvls-1) ) then
+
+    select case (radheat_cpl_opt)
+    case (RADHEAT_PAR_DYN_DCU)
+
+      ! Subtract radiative heating from deep convection's input state
+
+      call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )                         ! in, in, out, out
+      call radheat_tend_add_subtract(-1._r8, zqrl, zqrs, state, ptend,         &! 4x in, 1x out
+                                      fsns, fsnt, flns, flnt, net_flx          )! 4x in, 1x out
+
+      tend%flx_net(:ncol) = tend%flx_net(:ncol) + net_flx(:ncol) ! Set net flux used by spectral dycores
+      call physics_update(state, ptend, ztodt, tend)  ! Note that with the presence of "tend",
+                                                      ! the effect of radiative heating is also
+                                                      ! excluded from the physics-total *tendency*
+                                                      ! passed to the dycore.
+
+      call check_energy_chng(state, tend, "radheat_subtract_before_dyn", nstep, ztodt, &
+                             zero, zero, zero, net_flx)
+    end select
+
+end if
+
+
     !===================================================
     ! Update Nudging values, if needed
     !===================================================
@@ -1696,6 +1746,7 @@ end if ! l_gw_drag
       call nudging_timestep_tend(state,ptend)
       call physics_update(state,ptend,ztodt,tend)
     endif
+
 
 if (l_ac_energy_chk) then
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -2033,9 +2084,6 @@ subroutine tphysbc (ztodt,               &
     type(physics_ptend) :: ptend_dribble  ! local array to save tendencies to be dribbled into mac-mic subcyles
 
     integer :: radheat_cpl_opt            ! options for when to apply radheat
-    integer,parameter :: RADHEAT_SEQ = 1
-    integer,parameter :: RADHEAT_PAR_SFC_DYN_DCU = 2
-    integer,parameter :: RADHEAT_PAR_DCU = 3
     real(r8):: zqrl(pcols,pver)           ! longwave heating
     real(r8):: zqrs(pcols,pver)           ! shortwave heating
     type(physics_state) :: state_deep_in  ! input to deep cu
@@ -2305,7 +2353,7 @@ end if
 if (l_rad .and. (nstep > dyn_time_lvls-1) ) then
       
     select case (radheat_cpl_opt)  
-    case (RADHEAT_SEQ, RADHEAT_PAR_SFC_DYN_DCU)
+    case (RADHEAT_SEQ, RADHEAT_PAR_SFC_DYN_DCU,RADHEAT_PAR_DYN_DCU)
 
       continue
       
@@ -2433,18 +2481,18 @@ if (l_rad .and. (nstep > dyn_time_lvls-1) ) then
     case (RADHEAT_SEQ, RADHEAT_PAR_DCU)
       continue  ! Default model using sequential splitting. No action needed here.
       
-    case (RADHEAT_PAR_SFC_DYN_DCU)
+    case (RADHEAT_PAR_SFC_DYN_DCU, RADHEAT_PAR_DYN_DCU)
       
       ! Apply radiative heating calculated in the previous time step
     
       call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )                    ! in, in, out, out
       call radheat_tend_add_subtract( 1._r8, zqrl, zqrs, state, ptend,    &! 4x in, 1x out
                                       fsns, fsnt, flns, flnt, net_flx     )! 4x in, 1x out
-    
+
       call physics_update(state, ptend, ztodt) ! Note: no "tend" here, as rad is parallel to dyn.
       call check_energy_chng(state, tend, "radheat_add_before_macmic", nstep, ztodt, &
                              zero, zero, zero, net_flx)
-    
+
     case default
       call endrun("tphysbc, before macmic: unknown choice of radheat_cpl_opt.")
     end select
@@ -2809,7 +2857,7 @@ if (l_rad) then
     ! Apply radiative heating?
     !------------------------------------
     select case (radheat_cpl_opt)
-    case (RADHEAT_SEQ, RADHEAT_PAR_DCU) !------ Apply ----------------------------
+    case (RADHEAT_SEQ, RADHEAT_PAR_DCU, RADHEAT_PAR_DYN_DCU) !------ Apply ----------------------------
   
       ! Set net flux used by spectral dycores. This is NOT needed by the SE dycore.
       tend%flx_net(:ncol) = net_flx(:ncol)
