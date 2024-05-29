@@ -2489,7 +2489,9 @@ if (l_rad .and. (nstep > dyn_time_lvls-1) ) then
       call radheat_tend_add_subtract( 1._r8, zqrl, zqrs, state, ptend,    &! 4x in, 1x out
                                       fsns, fsnt, flns, flnt, net_flx     )! 4x in, 1x out
 
-      call physics_update(state, ptend, ztodt) ! Note: no "tend" here, as rad is parallel to dyn.
+      tend%flx_net(:ncol) = net_flx(:ncol)
+      call physics_update(state, ptend, ztodt, tend)
+     !call physics_update(state, ptend, ztodt) ! Note: no "tend" here, as rad is parallel to dyn.
       call check_energy_chng(state, tend, "radheat_add_before_macmic", nstep, ztodt, &
                              zero, zero, zero, net_flx)
 
