@@ -99,17 +99,69 @@ integer  ::      snow_pcw_idx = 0
 integer  ::      wsresp_idx = 0
 integer  ::      tau_est_idx = 0
 
+integer  ::      ubot_time_levels_idx = 0
+integer  ::      vbot_time_levels_idx = 0
+integer  ::      tbot_time_levels_idx = 0
+integer  ::      qbot_time_levels_idx = 0
+
 integer :: tpert_idx=-1, qpert_idx=-1, pblh_idx=-1
 logical :: prog_modal_aero
 logical :: linearize_pbl_winds
+
+integer, parameter :: seconds_per_day = 86400
+integer :: steps_per_day ! Number of atmosphere time steps per day.
+                         ! This module assumes that this really is an integer,
+                         ! otherwise discrete Fourier transform diagnostics will
+                         ! only approximate the correct periods.
+integer :: steps_for_2dt ! Even number of time steps used for 2*dtime diagnostics.
+
+real(r8) :: power_factor ! Conversion factor converting DFT component squared
+                         ! to power spectral density (seconds)
+
+! Weights to get a component of the discrete Fourier transform for different periods.
+! (FFT is overkill when we only need a couple of frequencies.)
+real(r8), allocatable :: fourier_1day_real_weights(:)
+real(r8), allocatable :: fourier_1day_imag_weights(:)
+! For an even-length time series, only real weights are needed for the 2*dtime
+! diagnostics.
+real(r8), allocatable :: fourier_2dt_weights(:)
 contains
 
 ! ===============================================================================
 
 subroutine diag_register
-    
+  use cam_logfile, only: iulog
+  use spmd_utils, only: masterproc
+  use time_manager, only: get_step_size
+
+  integer :: step_size ! in seconds
+
    ! Request physics buffer space for fields that persist across timesteps.
    call pbuf_add_field('T_TTEND', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), t_ttend_idx)
+
+  step_size = get_step_size()
+  steps_per_day = seconds_per_day / step_size
+  if (masterproc .and. step_size * steps_per_day /= seconds_per_day) then
+     write(iulog,*) "WARNING: Atmosphere time step size does not evenly divide a day."
+     write(iulog,*) "Online Fourier diagnostics tied to the diurnal cycle may be inaccurate."
+  end if
+  ! The below message is unlikely to trigger in any context where it would be useful,
+  ! but sometimes people try out unusual edge cases, so it's included for completeness.
+  if (masterproc .and. steps_per_day < 2) then
+     write(iulog,*) "WARNING: Atmosphere model takes fewer than two time steps per day."
+     write(iulog,*) "Unless you are testing heavily modified physics and dynamics, the model will crash."
+     write(iulog,*) "Online Fourier diagnostics will be inaccurate."
+  end if
+  if (mod(steps_per_day, 2) == 0) then
+     steps_for_2dt = steps_per_day
+  else
+     steps_for_2dt = steps_per_day - 1
+  end if
+  power_factor = real(seconds_per_day, r8) / (steps_per_day * steps_per_day)
+  call pbuf_add_field('UBOT_TIME_LEVELS', 'global', dtype_r8, [pcols, steps_per_day], ubot_time_levels_idx)
+  call pbuf_add_field('VBOT_TIME_LEVELS', 'global', dtype_r8, [pcols, steps_per_day], vbot_time_levels_idx)
+  call pbuf_add_field('TBOT_TIME_LEVELS', 'global', dtype_r8, [pcols, steps_per_day], tbot_time_levels_idx)
+  call pbuf_add_field('QBOT_TIME_LEVELS', 'global', dtype_r8, [pcols, steps_per_day], qbot_time_levels_idx)
 
 end subroutine diag_register
 
@@ -153,7 +205,8 @@ end subroutine diag_readnl
 
 !================================================================================================
 
-subroutine diag_init()
+subroutine diag_init(pbuf2d)
+  use physconst, only: pi
 
   ! Declare the history fields for which this module contains outfld calls.
 
@@ -161,6 +214,9 @@ subroutine diag_init()
    use constituent_burden, only: constituent_burden_init
    use cam_control_mod,    only: moist_physics, ideal_phys
    use tidal_diag,         only: tidal_diag_init 
+   use physics_buffer,     only: pbuf_set_field
+
+   type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
    integer :: k, m
    ! Note - this is a duplication of information in ice_constants 
@@ -432,6 +488,17 @@ subroutine diag_init()
 
    call addfld ('U90M',horiz_only,    'A','m/s','Zonal wind at turbine hub height (90m above surface)')
    call addfld ('V90M',horiz_only,    'A','m/s','Meridional wind at turbine hub height (90m above surface)')
+
+   ! Fields calculated by using Fourier transforms over each day.
+   call addfld ('UBOT_1DAY_POWER', horiz_only, 'I', 'm2/s', 'Power spectral density at a period of 1 day of lowest-level zonal wind estimated over previous day')
+   call addfld ('VBOT_1DAY_POWER', horiz_only, 'I', 'm2/s', 'Power spectral density at a period of 1 day of lowest-level meridional wind estimated over previous day')
+   call addfld ('TBOT_1DAY_POWER', horiz_only, 'I', 'K2 s', 'Power spectral density at a period of 1 day of lowest-level temperature estimated over previous day')
+   call addfld ('QBOT_1DAY_POWER', horiz_only, 'I', 'kg2/kg2 s', 'Power spectral density at a period of 1 day of lowest-level water vapor mixing ratio estimated over previous day')
+
+   call addfld ('UBOT_2DT_POWER', horiz_only, 'I', 'm2/s', 'Power spectral density at highest resolvable frequency of lowest-level zonal wind estimated over previous day')
+   call addfld ('VBOT_2DT_POWER', horiz_only, 'I', 'm2/s', 'Power spectral density at highest resolvable frequency of lowest-level meridional wind estimated over previous day')
+   call addfld ('TBOT_2DT_POWER', horiz_only, 'I', 'K2 s', 'Power spectral density at highest resolvable frequency of lowest-level temperature estimated over previous day')
+   call addfld ('QBOT_2DT_POWER', horiz_only, 'I', 'kg2/kg2 s', 'Power spectral density at highest resolvable frequency of lowest-level water vapor mixing ratio estimated over previous day')
 
    ! This field is added by radiation when full physics is used
    if ( ideal_phys )then
@@ -866,6 +933,28 @@ subroutine diag_init()
      wsresp_idx  = pbuf_get_index('wsresp')
      tau_est_idx  = pbuf_get_index('tau_est')
   end if
+
+  ! Initialize initial fields (note that Fourier diags will not be meaningful
+  ! until a full day is complete, especially for tbot, since 0K is wildly out of
+  ! the reasonable range for surface temperature).
+  if (is_first_step()) then
+     call pbuf_set_field(pbuf2d, ubot_time_levels_idx, 0._r8)
+     call pbuf_set_field(pbuf2d, vbot_time_levels_idx, 0._r8)
+     call pbuf_set_field(pbuf2d, tbot_time_levels_idx, 0._r8)
+     call pbuf_set_field(pbuf2d, qbot_time_levels_idx, 0._r8)
+  end if
+
+  ! Set up weights for Fourier diagnostics.
+  allocate(fourier_1day_real_weights(steps_per_day))
+  allocate(fourier_1day_imag_weights(steps_per_day))
+  do k = 1, steps_per_day
+     fourier_1day_real_weights(k) = cos(-2. * pi * (k-1) / steps_per_day)
+     fourier_1day_imag_weights(k) = sin(-2. * pi * (k-1) / steps_per_day)
+  end do
+  allocate(fourier_2dt_weights(steps_for_2dt))
+  do k = 1, steps_for_2dt/2
+     fourier_2dt_weights(2*k-1:2*k) = [1._r8, -1._r8]
+  end do
 
 end subroutine diag_init
 
@@ -2092,7 +2181,7 @@ end subroutine diag_conv
 
 !===============================================================================
 
-subroutine diag_surf (cam_in, cam_out, ps, trefmxav, trefmnav )
+subroutine diag_surf (cam_in, cam_out, pbuf, ps, trefmxav, trefmnav )
 
 !----------------------------------------------------------------------- 
 ! 
@@ -2110,6 +2199,7 @@ subroutine diag_surf (cam_in, cam_out, ps, trefmxav, trefmnav )
 !
     type(cam_in_t),  intent(in) :: cam_in
     type(cam_out_t), intent(in) :: cam_out
+    type(physics_buffer_desc), pointer :: pbuf(:)
 
     real(r8), intent(inout) :: trefmnav(pcols) ! daily minimum tref  
     real(r8), intent(inout) :: trefmxav(pcols) ! daily maximum tref
@@ -2123,11 +2213,21 @@ subroutine diag_surf (cam_in, cam_out, ps, trefmxav, trefmnav )
     integer :: ncol         ! longitude dimension
     real(r8) tem2(pcols)    ! temporary workspace
     real(r8) ftem(pcols)    ! temporary workspace
+
+    real(r8), pointer :: ubot_time_levels(:,:)      ! lowest level zonal wind for the past day
+    real(r8), pointer :: vbot_time_levels(:,:)      ! lowest level meridional wind for the past day
+    real(r8), pointer :: tbot_time_levels(:,:)      ! lowest level temperature for the past day
+    real(r8), pointer :: qbot_time_levels(:,:)      ! lowest level water vapor mmr for the past day
 !
 !-----------------------------------------------------------------------
 !
     lchnk = cam_in%lchnk
     ncol  = cam_in%ncol
+
+    call pbuf_get_field(pbuf, ubot_time_levels_idx, ubot_time_levels)
+    call pbuf_get_field(pbuf, vbot_time_levels_idx, vbot_time_levels)
+    call pbuf_get_field(pbuf, tbot_time_levels_idx, tbot_time_levels)
+    call pbuf_get_field(pbuf, qbot_time_levels_idx, qbot_time_levels)
 
     call outfld('SHFLX',    cam_in%shf,       pcols, lchnk)
     call outfld('LHFLX',    cam_in%lhf,       pcols, lchnk)
@@ -2195,6 +2295,96 @@ subroutine diag_surf (cam_in, cam_out, ps, trefmxav, trefmnav )
           call outfld(sflxnam(c_i(m)), cam_in%cflx(:,c_i(m)), pcols, lchnk)
        end do
     end if
+
+    ! Set the current time levels based on cam_out.
+    ! In each case, we shift current saved values to make room, then save the
+    ! most recent time level.
+    ubot_time_levels(:ncol,2:) = ubot_time_levels(:ncol,:steps_per_day-1)
+    ubot_time_levels(:ncol,1) = cam_out%ubot(:ncol)
+    vbot_time_levels(:ncol,2:) = vbot_time_levels(:ncol,:steps_per_day-1)
+    vbot_time_levels(:ncol,1) = cam_out%vbot(:ncol)
+    tbot_time_levels(:ncol,2:) = tbot_time_levels(:ncol,:steps_per_day-1)
+    tbot_time_levels(:ncol,1) = cam_out%tbot(:ncol)
+    qbot_time_levels(:ncol,2:) = qbot_time_levels(:ncol,:steps_per_day-1)
+    qbot_time_levels(:ncol,1) = cam_out%qbot(:ncol, 1)
+
+    ! Calculate power spectral densities at period of 1 day.
+    ftem = calc_1day_power(ncol, ubot_time_levels)
+    call outfld('UBOT_1DAY_POWER', ftem, pcols, lchnk)
+    ftem = calc_1day_power(ncol, vbot_time_levels)
+    call outfld('VBOT_1DAY_POWER', ftem, pcols, lchnk)
+    ftem = calc_1day_power(ncol, tbot_time_levels)
+    call outfld('TBOT_1DAY_POWER', ftem, pcols, lchnk)
+    ftem = calc_1day_power(ncol, qbot_time_levels)
+    call outfld('QBOT_1DAY_POWER', ftem, pcols, lchnk)
+
+    ! Calculate power spectral densities at period of 2 * delta-t.
+    ftem = calc_2dt_power(ncol, ubot_time_levels(:,:steps_for_2dt))
+    call outfld('UBOT_2DT_POWER', ftem, pcols, lchnk)
+    ftem = calc_2dt_power(ncol, vbot_time_levels(:,:steps_for_2dt))
+    call outfld('VBOT_2DT_POWER', ftem, pcols, lchnk)
+    ftem = calc_2dt_power(ncol, tbot_time_levels(:,:steps_for_2dt))
+    call outfld('TBOT_2DT_POWER', ftem, pcols, lchnk)
+    ftem = calc_2dt_power(ncol, qbot_time_levels(:,:steps_for_2dt))
+    call outfld('QBOT_2DT_POWER', ftem, pcols, lchnk)
+
+  contains
+
+    ! Utility function for calculating the power spectral density corresponding
+    ! to the diurnal cycle.
+    function calc_1day_power(ncol, time_level_values) result(res)
+      integer, intent(in) :: ncol
+      real(r8), intent(in) :: time_level_values(:,:)
+      real(r8) :: res(size(time_level_values, 1))
+
+      real(r8) :: real_component(ncol)
+      real(r8) :: imag_component(ncol)
+
+      integer :: it, num_times
+
+      num_times = size(time_level_values, 2)
+
+      real_component = 0._r8
+      imag_component = 0._r8
+      res = 0._r8
+
+      do it = 1, num_times
+         real_component = real_component &
+              + (fourier_1day_real_weights(it) * time_level_values(:ncol,it))
+         imag_component = imag_component &
+              + (fourier_1day_imag_weights(it) * time_level_values(:ncol,it))
+      end do
+
+      res(:ncol) = power_factor &
+           * (real_component*real_component + imag_component*imag_component)
+
+    end function calc_1day_power
+
+    ! Utility function for calculating the power spectral density corresponding
+    ! to a period of 2 * delta-t.
+    function calc_2dt_power(ncol, time_level_values) result(res)
+      integer, intent(in) :: ncol
+      real(r8), intent(in) :: time_level_values(:,:)
+      real(r8) :: res(size(time_level_values, 1))
+
+      ! Only a real component for real input data.
+      real(r8) :: real_component(ncol)
+
+      integer :: it, num_times
+
+      num_times = size(time_level_values, 2)
+
+      real_component = 0._r8
+      res = 0._r8
+
+      do it = 1, num_times
+         real_component = real_component &
+              + (fourier_2dt_weights(it) * time_level_values(:ncol,it))
+      end do
+
+      res(:ncol) = power_factor * real_component*real_component
+
+    end function calc_2dt_power
 
 end subroutine diag_surf
 

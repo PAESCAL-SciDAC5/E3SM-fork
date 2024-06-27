@@ -830,7 +830,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
 
     ! diag_init makes addfld calls for dynamics fields that are output from
     ! the physics decomposition
-    call diag_init()
+    call diag_init(pbuf2d)
 
     call check_energy_init(phys_state)
 
@@ -1430,7 +1430,7 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
        ! surface diagnostics for history files
        !
        call t_startf('diag_surf')
-       call diag_surf(cam_in(c), cam_out(c), phys_state(c)%ps,trefmxav(1,c), trefmnav(1,c))
+       call diag_surf(cam_in(c), cam_out(c), phys_buffer_chunk, phys_state(c)%ps,trefmxav(1,c), trefmnav(1,c))
        call t_stopf('diag_surf')
 
        call tphysac(ztodt, cam_in(c),  &
