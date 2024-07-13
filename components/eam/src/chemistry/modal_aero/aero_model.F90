@@ -661,6 +661,7 @@ contains
        call addfld('i_vmr_'//trim(nametmp)//'_preAerMic',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR before aerosol microphysics')
        call addfld('o_vmr_'//trim(nametmp)//'_pstAerMic',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR after aerosol microphysics')
        call addfld('d_vmr_'//trim(nametmp)//'_AerMic',   (/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR change due to aerosol microphysics')
+       call addfld('d_vmr_'//trim(nametmp)//'_AerMic_rx',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR change due to aerosol microphysics')
     enddo
 
     do n = 1,pcnst
@@ -713,6 +714,7 @@ contains
           call addfld('i_vmr_'//trim(nametmp)//'_preAerMic',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR before aerosol microphysics')
           call addfld('o_vmr_'//trim(nametmp)//'_pstAerMic',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR after aerosol microphysics')
           call addfld('d_vmr_'//trim(nametmp)//'_AerMic',   (/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR change due to aerosol microphysics')
+          call addfld('d_vmr_'//trim(nametmp)//'_AerMic_rx',(/'lev'/), 'A', trim(strtmp), trim(nametmp)//' VMR change due to aerosol microphysics')
 
        endif
     enddo
@@ -2405,6 +2407,7 @@ do_lphase2_conditional: &
                                     airdens, invariants, del_h2so4_gasprod,  &
                                     vmr0, vmr, pbuf )
 
+    use mo_precision_utils,    only : change_precision
     use time_manager,          only : get_nstep
     use modal_aero_amicphys,   only : modal_aero_amicphys_intr
     use modal_aero_coag,       only : modal_aero_coag_sub
@@ -2466,6 +2469,33 @@ do_lphase2_conditional: &
     real(r8), pointer :: fldcw(:,:)
 
     logical :: use_ECPP
+
+    !-- for pseudo-rx calculation +++
+
+    integer :: precision_out
+
+    real(r8),allocatable ::         tfld_rx(:,:)
+    real(r8),allocatable ::         pmid_rx(:,:)
+    real(r8),allocatable ::         pdel_rx(:,:)
+    real(r8),allocatable ::           zm_rx(:,:)
+    real(r8),allocatable ::         pblh_rx(:)
+    real(r8),allocatable ::         qh2o_rx(:,:)
+    real(r8),allocatable ::        cldfr_rx(:,:)
+
+    real(r8),allocatable ::        dgnum_rx(:,:,:)
+    real(r8),allocatable ::     dgnumwet_rx(:,:,:)
+    real(r8),allocatable ::      wetdens_rx(:,:,:)
+
+    real(r8),allocatable ::         vmr0_rx(:,:,:)
+    real(r8),allocatable ::          vmr_rx(:,:,:)
+    real(r8),allocatable ::       dvmrdt_rx(:,:,:)
+    real(r8),allocatable ::    dvmr_amic_rx(:,:,:)
+
+    real(r8),allocatable ::        vmrcw_rx(:,:,:)
+    real(r8),allocatable ::     dvmrcwdt_rx(:,:,:)
+    real(r8),allocatable ::  dvmrcw_amic_rx(:,:,:)
+
+    !-- for pseudo-rx calculation, end =============
 
     call phys_getopts( use_ECPP_out  = use_ECPP ) 
 
@@ -2621,11 +2651,46 @@ do_lphase2_conditional: &
     else ! (mam_amicphys_optaa > 0) 
     ! do gas-aerosol exchange, nucleation, and coagulation using new routines
 
-       call t_startf('modal_aero_amicphys')
 
-       ! note that:
+       ! note that at this point,
        !     vmr0 holds vmr before gas-phase chemistry
        !     dvmrdt and dvmrcwdt hold vmr and vmrcw before aqueous chemistry
+
+       !##########################################################################
+       ! Create a copy of amicphys' input variables at different precision
+
+       precision_out = 32
+
+       ! Atmospheric conditions
+
+       call change_precision(  tfld, precision_out,  tfld_rx )
+       call change_precision(  pmid, precision_out,  pmid_rx )
+       call change_precision(  pdel, precision_out,  pdel_rx )
+       call change_precision(    zm, precision_out,    zm_rx )
+       call change_precision(  pblh, precision_out,  pblh_rx )
+       call change_precision(  qh2o, precision_out,  qh2o_rx )
+       call change_precision( cldfr, precision_out, cldfr_rx )
+
+       ! Particle size and density
+
+       call change_precision(    dgnum, precision_out,    dgnum_rx )
+       call change_precision( dgnumwet, precision_out, dgnumwet_rx )
+       call change_precision(  wetdens, precision_out,  wetdens_rx )
+
+       ! Gases and interstitial aerosols vmrs
+
+       call change_precision(   vmr0, precision_out,      vmr0_rx )
+       call change_precision( dvmrdt, precision_out,    dvmrdt_rx )
+       call change_precision(    vmr, precision_out,       vmr_rx )
+       call change_precision(    vmr, precision_out, dvmr_amic_rx )  ! for diag and outfld only
+
+       ! Cloud-borne aerosol vmrs
+
+       call change_precision( dvmrcwdt, precision_out,    dvmrcwdt_rx )
+       call change_precision(    vmrcw, precision_out,       vmrcw_rx )
+       call change_precision(    vmrcw, precision_out, dvmrcw_amic_rx )  ! for diag and outfld only
+
+       !##################
 
        !-----------------------------------------
        ! Send amicphys input to history buffer
@@ -2666,6 +2731,8 @@ do_lphase2_conditional: &
        end do
        !----------------------------------------------
 
+       call t_startf('modal_aero_amicphys')
+
        call modal_aero_amicphys_intr(                &
             1,                  1,                   &
             1,                  1,                   &
@@ -2696,6 +2763,8 @@ do_lphase2_conditional: &
 !           wetdens_host,                            &
 !           qaerwat                                  )
 
+       call t_stopf('modal_aero_amicphys')
+
        !-----------------------------------------
        ! Send amicphys output to history buffer
        !-----------------------------------------
@@ -2716,7 +2785,75 @@ do_lphase2_conditional: &
        end do
        !---------------------
 
-       call t_stopf('modal_aero_amicphys')
+       !#################################################################
+       !--------------------------------------------------------------
+       ! Second call of amicphys using input of a different precision
+       !--------------------------------------------------------------
+       call t_startf('modal_aero_amicphys_call_2')
+       call modal_aero_amicphys_intr(                &
+            1,                  1,                   &
+            1,                  1,                   &
+            lchnk,     ncol,    nstep,               &
+            loffset,   delt,                         &
+            latndx,    lonndx,                       &
+            tfld_rx,   pmid_rx, pdel_rx,             &
+            zm_rx,     pblh_rx,                      &
+            qh2o_rx,   cldfr_rx,                     &
+            vmr_rx,             vmrcw_rx,            &
+            vmr0_rx,                                 &
+            dvmrdt_rx,          dvmrcwdt_rx,         &
+            dgnum_rx,           dgnumwet_rx,         &
+            wetdens_rx                               )
+       call t_stopf('modal_aero_amicphys_call_2')
+
+       !----------------------------------------------------------------
+       ! Diagnose amicphys-caused increments and send to history buffer
+       !----------------------------------------------------------------
+       ! Gases and interstitial aerosols
+       do m = 1,gas_pcnst
+          dvmr_amic_rx(1:ncol,:,m) = vmr_rx(1:ncol,:,m) - dvmr_amic_rx(1:ncol,:,m)  ! diagnose changes due to amicphys
+          call outfld('d_vmr_'//trim(adjustl(solsym(m)))//'_AerMic_rx',    dvmr_amic_rx(1:ncol,:,m), ncol, lchnk )
+       end do
+
+       ! Cloud-borne aerosols
+       do m = 1,gas_pcnst
+        if( cnst_name_cw(m+loffset)/=' ' ) then
+          dvmrcw_amic_rx(1:ncol,:,m) = vmrcw_rx(1:ncol,:,m) - dvmrcw_amic_rx(1:ncol,:,m)  ! diagnose changes due to amicphys
+          call outfld('d_vmr_'//trim(adjustl(cnst_name_cw(m+loffset)))//'_AerMic_rx', dvmrcw_amic_rx(1:ncol,:,m), ncol, lchnk )
+        end if
+       end do
+
+       !---------------------
+       ! Clean up
+       !---------------------
+       deallocate(  tfld_rx )
+       deallocate(  pmid_rx )
+       deallocate(  pdel_rx )
+       deallocate(    zm_rx )
+       deallocate(  pblh_rx )
+       deallocate(  qh2o_rx )
+       deallocate( cldfr_rx )
+
+       ! Particle size and density
+
+       deallocate(    dgnum_rx )
+       deallocate( dgnumwet_rx )
+       deallocate(  wetdens_rx )
+
+       ! Gases and interstitial aerosols vmrs
+
+       deallocate(      vmr0_rx )
+       deallocate(    dvmrdt_rx )
+       deallocate(       vmr_rx )
+       deallocate( dvmr_amic_rx )  ! for diag and outfld only
+
+       ! Cloud-borne aerosol vmrs
+
+       deallocate(    dvmrcwdt_rx )
+       deallocate(       vmrcw_rx )
+       deallocate( dvmrcw_amic_rx )  ! for diag and outfld only
+
+       !#################################################################
 
     endif ! (mam_amicphys_optaa <= 0 OR > 0)
 
