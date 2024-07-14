@@ -94,6 +94,11 @@ integer           :: convproc_method_activate = 2      ! controls activation in 
 integer           :: mam_amicphys_optaa   = 0          ! <= 0 -- use old microphysics code (separate calls to gasaerexch, 
                                                        !                                    newnuc, and coag routines) 
                                                        !  > 0 -- use new microphysics code (single call to amicphys routine)
+integer           :: mam_amicphys_nsigbits = 16        ! for a second (diag) call of amicphys: floating-point precision
+                                                       ! expressed as the number of significand bits. Examples:
+                                                       ! 32: double precision; 16: single precision;
+                                                       ! smaller than 16: lower precision emulated using code from
+                                                       ! Dawson and Dueben (2017, GMD, DOI:10.5194/gmd-10-2221-2017).
 real(r8)          :: n_so4_monolayers_pcage = huge(1.0_r8) ! number of so4(+nh4) monolayers needed to "age" a carbon particle
 real(r8)          :: micro_mg_accre_enhan_fac = huge(1.0_r8) !!Accretion enhancement factor
 logical           :: liqcf_fix            = .false.    ! liq cld fraction fix calc.                     
@@ -207,6 +212,7 @@ subroutine phys_ctl_readnl(nlfile)
       cld_macmic_num_steps, micro_do_icesupersat, &
       fix_g1_err_ndrop, ssalt_tuning, resus_fix, convproc_do_aer, &
       convproc_do_gas, convproc_method_activate, liqcf_fix, regen_fix, demott_ice_nuc, pergro_mods, pergro_test_active, &
+      mam_amicphys_nsigbits, &
       mam_amicphys_optaa, n_so4_monolayers_pcage,micro_mg_accre_enhan_fac, &
       l_tracer_aero, l_vdiff, l_rayleigh, l_gw_drag, l_ac_energy_chk, &
       l_bc_energy_fix, l_dry_adj, l_st_mac, l_st_mic, l_rad, prc_coef1,prc_exp,prc_exp1,cld_sed,mg_prc_coeff_fix, &
@@ -283,6 +289,7 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(convproc_do_aer,                 1 , mpiint,  0, mpicom)
    call mpibcast(convproc_do_gas,                 1 , mpilog,  0, mpicom)
    call mpibcast(convproc_method_activate,        1 , mpiint,  0, mpicom)
+   call mpibcast(mam_amicphys_nsigbits,           1 , mpiint,  0, mpicom)
    call mpibcast(mam_amicphys_optaa,              1 , mpiint,  0, mpicom)
    call mpibcast(n_so4_monolayers_pcage,          1 , mpir8,   0, mpicom)
    call mpibcast(micro_mg_accre_enhan_fac,        1 , mpir8,   0, mpicom)
@@ -470,6 +477,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
                         cld_macmic_num_steps_out, micro_do_icesupersat_out, &
                         fix_g1_err_ndrop_out, ssalt_tuning_out,resus_fix_out,convproc_do_aer_out,  &
                         convproc_do_gas_out, convproc_method_activate_out, mam_amicphys_optaa_out, n_so4_monolayers_pcage_out, &
+                        mam_amicphys_nsigbits_out, &
                         micro_mg_accre_enhan_fac_out, liqcf_fix_out, regen_fix_out,demott_ice_nuc_out, pergro_mods_out, pergro_test_active_out &
                        ,l_tracer_aero_out, l_vdiff_out, l_rayleigh_out, l_gw_drag_out, l_ac_energy_chk_out  &
                        ,l_bc_energy_fix_out, l_dry_adj_out, l_st_mac_out, l_st_mic_out, l_rad_out  &
@@ -531,6 +539,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    logical,           intent(out), optional :: convproc_do_aer_out 
    logical,           intent(out), optional :: convproc_do_gas_out 
    integer,           intent(out), optional :: convproc_method_activate_out 
+   integer,           intent(out), optional :: mam_amicphys_nsigbits_out
    integer,           intent(out), optional :: mam_amicphys_optaa_out
    real(r8),          intent(out), optional :: n_so4_monolayers_pcage_out
    real(r8),          intent(out), optional :: micro_mg_accre_enhan_fac_out
@@ -609,6 +618,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    if ( present(convproc_do_aer_out     ) ) convproc_do_aer_out      = convproc_do_aer
    if ( present(convproc_do_gas_out     ) ) convproc_do_gas_out      = convproc_do_gas
    if ( present(convproc_method_activate_out ) ) convproc_method_activate_out = convproc_method_activate
+   if ( present(mam_amicphys_nsigbits_out)) mam_amicphys_nsigbits_out= mam_amicphys_nsigbits
    if ( present(mam_amicphys_optaa_out  ) ) mam_amicphys_optaa_out  = mam_amicphys_optaa
    if ( present(n_so4_monolayers_pcage_out  ) ) n_so4_monolayers_pcage_out = n_so4_monolayers_pcage
    if ( present(micro_mg_accre_enhan_fac_out)) micro_mg_accre_enhan_fac_out = micro_mg_accre_enhan_fac
