@@ -92,6 +92,7 @@ module aero_model
   integer :: strt_loop, end_loop, stride_loop !loop indices for the lphase loop
 
   ! Namelist variables
+  integer :: mam_amicphys_nsigbits = 16
   integer :: mam_amicphys_optaa
   logical :: sscav_tuning, convproc_do_aer, convproc_do_gas, resus_fix  
   character(len=16) :: wetdep_list(pcnst) = ' '
@@ -223,6 +224,7 @@ contains
          convproc_do_aer_out = convproc_do_aer, & 
          convproc_do_gas_out = convproc_do_gas, &
          resus_fix_out       = resus_fix,       &
+         mam_amicphys_nsigbits_out = mam_amicphys_nsigbits, &
          mam_amicphys_optaa_out = mam_amicphys_optaa ) ! REASTER 08/04/2015
 
 
@@ -2659,7 +2661,7 @@ do_lphase2_conditional: &
        !##########################################################################
        ! Create a copy of amicphys' input variables at different precision
 
-       precision_out = 6
+       precision_out = mam_amicphys_nsigbits
 
        ! Atmospheric conditions
 
