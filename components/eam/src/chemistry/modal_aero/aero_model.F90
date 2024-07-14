@@ -2659,7 +2659,7 @@ do_lphase2_conditional: &
        !##########################################################################
        ! Create a copy of amicphys' input variables at different precision
 
-       precision_out = 16
+       precision_out = 6
 
        ! Atmospheric conditions
 
