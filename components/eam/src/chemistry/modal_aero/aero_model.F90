@@ -739,6 +739,7 @@ contains
     call addfld('i_zm',   (/'lev'/), 'A','m', 'geopotential height input to aerosol microphysics')
     call addfld('i_pblh', horiz_only,'A','m', 'PBL height input to aerosol microphysics')
     call addfld('i_qh2o', (/'lev'/), 'A','kg/kg','specific humidity input to aerosol microphysics')
+    call addfld('i_rh',   (/'lev'/), 'A','-', 'grid-box mean relative humidity diagnosed in aerosol microphysics')
     call addfld('i_cldfr',(/'lev'/), 'A','-', 'cloud fraction input to aerosol microphysics')
     !----
 
@@ -2463,6 +2464,8 @@ do_lphase2_conditional: &
     real(r8) :: dvmrcw_amic(ncol,pver,gas_pcnst)            ! cloud-borne aerosol
     ! ---- 
 
+    real(r8) :: rh_out(pcols,pver) ! relative humidity diagnosed inside amicphys_intr; declared here for outfld only
+
     real(r8), pointer :: fldcw(:,:)
 
     logical :: use_ECPP
@@ -2631,6 +2634,8 @@ do_lphase2_conditional: &
        ! Send amicphys input to history buffer
        !-----------------------------------------
        ! Atmospheric conditions
+       ! (Note that the outfld call for i_rh is placed after the call of modal_aero_amicphys_intr
+       ! because rh is diagnocased inside that subroutine.)
 
        call outfld('i_T',    tfld (1:ncol,:), ncol, lchnk)
        call outfld('i_pmid', pmid (1:ncol,:), ncol, lchnk)
@@ -2674,7 +2679,7 @@ do_lphase2_conditional: &
             latndx,    lonndx,                       &
             tfld,      pmid,    pdel,                &
             zm,        pblh,                         &
-            qh2o,      cldfr,                        &
+            qh2o,      cldfr,   rh_out,              &
             vmr,                vmrcw,               &
             vmr0,                                    &
             dvmrdt,             dvmrcwdt,            &
@@ -2699,6 +2704,8 @@ do_lphase2_conditional: &
        !-----------------------------------------
        ! Send amicphys output to history buffer
        !-----------------------------------------
+       call outfld('i_rh',  rh_out(1:ncol,:), ncol, lchnk)
+
        ! Gases and interstitial aerosols
        do m = 1,gas_pcnst
           dvmr_amic(1:ncol,:,m) = vmr(1:ncol,:,m) - dvmr_amic(1:ncol,:,m)  ! diagnose changes due to amicphys
