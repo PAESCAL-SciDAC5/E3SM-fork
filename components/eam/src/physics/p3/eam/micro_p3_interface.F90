@@ -97,6 +97,19 @@ module micro_p3_interface
       accre_enhan_idx,    &
       mon_ccn_1_idx,      &
       mon_ccn_2_idx,      &
+      p3_input_steps_idx, &
+      p3_output_steps_idx, &
+      cloudfrac_rain_micro_steps_idx, &
+      p3_sed_cldrain_steps_idx, &
+      p3_sed_numrain_steps_idx, &
+      p3_mtend_cldrain_steps_idx, &
+      p3_mtend_numrain_steps_idx, &
+      p3_nr_selfcollect_tend_steps_idx, &
+      p3_ncautr_steps_idx, &
+      p3_qc2qr_autoconv_tend_steps_idx, &
+      p3_qc2qr_accret_tend_steps_idx, &
+      p3_qr2qv_evap_tend_steps_idx, &
+      p3_nr_evap_tend_steps_idx, &
       current_month      !Needed for prescribed CCN option         
 
 ! Physics buffer indices for fields registered by other modules
@@ -146,6 +159,7 @@ module micro_p3_interface
    logical            :: micro_subgrid_cloud     = .false.   ! Use subgrid cloudiness
    logical            :: micro_tend_output       = .false.   ! Default microphysics tendencies to output file
    logical            :: do_prescribed_CCN       = .false.   ! Use prescribed CCN
+   logical            :: p3_output_each_substep  = .false.   ! Output for every microphysics substep
 
    contains
 !===============================================================================
@@ -165,7 +179,7 @@ subroutine micro_p3_readnl(nlfile)
        micro_p3_tableversion, micro_p3_lookup_dir, micro_aerosolactivation, micro_subgrid_cloud, &
        micro_tend_output, p3_autocon_coeff, p3_qc_autocon_expon, p3_nc_autocon_expon, p3_accret_coeff, &
        p3_qc_accret_expon, p3_wbf_coeff, p3_max_mean_rain_size, p3_embryonic_rain_size, &
-       do_prescribed_CCN, do_Cooper_inP3, p3_mincdnc 
+       do_prescribed_CCN, do_Cooper_inP3, p3_mincdnc, p3_output_each_substep
 
   !-----------------------------------------------------------------------------
 
@@ -199,6 +213,7 @@ subroutine micro_p3_readnl(nlfile)
      write(iulog,'(A30,1x,8e12.4)') 'p3_embryonic_rain_size',  p3_embryonic_rain_size
      write(iulog,'(A30,1x,L)')    'do_prescribed_CCN: ',       do_prescribed_CCN
      write(iulog,'(A30,1x,L)')    'do_Cooper_inP3: ',          do_Cooper_inP3
+     write(iulog,'(A30,1x,L)')    'p3_output_each_substep: ',  p3_output_each_substep
 
   end if
 
@@ -220,6 +235,7 @@ subroutine micro_p3_readnl(nlfile)
   call mpibcast(p3_embryonic_rain_size,  1 ,                         mpir8,   0, mpicom)
   call mpibcast(do_prescribed_CCN,       1,                          mpilog,  0, mpicom)
   call mpibcast(do_Cooper_inP3,          1,                          mpilog,  0, mpicom)
+  call mpibcast(p3_output_each_substep,  1,                          mpilog,  0, mpicom)
 
 #endif
 
@@ -258,16 +274,20 @@ end subroutine micro_p3_readnl
   logical :: prog_modal_aero ! prognostic aerosols
 
   integer :: idim
-  integer,parameter :: P3_in_dimsize = 16
-  integer,parameter :: P3_out_dimsize = 32
+  integer,parameter :: P3_in_dimsize = 17
+  integer,parameter :: P3_out_dimsize = 31
   integer,parameter,dimension(P3_in_dimsize) :: &
-          P3_input_dim = (/ 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16/)
+          P3_input_dim = (/ 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17/)
   integer,parameter,dimension(P3_out_dimsize) :: &
-          P3_output_dim = (/ 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32 /)
+          P3_output_dim = (/ 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31 /)
+  integer :: cld_macmic_num_steps = 0 ! Number of macmic iterations
+  integer, allocatable, target :: micro_step_dim(:)
+  integer :: i
 
   if (masterproc) write(iulog,'(A20)') ' P3 register start ...'
 
-  call phys_getopts( prog_modal_aero_out   = prog_modal_aero )
+  call phys_getopts( prog_modal_aero_out   = prog_modal_aero, &
+       cld_macmic_num_steps_out = cld_macmic_num_steps)
 
    ncnst = 0
     ! Register Microphysics Constituents 
@@ -351,6 +371,26 @@ end subroutine micro_p3_readnl
 
    call add_hist_coord('P3_input_dim',  P3_in_dimsize, 'Input field dimension for p3_main subroutine',  'N/A', P3_input_dim)
    call add_hist_coord('P3_output_dim', P3_out_dimsize, 'Output field dimension for p3_main subroutine', 'N/A', P3_output_dim)
+
+   if (p3_output_each_substep) then
+      call pbuf_add_field('P3_input_steps', 'physpkg',dtype_r8,(/pcols,pver+1,cld_macmic_num_steps,P3_in_dimsize/), p3_input_steps_idx)
+      call pbuf_add_field('P3_output_steps', 'physpkg',dtype_r8,(/pcols,pver+1,cld_macmic_num_steps,P3_out_dimsize/), p3_output_steps_idx)
+
+      call pbuf_add_field('CLOUDFRAC_RAIN_MICRO_steps', 'physpkg',dtype_r8,(/pcols,pver,cld_macmic_num_steps/), cloudfrac_rain_micro_steps_idx)
+      call pbuf_add_field('P3_sed_CLDRAIN_steps', 'physpkg',dtype_r8,(/pcols,pver,cld_macmic_num_steps/), p3_sed_cldrain_steps_idx)
+      call pbuf_add_field('P3_sed_NUMRAIN_steps', 'physpkg',dtype_r8,(/pcols,pver,cld_macmic_num_steps/), p3_sed_numrain_steps_idx)
+      call pbuf_add_field('P3_mtend_CLDRAIN_steps', 'physpkg',dtype_r8,(/pcols,pver,cld_macmic_num_steps/), p3_mtend_cldrain_steps_idx)
+      call pbuf_add_field('P3_mtend_NUMRAIN_steps', 'physpkg',dtype_r8,(/pcols,pver,cld_macmic_num_steps/), p3_mtend_numrain_steps_idx)
+      call pbuf_add_field('P3_nr_selfcollect_tend_steps', 'physpkg',dtype_r8,(/pcols,pver,cld_macmic_num_steps/), p3_nr_selfcollect_tend_steps_idx)
+      call pbuf_add_field('P3_ncautr_steps', 'physpkg',dtype_r8,(/pcols,pver,cld_macmic_num_steps/), p3_ncautr_steps_idx)
+      call pbuf_add_field('P3_qc2qr_autoconv_tend_steps', 'physpkg',dtype_r8,(/pcols,pver,cld_macmic_num_steps/), p3_qc2qr_autoconv_tend_steps_idx)
+      call pbuf_add_field('P3_qc2qr_accret_tend_steps', 'physpkg',dtype_r8,(/pcols,pver,cld_macmic_num_steps/), p3_qc2qr_accret_tend_steps_idx)
+      call pbuf_add_field('P3_qr2qv_evap_tend_steps', 'physpkg',dtype_r8,(/pcols,pver,cld_macmic_num_steps/), p3_qr2qv_evap_tend_steps_idx)
+      call pbuf_add_field('P3_nr_evap_tend_steps', 'physpkg',dtype_r8,(/pcols,pver,cld_macmic_num_steps/), p3_nr_evap_tend_steps_idx)
+
+      micro_step_dim = [ (i, i = 1, cld_macmic_num_steps) ]
+      call add_hist_coord('micro_step_dim', cld_macmic_num_steps, 'Dimension for microphysics substeps', 'N/A', micro_step_dim)
+   end if
 
    if (masterproc) write(iulog,'(A20)') '    P3 register finished'
   end subroutine micro_p3_register
@@ -451,6 +491,7 @@ end subroutine micro_p3_readnl
     integer :: year, month, day, tod, next_month, grid_id
     logical :: found = .false.
     real(rtype), pointer :: ccn_values(:,:,:)
+    character(len=20), allocatable :: midpoint_dims(:), input_dims(:), output_dims(:)
 
     nullify(ccn_values)
 
@@ -501,6 +542,17 @@ end subroutine micro_p3_readnl
 
     ! INITIALIZE OUTPUT
     !==============
+
+    if (p3_output_each_substep) then
+       midpoint_dims = ['lev', 'micro_step_dim']
+       input_dims = ['ilev', 'micro_step_dim', 'P3_input_dim']
+       output_dims = ['ilev', 'micro_step_dim', 'P3_output_dim']
+    else
+       midpoint_dims = ['lev']
+       input_dims = ['ilev', 'P3_input_dim']
+       output_dims = ['ilev', 'P3_output_dim']
+    end if
+
     do m = 1, ncnst
        call cnst_get_ind(cnst_names(m), mm)
        if ( any(mm == (/ ixcldliq, ixcldice, ixrain, ixcldrim /)) ) then
@@ -538,7 +590,7 @@ end subroutine micro_p3_readnl
     ! microphysics cloud fraction fields
     call addfld('CLOUDFRAC_LIQ_MICRO', (/ 'lev' /), 'A', 'unitless', 'Grid box liquid cloud fraction in microphysics' )
     call addfld('CLOUDFRAC_ICE_MICRO', (/ 'lev' /), 'A', 'unitless', 'Grid box ice cloud fraction in microphysics' )
-    call addfld('CLOUDFRAC_RAIN_MICRO', (/ 'lev' /), 'A', 'unitless', 'Grid box rain cloud fraction in microphysics' )
+    call addfld('CLOUDFRAC_RAIN_MICRO', midpoint_dims, 'A', 'unitless', 'Grid box rain cloud fraction in microphysics' )
 
     call addfld ('CME', (/ 'lev' /), 'A', 'kg/kg/s', 'Rate of cond-evap within the cloud'                      )
     call addfld ('FICE', (/ 'lev' /), 'A', 'fraction', 'Fractional ice content within cloud'                     )
@@ -601,13 +653,13 @@ end subroutine micro_p3_readnl
    call addfld('UMR', (/ 'lev' /), 'A',   'm/s', 'Mass-weighted rain  fallspeed'              )
 
    ! Record of inputs/outputs from p3_main
-   call addfld('P3_input',  (/ 'ilev         ',    'P3_input_dim ' /),    'I', 'N/A', 'Inputs for p3_main subroutine')
-   call addfld('P3_output', (/ 'ilev         ',    'P3_output_dim' /),    'I', 'N/A', 'Outputs for p3_main subroutine')
+   call addfld('P3_input', input_dims,    'I', 'N/A', 'Inputs for p3_main subroutine')
+   call addfld('P3_output', output_dims,    'I', 'N/A', 'Outputs for p3_main subroutine')
    ! Record of microphysics tendencies
    ! warm-phase process rates
    !call addfld('P3_qrcon',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for rain condensation   (Not in paper?)')
-   call addfld('P3_qc2qr_accret_tend',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for cloud droplet accretion by rain')
-   call addfld('P3_qc2qr_autoconv_tend',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for cloud droplet autoconversion to rain')
+   call addfld('P3_qc2qr_accret_tend',  midpoint_dims, 'A', 'kg/kg/s', 'P3 Tendency for cloud droplet accretion by rain')
+   call addfld('P3_qc2qr_autoconv_tend',  midpoint_dims, 'A', 'kg/kg/s', 'P3 Tendency for cloud droplet autoconversion to rain')
    call addfld('P3_nc_accret_tend',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for change in cloud droplet number from accretion by rain')
    call addfld('P3_nc2nr_autoconv_tend', (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for change in cloud droplet number from autoconversion')
    call addfld('P3_nc_selfcollect_tend',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for change in cloud droplet number from self-collection  (Not in paper?)')
@@ -615,10 +667,10 @@ end subroutine micro_p3_readnl
    call addfld('P3_nc_nuceat_tend',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for change in cloud droplet number from activation of CCN')
    call addfld('P3_qccon',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for cloud droplet condensation')
    call addfld('P3_qcnuc',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for activation of cloud droplets from CCN')
-   call addfld('P3_qr2qv_evap_tend',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for rain evaporation')
+   call addfld('P3_qr2qv_evap_tend',  midpoint_dims, 'A', 'kg/kg/s', 'P3 Tendency for rain evaporation')
    call addfld('P3_qcevp',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for cloud droplet evaporation')
-   call addfld('P3_nr_evap_tend',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for change in rain number from evaporation')
-   call addfld('P3_ncautr', (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for change in rain number from autoconversion of cloud water')
+   call addfld('P3_nr_evap_tend', midpoint_dims, 'A', 'kg/kg/s', 'P3 Tendency for change in rain number from evaporation')
+   call addfld('P3_ncautr', midpoint_dims, 'A', 'kg/kg/s', 'P3 Tendency for change in rain number from autoconversion of cloud water')
    ! ice-phase process rates
    call addfld('P3_qccol',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for collection of cloud water by ice')
    call addfld('P3_qwgrth', (/ 'lev' /), 'A', 'kg/kg/s', 'P3 wet growth rate')
@@ -632,7 +684,7 @@ end subroutine micro_p3_readnl
    call addfld('P3_qi2qr_melt_tend',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for melting of ice')
    call addfld('P3_ni2nr_melt_tend',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for melting of ice')
    call addfld('P3_ni_sublim_tend',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for change in ice number from sublimation')
-   call addfld('P3_ni_selfcollect_tend',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for change in ice number from collection within a category (Not in paper?)')
+   call addfld('P3_ni_selfcollect_tend',  midpoint_dims, 'A', 'kg/kg/s', 'P3 Tendency for change in ice number from collection within a category (Not in paper?)')
    call addfld('P3_qc2qi_hetero_frz_tend', (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for immersion freezing droplets')
    call addfld('P3_qr2qi_immers_frz_tend', (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for immersion freezing rain')
    call addfld('P3_nc2ni_immers_frz_tend', (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for immersion freezing droplets')
@@ -643,15 +695,15 @@ end subroutine micro_p3_readnl
    ! Sedimentation 
    call addfld('P3_sed_CLDLIQ',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for liquid cloud content due to sedimentation')
    call addfld('P3_sed_NUMLIQ',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for liquid cloud number due to sedimentation')
-   call addfld('P3_sed_CLDRAIN', (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for rain cloud content due to sedimentation')
-   call addfld('P3_sed_NUMRAIN', (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for rain cloud number due to sedimentation')
+   call addfld('P3_sed_CLDRAIN', midpoint_dims, 'A', 'kg/kg/s', 'P3 Tendency for rain cloud content due to sedimentation')
+   call addfld('P3_sed_NUMRAIN', midpoint_dims, 'A', 'kg/kg/s', 'P3 Tendency for rain cloud number due to sedimentation')
    call addfld('P3_sed_CLDICE',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for ice cloud content due to sedimentation')
    call addfld('P3_sed_NUMICE',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for ice cloud number due to sedimentation')
    ! Microphysics Processes
    call addfld('P3_mtend_CLDLIQ',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for liquid cloud content due to micro processes')
    call addfld('P3_mtend_NUMLIQ',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for liquid cloud number due to micro processes')
-   call addfld('P3_mtend_CLDRAIN', (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for rain cloud content due to micro processes')
-   call addfld('P3_mtend_NUMRAIN', (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for rain cloud number due to micro processes')
+   call addfld('P3_mtend_CLDRAIN', midpoint_dims, 'A', 'kg/kg/s', 'P3 Tendency for rain cloud content due to micro processes')
+   call addfld('P3_mtend_NUMRAIN', midpoint_dims, 'A', 'kg/kg/s', 'P3 Tendency for rain cloud number due to micro processes')
    call addfld('P3_mtend_CLDICE',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for ice cloud content due to micro processes')
    call addfld('P3_mtend_NUMICE',  (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for ice cloud number due to micro processes')
    call addfld('P3_mtend_Q',       (/ 'lev' /), 'A', 'kg/kg/s', 'P3 Tendency for water vapor due to micro processes')
@@ -956,7 +1008,7 @@ end subroutine micro_p3_readnl
     end subroutine get_prescribed_CCN
 
   !================================================================================================
-  subroutine micro_p3_tend(state, ptend, dtime, pbuf)
+  subroutine micro_p3_tend(state, ptend, dtime, pbuf, macmic_it)
 
     use phys_grid,      only: get_rlat_all_p, get_rlon_all_p, get_gcol_all_p
     use time_manager,   only: get_nstep
@@ -975,6 +1027,7 @@ end subroutine micro_p3_readnl
     type(physics_ptend),         intent(out)   :: ptend
     real(rtype),                 intent(in)    :: dtime
     type(physics_buffer_desc),   pointer       :: pbuf(:)
+    integer,                     intent(in)    :: macmic_it
     logical :: lq(pcnst)   !list of what constituents to update
 
     !INTERNAL VARIABLES
@@ -1048,6 +1101,20 @@ end subroutine micro_p3_readnl
     real(rtype), pointer :: dei(:,:)          ! Ice effective diameter (um)
     real(rtype), pointer :: mu(:,:)           ! Size distribution shape parameter for radiation
     real(rtype), pointer :: lambdac(:,:)      ! Size distribution slope parameter for radiation
+    ! Multiple substep outputs
+    real(rtype), pointer :: p3_input_steps(:,:,:,:) ! Record of inputs for p3_main (over multiple steps)
+    real(rtype), pointer :: p3_output_steps(:,:,:,:) ! Record of outputs for p3_main (over multiple steps)
+    real(rtype), pointer :: cloudfrac_rain_micro_steps(:,:,:)
+    real(rtype), pointer :: p3_sed_cldrain_steps(:,:,:)
+    real(rtype), pointer :: p3_sed_numrain_steps(:,:,:)
+    real(rtype), pointer :: p3_mtend_cldrain_steps(:,:,:)
+    real(rtype), pointer :: p3_mtend_numrain_steps(:,:,:)
+    real(rtype), pointer :: p3_nr_selfcollect_tend_steps(:,:,:)
+    real(rtype), pointer :: p3_ncautr_steps(:,:,:)
+    real(rtype), pointer :: p3_qc2qr_autoconv_tend_steps(:,:,:)
+    real(rtype), pointer :: p3_qc2qr_accret_tend_steps(:,:,:)
+    real(rtype), pointer :: p3_qr2qv_evap_tend_steps(:,:,:)
+    real(rtype), pointer :: p3_nr_evap_tend_steps(:,:,:)
     ! DONE PBUF
     ! For recording inputs/outputs to p3_main
     real(rtype) :: p3_main_inputs(pcols,pver+1,17) ! Record of inputs for p3_main
@@ -1101,6 +1168,8 @@ end subroutine micro_p3_readnl
     real(rtype), parameter :: mucon  = 5.3_rtype            ! Convective size distribution shape parameter
     real(rtype), parameter :: deicon = 50._rtype            ! Convective ice effective diameter (um)
 
+    integer :: cld_macmic_num_steps = 0 ! Number of macmic iterations
+
     call t_startf('micro_p3_tend_init')
  
     psetcols = state%psetcols
@@ -1108,6 +1177,8 @@ end subroutine micro_p3_readnl
 
     !+++ Aaron Donahue
     itim_old = pbuf_old_tim_idx()
+
+    call phys_getopts(cld_macmic_num_steps_out = cld_macmic_num_steps)
 
     !============================ 
     ! All external PBUF variables:
@@ -1398,8 +1469,21 @@ end subroutine micro_p3_readnl
     p3_main_outputs(:ncol,1,12) = precip_ice_surf(1)
     p3_main_outputs(:ncol,pver+1,23) = precip_liq_flux(:ncol,pver+1)
     p3_main_outputs(:ncol,pver+1,24) = precip_ice_flux(:ncol,pver+1)
-    call outfld('P3_input',  p3_main_inputs,  pcols, lchnk)
-    call outfld('P3_output', p3_main_outputs, pcols, lchnk)
+    if (p3_output_each_substep) then
+       ! Save the P3 inputs/outputs to the pbuf field.
+       call pbuf_get_field(pbuf, p3_input_steps_idx, p3_input_steps)
+       call pbuf_get_field(pbuf, p3_output_steps_idx, p3_output_steps)
+       p3_input_steps(:,:,macmic_it,:) = p3_main_inputs
+       p3_output_steps(:,:,macmic_it,:) = p3_main_outputs
+       ! Output these variables on the last macmic step.
+       if (macmic_it == cld_macmic_num_steps) then
+          call outfld('P3_input',  p3_input_steps,  pcols, lchnk)
+          call outfld('P3_output', p3_output_steps, pcols, lchnk)
+       end if
+    else
+       call outfld('P3_input',  p3_main_inputs,  pcols, lchnk)
+       call outfld('P3_output', p3_main_outputs, pcols, lchnk)
+    end if
 
     !MASSAGE OUTPUT TO FIT E3SM EXPECTATIONS
     !============= 
@@ -1629,24 +1713,17 @@ end subroutine micro_p3_readnl
 
    call outfld('CLOUDFRAC_LIQ_MICRO',  cld_frac_l,      pcols, lchnk)
    call outfld('CLOUDFRAC_ICE_MICRO',  cld_frac_i,      pcols, lchnk)
-   call outfld('CLOUDFRAC_RAIN_MICRO', cld_frac_r,      pcols, lchnk)
 
    ! Write p3 tendencies as output 
    ! warm-phase process rates
    !call outfld('P3_qrcon',               tend_out(:,:, 1), pcols, lchnk) 
-   call outfld('P3_qc2qr_accret_tend',    tend_out(:,:, 2), pcols, lchnk) 
-   call outfld('P3_qc2qr_autoconv_tend',  tend_out(:,:, 3), pcols, lchnk) 
    call outfld('P3_nc_accret_tend',       tend_out(:,:, 4), pcols, lchnk) 
    call outfld('P3_nc2nr_autoconv_tend',  tend_out(:,:, 5), pcols, lchnk) 
    call outfld('P3_nc_selfcollect_tend',  tend_out(:,:, 6), pcols, lchnk) 
-   call outfld('P3_nr_selfcollect_tend',  tend_out(:,:, 7), pcols, lchnk) 
    call outfld('P3_nc_nuceat_tend',       tend_out(:,:, 8), pcols, lchnk) 
    !call outfld('P3_qccon',               tend_out(:,:, 9), pcols, lchnk) 
    !call outfld('P3_qcnuc',               tend_out(:,:,10), pcols, lchnk) 
-   call outfld('P3_qr2qv_evap_tend',      tend_out(:,:,11), pcols, lchnk) 
    !call outfld('P3_qcevp',               tend_out(:,:,12), pcols, lchnk) 
-   call outfld('P3_nr_evap_tend',         tend_out(:,:,13), pcols, lchnk) 
-   call outfld('P3_ncautr',               tend_out(:,:,14), pcols, lchnk) 
    ! ice-phase process rate
    call outfld('P3_qccol',                tend_out(:,:,15), pcols, lchnk) 
    call outfld('P3_qwgrth',               tend_out(:,:,16), pcols, lchnk) ! Not a tendency in itself, it is used to build qccol and qrcol
@@ -1672,15 +1749,11 @@ end subroutine micro_p3_readnl
    ! sedimentation 
    call outfld('P3_sed_CLDLIQ',           tend_out(:,:,36), pcols, lchnk)
    call outfld('P3_sed_NUMLIQ',           tend_out(:,:,37), pcols, lchnk)
-   call outfld('P3_sed_CLDRAIN',          tend_out(:,:,38), pcols, lchnk)
-   call outfld('P3_sed_NUMRAIN',          tend_out(:,:,39), pcols, lchnk)
    call outfld('P3_sed_CLDICE',           tend_out(:,:,40), pcols, lchnk)
    call outfld('P3_sed_NUMICE',           tend_out(:,:,41), pcols, lchnk)
    ! microphysics processes 
    call outfld('P3_mtend_CLDLIQ',         tend_out(:,:,42), pcols, lchnk)
    call outfld('P3_mtend_NUMLIQ',         tend_out(:,:,43), pcols, lchnk)
-   call outfld('P3_mtend_CLDRAIN',        tend_out(:,:,44), pcols, lchnk)
-   call outfld('P3_mtend_NUMRAIN',        tend_out(:,:,45), pcols, lchnk)
    call outfld('P3_mtend_CLDICE',         tend_out(:,:,46), pcols, lchnk)
    call outfld('P3_mtend_NUMICE',         tend_out(:,:,47), pcols, lchnk)
    call outfld('P3_mtend_Q',              tend_out(:,:,48), pcols, lchnk)
@@ -1704,6 +1777,66 @@ end subroutine micro_p3_readnl
    call outfld ('LS_FLXSNW',              flxsnw(:,:), pcols, lchnk)
    call outfld ('LS_REFFRAIN',            reffrain(:,:), pcols, lchnk)
 
+   ! Output variables that have step-wise output implemented.
+   if (p3_output_each_substep) then
+      ! Save cloudfrac and P3 tendencies to the pbuf field.
+      call pbuf_get_field(pbuf, cloudfrac_rain_micro_steps_idx, cloudfrac_rain_micro_steps)
+      call pbuf_get_field(pbuf, p3_qc2qr_accret_tend_steps_idx, p3_qc2qr_accret_tend_steps)
+      call pbuf_get_field(pbuf, p3_qc2qr_autoconv_tend_steps_idx, p3_qc2qr_autoconv_tend_steps)
+      call pbuf_get_field(pbuf, p3_nr_selfcollect_tend_steps_idx, p3_nr_selfcollect_tend_steps)
+      call pbuf_get_field(pbuf, p3_qr2qv_evap_tend_steps_idx, p3_qr2qv_evap_tend_steps)
+      call pbuf_get_field(pbuf, p3_nr_evap_tend_steps_idx, p3_nr_evap_tend_steps)
+      call pbuf_get_field(pbuf, p3_ncautr_steps_idx, p3_ncautr_steps)
+      call pbuf_get_field(pbuf, p3_sed_cldrain_steps_idx, p3_sed_cldrain_steps)
+      call pbuf_get_field(pbuf, p3_sed_numrain_steps_idx, p3_sed_numrain_steps)
+      call pbuf_get_field(pbuf, p3_mtend_cldrain_steps_idx, p3_mtend_cldrain_steps)
+      call pbuf_get_field(pbuf, p3_mtend_numrain_steps_idx, p3_mtend_numrain_steps)
+      cloudfrac_rain_micro_steps(:,:,macmic_it) = cld_frac_r
+      p3_qc2qr_accret_tend_steps(:,:,macmic_it) = tend_out(:,:, 2)
+      p3_qc2qr_autoconv_tend_steps(:,:,macmic_it) = tend_out(:,:, 3)
+      p3_nr_selfcollect_tend_steps(:,:,macmic_it) = tend_out(:,:, 7)
+      p3_qr2qv_evap_tend_steps(:,:,macmic_it) = tend_out(:,:,11)
+      p3_nr_evap_tend_steps(:,:,macmic_it) = tend_out(:,:,13)
+      p3_ncautr_steps(:,:,macmic_it) = tend_out(:,:,14)
+      p3_sed_cldrain_steps(:,:,macmic_it) = tend_out(:,:,38)
+      p3_sed_numrain_steps(:,:,macmic_it) = tend_out(:,:,39)
+      p3_mtend_cldrain_steps(:,:,macmic_it) = tend_out(:,:,44)
+      p3_mtend_numrain_steps(:,:,macmic_it) = tend_out(:,:,45)
+      ! Output these variables on the last macmic step.
+      if (macmic_it == cld_macmic_num_steps) then
+         call outfld('CLOUDFRAC_RAIN_MICRO', cloudfrac_rain_micro_steps,      pcols, lchnk)
+         ! Write p3 tendencies as output
+         ! warm-phase process rates
+         call outfld('P3_qc2qr_accret_tend', p3_qc2qr_accret_tend_steps, pcols, lchnk)
+         call outfld('P3_qc2qr_autoconv_tend', p3_qc2qr_autoconv_tend_steps, pcols, lchnk)
+         call outfld('P3_nr_selfcollect_tend', p3_nr_selfcollect_tend_steps, pcols, lchnk)
+         call outfld('P3_qr2qv_evap_tend', p3_qr2qv_evap_tend_steps, pcols, lchnk)
+         call outfld('P3_nr_evap_tend', p3_nr_evap_tend_steps, pcols, lchnk)
+         call outfld('P3_ncautr', p3_ncautr_steps, pcols, lchnk)
+         ! sedimentation
+         call outfld('P3_sed_CLDRAIN', p3_sed_cldrain_steps, pcols, lchnk)
+         call outfld('P3_sed_NUMRAIN', p3_sed_numrain_steps, pcols, lchnk)
+         ! microphysics processes
+         call outfld('P3_mtend_CLDRAIN', p3_mtend_cldrain_steps, pcols, lchnk)
+         call outfld('P3_mtend_NUMRAIN', p3_mtend_numrain_steps, pcols, lchnk)
+      end if
+   else
+      call outfld('CLOUDFRAC_RAIN_MICRO', cld_frac_r,      pcols, lchnk)
+      ! Write p3 tendencies as output
+      ! warm-phase process rates
+      call outfld('P3_qc2qr_accret_tend',    tend_out(:,:, 2), pcols, lchnk)
+      call outfld('P3_qc2qr_autoconv_tend',  tend_out(:,:, 3), pcols, lchnk)
+      call outfld('P3_nr_selfcollect_tend',  tend_out(:,:, 7), pcols, lchnk)
+      call outfld('P3_qr2qv_evap_tend',      tend_out(:,:,11), pcols, lchnk)
+      call outfld('P3_nr_evap_tend',         tend_out(:,:,13), pcols, lchnk)
+      call outfld('P3_ncautr',               tend_out(:,:,14), pcols, lchnk)
+      ! sedimentation
+      call outfld('P3_sed_CLDRAIN',          tend_out(:,:,38), pcols, lchnk)
+      call outfld('P3_sed_NUMRAIN',          tend_out(:,:,39), pcols, lchnk)
+      ! microphysics processes
+      call outfld('P3_mtend_CLDRAIN',        tend_out(:,:,44), pcols, lchnk)
+      call outfld('P3_mtend_NUMRAIN',        tend_out(:,:,45), pcols, lchnk)
+   end if
 
    call t_stopf('micro_p3_tend_finish')
   end subroutine micro_p3_tend
