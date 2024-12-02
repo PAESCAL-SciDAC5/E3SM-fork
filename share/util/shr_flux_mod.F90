@@ -237,6 +237,11 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
    real(R8)    :: qstar_prev  
    real(R8)    :: tstar  ! tstar
    real(R8)    :: tstar_prev
+   real(R8)    :: ustar10 ! solution for zeta_max = 10
+   real(R8)    :: tstar10 ! solution for zeta_max = 10
+   real(R8)    :: qstar10 ! solution for zeta_max = 10
+   real(R8)    :: zeta_max 
+   real(R8)    :: zeta_incr
    real(R8)    :: hol    ! H (at zbot) over L
    real(R8)    :: xsq    ! ?
    real(R8)    :: xqq    ! ?
@@ -345,138 +350,196 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
   !        = 0.0327,                      if hol < -eps_reg
   ! where m = (0.0327 - 0.018)/(-2.0*eps_reg)
   eps_reg = 0.5_R8
-  alpha_iter = 1.0_R8
+  alpha_iter = 0.08_R8
 
   !--- temporary hard-coding change of max iters and convergence ---
-  flux_con_tol = 1.e-13_R8
-  flux_con_max_iter = 100
+  flux_con_tol = 1.e-4_R8
+  flux_con_max_iter = 200000
 
    DO n=1,nMax
      if (mask(n) /= 0) then
 
-        !--- compute some needed quantities ---
-        wind0 = max(sqrt((ubot(n) - us(n))**2 + (vbot(n) - vs(n))**2), 0.01_r8)
-        vmag = wind0
-        if (present(ugust)) then
-           vmag = vmag + ugust(n)
-        end if
-        vmag = max(seq_flux_atmocn_minwind, vmag)
-        if (use_coldair_outbreak_mod) then
-            ! Cold Air Outbreak Modification:
-            ! Increase windspeed for negative tbot-ts
-            ! based on Mahrt & Sun 1995,MWR
+         !--- set zeta limiter and incrementer ---
+         ! we first apply the limiter with zeta_max = 20 and
+         ! check whether the iteration converges to zeta = zeta_max.
+         ! if so, reduce the value of zeta_max by zeta_incr and try again.
+         !
+         ! if zeta_max is reduced all the way to 0 without finding a solution
+         ! such that zeta =/= zeta_max, accept the solution corresponding to
+         ! zeta_max = 10
+         zeta_incr = 0.25_R8
+         zeta_max = 20.0_R8 + zeta_incr
 
-            if (tdiff(n).lt.td0) then
-               vscl=min((1._R8+alpha*(abs(tdiff(n)-td0)**0.5_R8/abs(vmag))),maxscl)
-               vmag=vmag*vscl
+        !--- loop over zeta_max ---
+        ! zeta initally set to zeta_max so we always do at least one iteration
+        hol = zeta_max
+        do while ((abs(abs(hol) - zeta_max) < 1.e-6) .and. (zeta_max > 0.0))
+            !--- increment zeta_max ---
+            zeta_max = max(zeta_max - zeta_incr, 0.0)
+
+            !--- compute some needed quantities ---
+            wind0 = max(sqrt((ubot(n) - us(n))**2 + (vbot(n) - vs(n))**2), 0.01_r8)
+            vmag = wind0
+            if (present(ugust)) then
+               vmag = vmag + ugust(n)
+            end if
+            vmag = max(seq_flux_atmocn_minwind, vmag)
+            if (use_coldair_outbreak_mod) then
+                  ! Cold Air Outbreak Modification:
+                  ! Increase windspeed for negative tbot-ts
+                  ! based on Mahrt & Sun 1995,MWR
+
+                  if (tdiff(n).lt.td0) then
+                     vscl=min((1._R8+alpha*(abs(tdiff(n)-td0)**0.5_R8/abs(vmag))),maxscl)
+                     vmag=vmag*vscl
+                  endif
             endif
-        endif
-        ssq    = 0.98_R8 * qsat(ts(n)) / rbot(n)   ! sea surf hum (kg/kg)
-        delt   = thbot(n) - ts(n)                  ! pot temp diff (K)
-        delq   = qbot(n) - ssq                     ! spec hum dif (kg/kg)
-        alz    = log(zbot(n)/zref)
-        cp     = loc_cpdair*(1.0_R8 + loc_cpvir*ssq)
+            ssq    = 0.98_R8 * qsat(ts(n)) / rbot(n)   ! sea surf hum (kg/kg)
+            delt   = thbot(n) - ts(n)                  ! pot temp diff (K)
+            delq   = qbot(n) - ssq                     ! spec hum dif (kg/kg)
+            alz    = log(zbot(n)/zref)
+            cp     = loc_cpdair*(1.0_R8 + loc_cpvir*ssq)
 
-        !------------------------------------------------------------
-        ! first estimate of Z/L and ustar, tstar and qstar
-        !------------------------------------------------------------
-        !--- neutral coefficients, z/L = 0.0 ---
-        stable = 0.5_R8 + sign(0.5_R8 , delt)
-        rdn    = sqrt(cdn(vmag))
-        rhn    = (1.0_R8-stable) * 0.0327_R8 + stable * 0.018_R8
-                 !(1.0_R8-stable) * chxcdu + stable * chxcds
-        ren    = 0.0346_R8 !cexcd
+            !------------------------------------------------------------
+            ! first estimate of Z/L and ustar, tstar and qstar
+            !------------------------------------------------------------
+            !--- neutral coefficients, z/L = 0.0 ---
+            stable = 0.5_R8 + sign(0.5_R8 , delt)
+            rdn    = sqrt(cdn(vmag))
+            !--- rhn    = (1.0_R8-stable) * 0.0327_R8 + stable * 0.018_R8
+                     !(1.0_R8-stable) * chxcdu + stable * chxcds
+            ren    = 0.0346_R8 !cexcd
 
-        !--- ustar, tstar, qstar ---
-        ustar = rdn * vmag
-        tstar = rhn * delt
-        qstar = ren * delq
-        ustar_prev = ustar*2.0_R8
-        tstar_prev = tstar*2.0_R8
-        qstar_prev = qstar*2.0_R8
-        u10n = vmag 
-
-        if (present(wsresp) .and. present(tau_est)) prev_tau = tau_est(n)
-        tau_diff = 1.e100_R8
-        wind_adj = wind0
-        ! Since we already have an estimated u*, do one update before iteration loop.
-        if (present(wsresp) .and. present(tau_est)) then
-           ! Update stress and magnitude of mean wind.
-           tau = rbot(n) * ustar * rdn * wind_adj
-           call shr_flux_update_stress(wind0, wsresp(n), tau_est(n), &
-                tau, prev_tau, tau_diff, prev_tau_diff, wind_adj)
-           vmag = wind_adj
-           if (present(ugust)) then
-              vmag = vmag + ugust(n)
-           end if
-           vmag = max(seq_flux_atmocn_minwind, vmag)
-        else
-           tau_diff = 0._R8
-        end if
-        iter = 0
-        do while( (abs((ustar - ustar_prev)/ustar) > flux_con_tol .or. &
-             abs((tstar - tstar_prev)/tstar) > flux_con_tol .or. &
-             abs((qstar - qstar_prev)/qstar) > flux_con_tol .or. &
-             abs(tau_diff) > dtaumin) .and. &
-             iter < flux_con_max_iter)
-           iter = iter + 1
-           ustar_prev = ustar
-           tstar_prev = tstar
-           qstar_prev = qstar
-           u10n_prev = u10n
-           !--- compute stability & evaluate all stability functions ---
-           hol  = loc_karman*loc_g*zbot(n)*  &
-                (tstar/thbot(n)+qstar/(1.0_R8/loc_zvir+qbot(n)))/ustar**2
-           hol  = sign( min(abs(hol),10.0_R8), hol )
-           stable = 0.5_R8 + sign(0.5_R8 , hol)
-           xsq    = max(sqrt(abs(1.0_R8 - 16.0_R8*hol)) , 1.0_R8)
-           xqq    = sqrt(xsq)
-           psimh  = -5.0_R8*hol*stable + (1.0_R8-stable)*psimhu(xqq)
-           psixh  = -5.0_R8*hol*stable + (1.0_R8-stable)*psixhu(xqq)
-
-           !--- shift wind speed using old coefficient ---
-           rd   = rdn / max(1.0_R8 + rdn/loc_karman*(alz-psimh), 1.e-3_r8)
-           u10n = alpha_iter * (vmag * rd / rdn) + (1.0_R8 - alpha_iter) * u10n_prev
-
-           !--- update transfer coeffs at 10m and neutral stability ---
-           rdn = sqrt(cdn(u10n_prev))
-           ren = 0.0346_R8 !cexcd
-
-           !--- C0 regularization of rhn based on linear function ---
-           if (hol > eps_reg) then
+            !--- replace rhn with regularized version for initial guess
+            !--- (if this the output of this subroutine, it suggests
+            !--- extreme sensitivitity of the iteration to the initial guess
+            if (delt > eps_reg) then
                rhn = 0.018_R8
-           else if (hol > -eps_reg) then
-               rhn = 0.018_R8 + (0.0327_R8 - 0.018_R8)/(-2.0_R8*eps_reg) * (hol - eps_reg)
-           else 
+            else if (delt > -eps_reg) then
+               rhn = 0.018_R8 + (0.0327_R8 - 0.018_R8) / (-2.0_R8 * eps_reg) * (delt - eps_reg)
+            else
                rhn = 0.0327_R8
-           end if
+            end if 
 
-           !--- shift all coeffs to measurement height and stability ---
-           rd = rdn / max(1.0_R8 + rdn/loc_karman*(alz-psimh), 1.e-3_r8)
-           rh = rhn / (1.0_R8 + rhn/loc_karman*(alz-psixh))
-           re = ren / (1.0_R8 + ren/loc_karman*(alz-psixh))
+            !--- ustar, tstar, qstar ---
+            ustar = rdn * vmag
+            tstar = rhn * delt
+            qstar = ren * delq
+            ustar_prev = ustar*2.0_R8
+            tstar_prev = tstar*2.0_R8
+            qstar_prev = qstar*2.0_R8
+            u10n = vmag 
 
-           !--- update ustar, tstar, qstar using updated, shifted coeffs --
-           ustar = alpha_iter * (rd * vmag) + (1.0_R8 - alpha_iter) * ustar
-           tstar = alpha_iter * (rh * delt) + (1.0_R8 - alpha_iter) * tstar
-           qstar = alpha_iter * (re * delq) + (1.0_R8 - alpha_iter) * qstar
+            if (present(wsresp) .and. present(tau_est)) prev_tau = tau_est(n)
+            tau_diff = 1.e100_R8
+            wind_adj = wind0
+            ! Since we already have an estimated u*, do one update before iteration loop.
+            if (present(wsresp) .and. present(tau_est)) then
+               ! Update stress and magnitude of mean wind.
+               tau = rbot(n) * ustar * rdn * wind_adj
+               call shr_flux_update_stress(wind0, wsresp(n), tau_est(n), &
+                     tau, prev_tau, tau_diff, prev_tau_diff, wind_adj)
+               vmag = wind_adj
+               if (present(ugust)) then
+                  vmag = vmag + ugust(n)
+               end if
+               vmag = max(seq_flux_atmocn_minwind, vmag)
+            else
+               tau_diff = 0._R8
+            end if
 
-           if (present(wsresp) .and. present(tau_est)) then
-              ! Update stress and magnitude of mean wind.
-              tau = rbot(n) * ustar * rd * wind_adj
-              call shr_flux_update_stress(wind0, wsresp(n), tau_est(n), &
-                   tau, prev_tau, tau_diff, prev_tau_diff, wind_adj)
-              vmag = wind_adj
-              if (present(ugust)) then
-                 vmag = vmag + ugust(n)
-              end if
-              vmag = max(seq_flux_atmocn_minwind, vmag)
-           end if
-        enddo
-        if (iter < 1) then
-           write(s_logunit,*) ustar,ustar_prev,flux_con_tol,flux_con_max_iter
-           call shr_sys_abort('No iterations performed ' // errMsg(sourcefile, __LINE__))
-        end if
+            ! iterate until convergence or max iters are reached
+            iter = 0
+            ! do while( (abs((ustar - ustar_prev)/ustar) > flux_con_tol .or. &
+            !       abs((tstar - tstar_prev)/tstar) > flux_con_tol .or. &
+            !       abs((qstar - qstar_prev)/qstar) > flux_con_tol .or. &
+            !       abs(tau_diff) > dtaumin) .and. &
+            !       iter < flux_con_max_iter)
+            do while( sqrt(((ustar - ustar_prev)/ustar)**2 + ((tstar - tstar_prev)/tstar)**2 + ((qstar - qstar_prev)/qstar)**2 + ((u10n - u10n_prev)/u10n)**2) > flux_con_tol )
+               ! abort if exceeded max iters
+               if (iter > flux_con_max_iter) then
+                  write(s_logunit,*) vmag,thbot(n),ts(n),zbot(n),qbot(n),ssq,ustar,ustar_prev,tstar,tstar_prev,qstar,qstar_prev,flux_con_tol,flux_con_max_iter
+                  call shr_sys_abort('MAX ITERS (1000) REACHED WITHOUT OCN-ATM ITERATION CONVERGING ' // errMsg(sourcefile, __LINE__))
+               end if
+               iter = iter + 1
+               ustar_prev = ustar
+               tstar_prev = tstar
+               qstar_prev = qstar
+               u10n_prev = u10n
+               !--- compute stability & evaluate all stability functions ---
+               hol  = loc_karman*loc_g*zbot(n)*  &
+                     (tstar/thbot(n)+qstar/(1.0_R8/loc_zvir+qbot(n)))/ustar**2
+               hol  = sign( min(abs(hol), zeta_max), hol )
+
+               stable = 0.5_R8 + sign(0.5_R8 , hol)
+               xsq    = max(sqrt(abs(1.0_R8 - 16.0_R8*hol)) , 1.0_R8)
+               xqq    = sqrt(xsq)
+               psimh  = -5.0_R8*hol*stable + (1.0_R8-stable)*psimhu(xqq)
+               psixh  = -5.0_R8*hol*stable + (1.0_R8-stable)*psixhu(xqq)
+
+               !--- shift wind speed using old coefficient ---
+               rd   = rdn / max(1.0_R8 + rdn/loc_karman*(alz-psimh), 1.e-3_r8)
+               u10n = alpha_iter * (vmag * rd / rdn) + (1.0_R8 - alpha_iter) * u10n_prev
+
+               !--- update transfer coeffs at 10m and neutral stability ---
+               rdn = sqrt(cdn(u10n))
+               ren = 0.0346_R8 !cexcd
+
+               !--- C0 regularization of rhn based on linear function ---
+               if (hol > eps_reg) then
+                  rhn = 0.018_R8
+               else if (hol > -eps_reg) then
+                  rhn = 0.018_R8 + (0.0327_R8 - 0.018_R8)/(-2.0_R8*eps_reg) * (hol - eps_reg)
+               else 
+                  rhn = 0.0327_R8
+               end if
+
+               !--- original rhn (discontinuous) ---
+               !--- rhn = (1.0-stable)*0.0327 + stable * 0.018
+
+               !--- shift all coeffs to measurement height and stability ---
+               rd = rdn / max(1.0_R8 + rdn/loc_karman*(alz-psimh), 1.e-3_r8)
+               rh = rhn / (1.0_R8 + rhn/loc_karman*(alz-psixh))
+               re = ren / (1.0_R8 + ren/loc_karman*(alz-psixh))
+
+               !--- update ustar, tstar, qstar using updated, shifted coeffs --
+               ustar = alpha_iter * (rd * vmag) + (1.0_R8 - alpha_iter) * ustar_prev
+               tstar = alpha_iter * (rh * delt) + (1.0_R8 - alpha_iter) * tstar_prev
+               qstar = alpha_iter * (re * delq) + (1.0_R8 - alpha_iter) * qstar_prev
+
+               if (present(wsresp) .and. present(tau_est)) then
+                  ! Update stress and magnitude of mean wind.
+                  tau = rbot(n) * ustar * rd * wind_adj
+                  call shr_flux_update_stress(wind0, wsresp(n), tau_est(n), &
+                        tau, prev_tau, tau_diff, prev_tau_diff, wind_adj)
+                  vmag = wind_adj
+                  if (present(ugust)) then
+                     vmag = vmag + ugust(n)
+                  end if
+                  vmag = max(seq_flux_atmocn_minwind, vmag)
+               end if
+            enddo
+
+            !--- store zeta_max=10 results
+            if (abs(zeta_max - 10.0) < 1.e-8) then
+               ustar10 = ustar 
+               tstar10 = tstar
+               qstar10 = qstar 
+            end if 
+
+            if (iter < 1) then
+               write(s_logunit,*) ustar,ustar_prev,flux_con_tol,flux_con_max_iter
+               call shr_sys_abort('No iterations performed ' // errMsg(sourcefile, __LINE__))
+            end if
+
+         enddo
+
+         !--- if no relevant solution was found
+         if (abs(zeta_max) < 1.e-8) then
+            ustar = ustar10 
+            tstar = tstar10
+            qstar = qstar10 
+         end if
 
         !------------------------------------------------------------
         ! compute the fluxes
@@ -493,7 +556,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         lat (n) =  loc_latvap * tau * qstar / ustar
         lwup(n) = -loc_stebol * ts(n)**4
 
-
+         ! print variables for this cell
+         ! write(s_logunit,*) "Final results for cell ", n, vmag,thbot(n),ts(n),zbot(n),qbot(n),rbot(n),ssq,ustar,u10n,tstar,qstar, taux(n), tauy(n), sen(n), lat(n), lwup(n)
 
 
         !--- water flux ---

@@ -40,15 +40,15 @@ readonly CASE_NAME="EAMv2_regularizeduniquescheme_nomaxiter_10years_instantaneou
 readonly DEBUG_COMPILE=false
 
 # Run options
-readonly MODEL_START_TYPE="initial"  # 'initial', 'continue', 'branch', 'hybrid'
-#readonly MODEL_START_TYPE="continue"  # 'initial', 'continue', 'branch', 'hybrid'
-readonly START_DATE="2009-09-01"
+# readonly MODEL_START_TYPE="initial"  # 'initial', 'continue', 'branch', 'hybrid'
+readonly MODEL_START_TYPE="continue"  # 'initial', 'continue', 'branch', 'hybrid'
+readonly START_DATE="2016-04-30"
 
-# Additional options for 'branch' and 'hybrid'
-#readonly GET_REFCASE=TRUE
-#readonly RUN_REFDIR="/global/cscratch1/sd/forsyth/E3SMv2/v2.LR.piControl/init"
-#readonly RUN_REFCASE="20210625.v2rc3c-GWD.piControl.ne30pg2_EC30to60E2r2.chrysalis"
-#readonly RUN_REFDATE="1001-01-01"   # same as MODEL_START_DATE for 'branch', can be different for 'hybrid'
+# # Additional options for 'branch' and 'hybrid'
+# readonly GET_REFCASE=TRUE
+# readonly RUN_REFDIR="/pscratch/sd/d/dong9/sfc_cpl/e3sm_restarts/regularizeduniquescheme_crash_2016"
+# readonly RUN_REFCASE="EAMv2_regularizeduniquescheme_nomaxiter_10years_instantaneousoutput_sfc_inout_ne30pg2_oECv3"
+# readonly RUN_REFDATE="2016-01-01"   # same as MODEL_START_DATE for 'branch', can be different for 'hybrid'
 
 # Set paths
 readonly CHECKOUT="maint-2.0_CondiDiag1.0_RHNregularization"
@@ -91,17 +91,17 @@ else
   readonly CASE_SCRIPTS_DIR=${CASE_ROOT}/case_scripts
   readonly CASE_RUN_DIR=${CASE_ROOT}/run
   readonly PELAYOUT="S"
-  readonly WALLTIME="23:00:00"
+  readonly WALLTIME="2:00:00"
   readonly STOP_OPTION="nmonths"
-  readonly STOP_N="32"
+  readonly STOP_N="12"
   readonly REST_OPTION="nmonths"
-  readonly REST_N="4"
-  readonly RESUBMIT="3"
+  readonly REST_N="1"
+  readonly RESUBMIT="0"
   readonly DO_SHORT_TERM_ARCHIVING=false
 fi
 
 # Coupler history
-readonly HIST_OPTION="nyears"
+readonly HIST_OPTION="nmonths"
 readonly HIST_N="5"
 
 # Leave empty (unless you understand what it does)
@@ -112,7 +112,7 @@ do_fetch_code=false
 do_create_newcase=true
 do_case_setup=true
 do_case_build=true
-do_case_submit=true
+do_case_submit=false
 
 # --- Now, do the work ---
 
