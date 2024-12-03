@@ -1,0 +1,21 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: E3SMv2 with ocean-atmosphere flux regularization
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Justin
+    family-names: Dong
+    email: dong9@llnl.gov
+    affiliation: Lawrence Livermore National Laboratory
+    orcid: 'https://orcid.org/0009-0005-8635-2895'
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.14263844
+repository-code: >-
+  https://github.com/PAESCAL-SciDAC5/E3SM-fork/tree/maint-2.0_CondiDiag1.0_RHNregularization
+license: CC-BY-NC-SA-4.0
