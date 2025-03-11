@@ -256,7 +256,7 @@ subroutine modal_aero_amicphys_intr(                             &
                         latndx,   lonndx,                        &
                         t,        pmid,     pdel,                &
                         zm,       pblh,                          &
-                        qv,       cld,                           &
+                        qv,       cld,      rh_out,              &
                         q,                  qqcw,                &
                         q_pregaschem,                            &
                         q_precldchem,       qqcw_precldchem,     &
@@ -323,6 +323,7 @@ implicit none
    real(r8), intent(in)    :: zm(pcols,pver)       ! altitude (above ground) at level centers (m)
    real(r8), intent(in)    :: pblh(pcols)          ! planetary boundary layer depth (m)
    real(r8), intent(in)    :: qv(pcols,pver)       ! specific humidity (kg/kg)
+   real(r8), intent(out)   :: rh_out(pcols,pver)   ! relative humidity (-)
    real(r8), intent(in)    :: cld(ncol,pver)       ! cloud fraction (-) *** NOTE ncol dimension
    real(r8), intent(inout) :: dgncur_a(pcols,pver,ntot_amode)
    real(r8), intent(inout) :: dgncur_awet(pcols,pver,ntot_amode)
@@ -515,6 +516,8 @@ implicit none
       call qsat( t(1:ncol,1:pver), pmid(1:ncol,1:pver), &
                  ev_sat(1:ncol,1:pver), qv_sat(1:ncol,1:pver) )
 
+      rh_out(:,:) = 0._r8
+
 main_k_loop: &
       do k = top_lev, pver
 main_i_loop: &
@@ -556,6 +559,8 @@ main_i_loop: &
       if (jcldy > 0) afracsub(jcldy) = fcldy
 
       relhumgcm = max( 0.0_r8, min( 1.0_r8, qv(i,k)/qv_sat(i,k) ) )
+      rh_out(i,k) = relhumgcm
+
       if (ncldy_subarea <= 0) then
          relhumsub(:) = relhumgcm
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
