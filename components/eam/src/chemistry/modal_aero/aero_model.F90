@@ -743,6 +743,7 @@ contains
     call addfld('i_zm',   (/'lev'/), 'A','m', 'geopotential height input to aerosol microphysics')
     call addfld('i_pblh', horiz_only,'A','m', 'PBL height input to aerosol microphysics')
     call addfld('i_qh2o', (/'lev'/), 'A','kg/kg','specific humidity input to aerosol microphysics')
+    call addfld('i_rh',   (/'lev'/), 'A','-', 'grid-box mean relative humidity diagnosed in aerosol microphysics')
     call addfld('i_cldfr',(/'lev'/), 'A','-', 'cloud fraction input to aerosol microphysics')
     !----
 
@@ -2468,6 +2469,8 @@ do_lphase2_conditional: &
     real(r8) :: dvmrcw_amic(ncol,pver,gas_pcnst)            ! cloud-borne aerosol
     ! ---- 
 
+    real(r8) :: rh_out(pcols,pver) ! relative humidity diagnosed inside amicphys_intr; declared here for outfld only
+
     real(r8), pointer :: fldcw(:,:)
 
     logical :: use_ECPP
@@ -2496,6 +2499,8 @@ do_lphase2_conditional: &
     real(r8),allocatable ::        vmrcw_rx(:,:,:)
     real(r8),allocatable ::     dvmrcwdt_rx(:,:,:)
     real(r8),allocatable ::  dvmrcw_amic_rx(:,:,:)
+
+    real(r8) :: rh_out_rx(pcols,pver) ! relative humidity diagnosed inside amicphys_intr; declared here for outfld only
 
     !-- for pseudo-rx calculation, end =============
 
@@ -2698,6 +2703,8 @@ do_lphase2_conditional: &
        ! Send amicphys input to history buffer
        !-----------------------------------------
        ! Atmospheric conditions
+       ! (Note that the outfld call for i_rh is placed after the call of modal_aero_amicphys_intr
+       ! because rh is diagnocased inside that subroutine.)
 
        call outfld('i_T',    tfld (1:ncol,:), ncol, lchnk)
        call outfld('i_pmid', pmid (1:ncol,:), ncol, lchnk)
@@ -2743,7 +2750,7 @@ do_lphase2_conditional: &
             latndx,    lonndx,                       &
             tfld,      pmid,    pdel,                &
             zm,        pblh,                         &
-            qh2o,      cldfr,                        &
+            qh2o,      cldfr,   rh_out,              &
             vmr,                vmrcw,               &
             vmr0,                                    &
             dvmrdt,             dvmrcwdt,            &
@@ -2770,6 +2777,8 @@ do_lphase2_conditional: &
        !-----------------------------------------
        ! Send amicphys output to history buffer
        !-----------------------------------------
+       call outfld('i_rh',  rh_out(1:ncol,:), ncol, lchnk)
+
        ! Gases and interstitial aerosols
        do m = 1,gas_pcnst
           dvmr_amic(1:ncol,:,m) = vmr(1:ncol,:,m) - dvmr_amic(1:ncol,:,m)  ! diagnose changes due to amicphys
@@ -2800,7 +2809,7 @@ do_lphase2_conditional: &
             latndx,    lonndx,                       &
             tfld_rx,   pmid_rx, pdel_rx,             &
             zm_rx,     pblh_rx,                      &
-            qh2o_rx,   cldfr_rx,                     &
+            qh2o_rx,   cldfr_rx, rh_out_rx,          &
             vmr_rx,             vmrcw_rx,            &
             vmr0_rx,                                 &
             dvmrdt_rx,          dvmrcwdt_rx,         &
