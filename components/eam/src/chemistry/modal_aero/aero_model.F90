@@ -92,7 +92,8 @@ module aero_model
   integer :: strt_loop, end_loop, stride_loop !loop indices for the lphase loop
 
   ! Namelist variables
-  integer :: mam_amicphys_nsigbits = 16
+  integer :: amicphys_precision_opt = 1   ! 1= single call using default precision
+  integer :: amicphys_rpe_nsigbits = 16   ! precision of additional variables if amicphys_precision_opt > 1
   integer :: mam_amicphys_optaa
   logical :: sscav_tuning, convproc_do_aer, convproc_do_gas, resus_fix  
   character(len=16) :: wetdep_list(pcnst) = ' '
@@ -224,7 +225,8 @@ contains
          convproc_do_aer_out = convproc_do_aer, & 
          convproc_do_gas_out = convproc_do_gas, &
          resus_fix_out       = resus_fix,       &
-         mam_amicphys_nsigbits_out = mam_amicphys_nsigbits, &
+         mam_amicphys_precision_opt_out = amicphys_precision_opt, &
+         mam_amicphys_rpe_nsigbits_out  = amicphys_rpe_nsigbits, &
          mam_amicphys_optaa_out = mam_amicphys_optaa ) ! REASTER 08/04/2015
 
 
@@ -2660,15 +2662,16 @@ do_lphase2_conditional: &
     else ! (mam_amicphys_optaa > 0) 
     ! do gas-aerosol exchange, nucleation, and coagulation using new routines
 
-
        ! note that at this point,
        !     vmr0 holds vmr before gas-phase chemistry
        !     dvmrdt and dvmrcwdt hold vmr and vmrcw before aqueous chemistry
 
-       !##########################################################################
-       ! Create a copy of amicphys' input variables at different precision
+      !##################################################################################################
+      if (amicphys_precision_opt > 1) then  ! need additional variables at a reduced precision
 
-       precision_out = mam_amicphys_nsigbits
+       ! Create a copy of amicphys' input variables and change precision
+
+       precision_out = amicphys_rpe_nsigbits
 
        ! Atmospheric conditions
 
@@ -2699,11 +2702,21 @@ do_lphase2_conditional: &
        call change_precision(    vmrcw, precision_out,       vmrcw_rx )
        call change_precision(    vmrcw, precision_out, dvmrcw_amic_rx )  ! for diag and outfld only
 
-       !##################
+      end if
+      !##################
 
-       !-----------------------------------------
-       ! Send amicphys input to history buffer
-       !-----------------------------------------
+      if (amicphys_precision_opt == 1 .or.& ! single call with the default precision ###########################
+          amicphys_precision_opt == 2) then ! double calls. First one default; second one with reduced precision
+       !----------------------------------------------------------------
+       ! Send amicphys input to history buffer.
+       !----------------------------------------------------------------
+       ! Note: when amicphys_precision_opt == 3, we should be using the
+       ! the *_rx variables in the outfld calls to capture the actual
+       ! values used in the model integration. However, since the i_*
+       ! history variables are intended to be used as input features in
+       ! ML traing and we currently don't use the RPE runs to generate
+       ! training data, the follow blocks of outfld calls are skipped.
+       !----------------------------------------------------------------
        ! Atmospheric conditions
        ! (Note that the outfld call for i_rh is placed after the call of modal_aero_amicphys_intr
        ! because rh is diagnocased inside that subroutine.)
@@ -2798,7 +2811,11 @@ do_lphase2_conditional: &
        end do
        !---------------------
 
-       !#################################################################
+      end if ! amicphys_precision_opt == 1 or 2
+
+     !#################################################################
+     if (amicphys_precision_opt == 2 .or. &
+         amicphys_precision_opt == 3) then
        !--------------------------------------------------------------
        ! Second call of amicphys using input of a different precision
        !--------------------------------------------------------------
@@ -2819,6 +2836,9 @@ do_lphase2_conditional: &
             wetdens_rx                               )
        call t_stopf('modal_aero_amicphys_call_2')
 
+     end if
+
+     if (amicphys_precision_opt == 2) then
        !----------------------------------------------------------------
        ! Diagnose amicphys-caused increments and send to history buffer
        !----------------------------------------------------------------
@@ -2838,6 +2858,26 @@ do_lphase2_conditional: &
         end if
        end do
 
+     end if !amicphys_precision_opt == 2
+
+     if (amicphys_precision_opt == 3) then
+       !----------------------------------------------------------------
+       ! Copy values that will feedback to the simulation
+       !----------------------------------------------------------------
+       vmr      = vmr_rx
+       vmrcw    = vmrcw_rx
+       dgnum    = dgnum_rx
+       dgnumwet = dgnumwet_rx
+       wetdens  = wetdens_rx
+       rh_out   = rh_out_rx
+
+       !-----------------------------------------------------------------------
+       ! Currently we are not using opt 3 for generating ML training
+       ! data, hence, outfld calls for o_vmr_* and d_vmr_* variables are omitted.
+       !-----------------------------------------------------------------------
+     end if !amicphys_precision_opt == 3
+
+     if (amicphys_precision_opt > 1) then
        !---------------------
        ! Clean up
        !---------------------
@@ -2868,7 +2908,8 @@ do_lphase2_conditional: &
        deallocate(       vmrcw_rx )
        deallocate( dvmrcw_amic_rx )  ! for diag and outfld only
 
-       !#################################################################
+     end if
+     !#################################################################
 
     endif ! (mam_amicphys_optaa <= 0 OR > 0)
 
