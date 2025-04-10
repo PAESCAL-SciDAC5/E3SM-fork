@@ -3653,11 +3653,20 @@ invokes new microphysics code (single call to amicphys routine) if > 0
 Default: 0
 </entry>
 
-<!-- Floating-point precision of diagnostic amicphys calculation -->
-<entry id="mam_amicphys_nsigbits" type="integer"  category="scavenging"
+<entry id="mam_amicphys_precision_opt" type="integer"  category="scavenging"
        group="phys_ctl_nl" valid_values="" >
-Floating-point precision of input to amicphys expressed in terms of
-the number of significand bits.
+How many amicphys calculations to perform and with what precision.
+1 = single call with the default precision.
+2 = double calls with the second being diagnostic and using reduced-precision input.
+3 = single call using reduced-precision input.
+Default: 1
+</entry>
+
+<!-- Floating-point precision of amicphys calculation with reduced-precision input -->
+<entry id="mam_amicphys_rpe_nsigbits" type="integer"  category="scavenging"
+       group="phys_ctl_nl" valid_values="" >
+Floating-point precision of input to amicphys calculation with reduced-precision input,
+expressed in terms of the number of significand bits.
 Default: 16
 </entry>
 
