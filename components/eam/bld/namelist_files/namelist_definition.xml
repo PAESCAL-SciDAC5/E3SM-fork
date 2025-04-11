@@ -3667,7 +3667,16 @@ Default: 1
        group="phys_ctl_nl" valid_values="" >
 Floating-point precision of input to amicphys calculation with reduced-precision input,
 expressed in terms of the number of significand bits.
-Default: 16
+Default: 23
+</entry>
+
+<!-- perturbation (unitless) to be added to the input of amicphys -->
+<entry id="mam_amicphys_input_ptb" type="real"  category="scavenging"
+       group="phys_ctl_nl" valid_values="" >
+Perturbation (unitless) to be added to the input of amicphys
+when mam_amicphys_precision_opt = 2 or 3
+and mam_amicphys_rpe_nsigbits = 52.
+Default: 0.
 </entry>
 
 <!-- number of so4(+nh4) monolayers needed to "age" a carbon particle -->
