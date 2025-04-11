@@ -14,11 +14,12 @@ end interface
 contains
 
 !==============================================================================
-subroutine change_precision_for_1d_array( array_in, precision_out, array_out )
+subroutine change_precision_for_1d_array( array_in, precision_out, ptb, array_out )
 
   real(r8),intent(in)              :: array_in (:)
   real(r8),intent(out),allocatable :: array_out(:)
   integer, intent(in)              :: precision_out
+  real(r8),intent(in)              :: ptb
 
   ! local variables
 
@@ -40,14 +41,23 @@ subroutine change_precision_for_1d_array( array_in, precision_out, array_out )
   ! Convert the input values to a different precision and assign to the output array
   !-----------------------------------------------------------------------------------
   select case(precision_out)
-  case(16) ! Single precision.
+
+  case(52) ! Double precision ------------------------
+
+    if ( abs(ptb) > 1e-16_r8 ) then ! add perturbation
+
+       call random_number(array_out)
+       array_out = array_in * ( 1._r8 + (array_out*2._r8 - 1._r8)*ptb )
+
+    else ! simply copy the input values
+       array_out = array_in
+    end if
+
+  case(23) ! Single precision -----------------------
 
     array_out = real(real(array_in,kind=r4),kind=r8)
 
-  case(32) ! Double precision
-    array_out = array_in
-
-  case default ! Emulated precision
+  case default ! Emulated precision ------------------
 
     allocate( array_rpe(shape1d(1)), stat=ierr )
     if (ierr/=0) call endrun(subname//": allocation error occurred for array_rpe")
@@ -64,11 +74,12 @@ subroutine change_precision_for_1d_array( array_in, precision_out, array_out )
 end subroutine change_precision_for_1d_array
 
 !==============================================================================
-subroutine change_precision_for_2d_array( array_in, precision_out, array_out )
+subroutine change_precision_for_2d_array( array_in, precision_out, ptb, array_out )
 
   real(r8),intent(in)              :: array_in (:,:)
   real(r8),intent(out),allocatable :: array_out(:,:)
   integer, intent(in)              :: precision_out
+  real(r8),intent(in)              :: ptb
 
   ! local variables
 
@@ -90,15 +101,22 @@ subroutine change_precision_for_2d_array( array_in, precision_out, array_out )
   ! Convert the input values to a different precision and assign to the output array
   !-----------------------------------------------------------------------------------
   select case(precision_out)
-  case(16) ! Single precision.
+  case(52) ! Double precision -------------------------------
+
+    if ( abs(ptb) > 1e-16_r8 ) then ! add perturbation
+
+       call random_number(array_out)
+       array_out = array_in * ( 1._r8 + (array_out*2._r8 - 1._r8)*ptb )
+
+    else ! simply copy the input values
+       array_out = array_in
+    end if
+
+  case(23) ! Single precision -------------------------------
 
     array_out = real(real(array_in,kind=r4),kind=r8)
 
-  case(32) ! Double precision
-
-    array_out = array_in
-
-  case default ! Emulated precision
+  case default ! Emulated precision -------------------------
 
     allocate( array_rpe(shape2d(1),shape2d(2)), stat=ierr )
     if (ierr/=0) call endrun(subname//": allocation error occurred for array_rpe")
@@ -115,11 +133,12 @@ subroutine change_precision_for_2d_array( array_in, precision_out, array_out )
 end subroutine change_precision_for_2d_array
 
 !==============================================================================
-subroutine change_precision_for_3d_array( array_in, precision_out, array_out )
+subroutine change_precision_for_3d_array( array_in, precision_out, ptb, array_out )
 
   real(r8),intent(in)              :: array_in (:,:,:)
   real(r8),intent(out),allocatable :: array_out(:,:,:)
   integer, intent(in)              :: precision_out
+  real(r8),intent(in)              :: ptb
 
   ! local variables
 
@@ -141,13 +160,20 @@ subroutine change_precision_for_3d_array( array_in, precision_out, array_out )
   ! Convert the input values to a different precision and assigne to the output array
   !-----------------------------------------------------------------------------------
   select case(precision_out)
-  case(16) ! Single precision.
+  case(52) ! Double precision
+
+    if ( abs(ptb) > 1e-16_r8 ) then ! add perturbation
+
+       call random_number(array_out)
+       array_out = array_in * ( 1._r8 + (array_out*2._r8 - 1._r8)*ptb )
+
+    else ! simply copy the input values
+       array_out = array_in
+    end if
+
+  case(23) ! Single precision.
 
     array_out = real(real(array_in,kind=r4),kind=r8)
-
-  case(32) ! Double precision
-
-    array_out = array_in
 
   case default ! Emulated precision
 

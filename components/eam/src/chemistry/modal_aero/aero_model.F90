@@ -93,7 +93,8 @@ module aero_model
 
   ! Namelist variables
   integer :: amicphys_precision_opt = 1   ! 1= single call using default precision
-  integer :: amicphys_rpe_nsigbits = 16   ! precision of additional variables if amicphys_precision_opt > 1
+  integer :: amicphys_rpe_nsigbits = 23   ! precision of additional variables if amicphys_precision_opt > 1
+  real(r8):: amicphys_input_ptb = 0._r8   ! perturbation to be added if amicphys_precision_opt > 1
   integer :: mam_amicphys_optaa
   logical :: sscav_tuning, convproc_do_aer, convproc_do_gas, resus_fix  
   character(len=16) :: wetdep_list(pcnst) = ' '
@@ -227,6 +228,7 @@ contains
          resus_fix_out       = resus_fix,       &
          mam_amicphys_precision_opt_out = amicphys_precision_opt, &
          mam_amicphys_rpe_nsigbits_out  = amicphys_rpe_nsigbits, &
+         mam_amicphys_input_ptb_out = amicphys_input_ptb, &
          mam_amicphys_optaa_out = mam_amicphys_optaa ) ! REASTER 08/04/2015
 
 
@@ -2675,32 +2677,32 @@ do_lphase2_conditional: &
 
        ! Atmospheric conditions
 
-       call change_precision(  tfld, precision_out,  tfld_rx )
-       call change_precision(  pmid, precision_out,  pmid_rx )
-       call change_precision(  pdel, precision_out,  pdel_rx )
-       call change_precision(    zm, precision_out,    zm_rx )
-       call change_precision(  pblh, precision_out,  pblh_rx )
-       call change_precision(  qh2o, precision_out,  qh2o_rx )
-       call change_precision( cldfr, precision_out, cldfr_rx )
+       call change_precision(  tfld, precision_out, amicphys_input_ptb,  tfld_rx )
+       call change_precision(  pmid, precision_out, amicphys_input_ptb,  pmid_rx )
+       call change_precision(  pdel, precision_out, amicphys_input_ptb,  pdel_rx )
+       call change_precision(    zm, precision_out, amicphys_input_ptb,    zm_rx )
+       call change_precision(  pblh, precision_out, amicphys_input_ptb,  pblh_rx )
+       call change_precision(  qh2o, precision_out, amicphys_input_ptb,  qh2o_rx )
+       call change_precision( cldfr, precision_out, amicphys_input_ptb, cldfr_rx )
 
        ! Particle size and density
 
-       call change_precision(    dgnum, precision_out,    dgnum_rx )
-       call change_precision( dgnumwet, precision_out, dgnumwet_rx )
-       call change_precision(  wetdens, precision_out,  wetdens_rx )
+       call change_precision(    dgnum, precision_out, amicphys_input_ptb,    dgnum_rx )
+       call change_precision( dgnumwet, precision_out, amicphys_input_ptb, dgnumwet_rx )
+       call change_precision(  wetdens, precision_out, amicphys_input_ptb,  wetdens_rx )
 
        ! Gases and interstitial aerosols vmrs
 
-       call change_precision(   vmr0, precision_out,      vmr0_rx )
-       call change_precision( dvmrdt, precision_out,    dvmrdt_rx )
-       call change_precision(    vmr, precision_out,       vmr_rx )
-       call change_precision(    vmr, precision_out, dvmr_amic_rx )  ! for diag and outfld only
+       call change_precision(   vmr0, precision_out, amicphys_input_ptb,      vmr0_rx )
+       call change_precision( dvmrdt, precision_out, amicphys_input_ptb,    dvmrdt_rx )
+       call change_precision(    vmr, precision_out, amicphys_input_ptb,       vmr_rx )
+       call change_precision(    vmr, precision_out, amicphys_input_ptb, dvmr_amic_rx )  ! for diag and outfld only
 
        ! Cloud-borne aerosol vmrs
 
-       call change_precision( dvmrcwdt, precision_out,    dvmrcwdt_rx )
-       call change_precision(    vmrcw, precision_out,       vmrcw_rx )
-       call change_precision(    vmrcw, precision_out, dvmrcw_amic_rx )  ! for diag and outfld only
+       call change_precision( dvmrcwdt, precision_out, amicphys_input_ptb,    dvmrcwdt_rx )
+       call change_precision(    vmrcw, precision_out, amicphys_input_ptb,       vmrcw_rx )
+       call change_precision(    vmrcw, precision_out, amicphys_input_ptb, dvmrcw_amic_rx )  ! for diag and outfld only
 
       end if
       !##################
