@@ -95,6 +95,8 @@ module aero_model
   integer :: amicphys_precision_opt = 1   ! 1= single call using default precision
   integer :: amicphys_rpe_nsigbits = 23   ! precision of additional variables if amicphys_precision_opt > 1
   real(r8):: amicphys_input_ptb = 0._r8   ! perturbation to be added if amicphys_precision_opt > 1
+  integer :: amicphys_ntsub_1 = 1         ! # of time substeps for the first (or only) amicphys call
+  integer :: amicphys_ntsub_2 = 1         ! # of time substeps for the second, diagnostic amicphys call (if any)
   integer :: mam_amicphys_optaa
   logical :: sscav_tuning, convproc_do_aer, convproc_do_gas, resus_fix  
   character(len=16) :: wetdep_list(pcnst) = ' '
@@ -229,6 +231,8 @@ contains
          mam_amicphys_precision_opt_out = amicphys_precision_opt, &
          mam_amicphys_rpe_nsigbits_out  = amicphys_rpe_nsigbits, &
          mam_amicphys_input_ptb_out = amicphys_input_ptb, &
+         mam_amicphys_ntsub_1_out = amicphys_ntsub_1, &
+         mam_amicphys_ntsub_2_out = amicphys_ntsub_2, &
          mam_amicphys_optaa_out = mam_amicphys_optaa ) ! REASTER 08/04/2015
 
 
@@ -2458,6 +2462,7 @@ do_lphase2_conditional: &
     integer :: n, m
     integer :: i,k
     integer :: nstep
+    integer :: ntsub
 
     real(r8) :: del_h2so4_aeruptk(ncol,pver)
 
@@ -2757,13 +2762,15 @@ do_lphase2_conditional: &
        end do
        !----------------------------------------------
 
+       ntsub = amicphys_ntsub_1
+
        call t_startf('modal_aero_amicphys')
 
        call modal_aero_amicphys_intr(                &
             1,                  1,                   &
             1,                  1,                   &
             lchnk,     ncol,    nstep,               &
-            loffset,   delt,                         &
+            loffset,   delt,    ntsub,               &
             latndx,    lonndx,                       &
             tfld,      pmid,    pdel,                &
             zm,        pblh,                         &
@@ -2821,12 +2828,15 @@ do_lphase2_conditional: &
        !--------------------------------------------------------------
        ! Second call of amicphys using input of a different precision
        !--------------------------------------------------------------
+       if (amicphys_precision_opt == 2) ntsub = amicphys_ntsub_2  ! below is the second, diagnostic call of modal_aero_amicphys_intr
+       if (amicphys_precision_opt == 3) ntsub = amicphys_ntsub_1  ! below is the only call of modal_aero_amicphys_intr
+
        call t_startf('modal_aero_amicphys_call_2')
        call modal_aero_amicphys_intr(                &
             1,                  1,                   &
             1,                  1,                   &
             lchnk,     ncol,    nstep,               &
-            loffset,   delt,                         &
+            loffset,   delt,    ntsub,               &
             latndx,    lonndx,                       &
             tfld_rx,   pmid_rx, pdel_rx,             &
             zm_rx,     pblh_rx,                      &
