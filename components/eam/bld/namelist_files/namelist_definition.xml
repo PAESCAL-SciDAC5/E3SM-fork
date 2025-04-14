@@ -3679,6 +3679,14 @@ and mam_amicphys_rpe_nsigbits = 52.
 Default: 0.
 </entry>
 
+<entry id="mam_amicphys_rpe_for_env" type="logical"  category="scavenging"
+       group="phys_ctl_nl" valid_values="" >
+If perturbing or using RPE for the input of amicphys,
+- apply modifications to environmental (atmospheric) conditions (.true.) OR
+- only to tracer mixing ratios, particle size and density etc. (.false.)
+Default: .true.
+</entry>
+
 <!-- amicphys time-stepping -->
 <entry id="mam_amicphys_ntsub_1" type="integer"  category="scavenging"
        group="phys_ctl_nl" valid_values="" >

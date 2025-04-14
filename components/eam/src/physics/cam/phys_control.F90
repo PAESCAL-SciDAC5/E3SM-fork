@@ -94,6 +94,7 @@ integer           :: convproc_method_activate = 2      ! controls activation in 
 integer           :: mam_amicphys_optaa   = 0          ! <= 0 -- use old microphysics code (separate calls to gasaerexch, 
                                                        !                                    newnuc, and coag routines) 
                                                        !  > 0 -- use new microphysics code (single call to amicphys routine)
+
 integer           :: mam_amicphys_precision_opt = 1    ! 1: single call of amicphys using the default floating-point precision,
                                                        ! 2: double calls with the second being diagnostic,
                                                        ! 3: single call using a different precision than default.
@@ -108,7 +109,12 @@ integer           :: mam_amicphys_rpe_nsigbits = 23    ! when applying pseudo re
                                                        !      Dawson and Dueben (2017, GMD, DOI:10.5194/gmd-10-2221-2017).
 real(r8)          :: mam_amicphys_input_ptb = 0._r8    ! random perturbation (unitless) to be added to the input of amicphys
                                                        ! This only takes effect when mam_amicphys_precision_opt = 2 or 3
-                                                       ! AND mam_amicphys_rpe_nsigbits = 52 (double precision). 
+                                                       ! AND mam_amicphys_rpe_nsigbits = 52 (double precision).
+logical           :: mam_amicphys_rpe_for_env = .true. ! when perturbing or using RPE for the input of amicphys, should the
+                                                       ! modifications be applied to environmental (atmospheric) conditions?
+                                                       ! .true.  = yes
+                                                       ! .false. = no = only modify tracer mixing ratios, particle size and density etc.
+
 integer           :: mam_amicphys_ntsub_1 = 1          ! # of time substeps for the first (or only) amicphys call
 integer           :: mam_amicphys_ntsub_2 = 1          ! # of time substeps for the second, diagnostic amicphys call (if any)
 real(r8)          :: n_so4_monolayers_pcage = huge(1.0_r8) ! number of so4(+nh4) monolayers needed to "age" a carbon particle
@@ -224,7 +230,7 @@ subroutine phys_ctl_readnl(nlfile)
       cld_macmic_num_steps, micro_do_icesupersat, &
       fix_g1_err_ndrop, ssalt_tuning, resus_fix, convproc_do_aer, &
       convproc_do_gas, convproc_method_activate, liqcf_fix, regen_fix, demott_ice_nuc, pergro_mods, pergro_test_active, &
-      mam_amicphys_precision_opt, mam_amicphys_rpe_nsigbits, mam_amicphys_input_ptb, &
+      mam_amicphys_precision_opt, mam_amicphys_rpe_nsigbits, mam_amicphys_input_ptb, mam_amicphys_rpe_for_env, &
       mam_amicphys_ntsub_1, mam_amicphys_ntsub_2, &
       mam_amicphys_optaa, n_so4_monolayers_pcage,micro_mg_accre_enhan_fac, &
       l_tracer_aero, l_vdiff, l_rayleigh, l_gw_drag, l_ac_energy_chk, &
@@ -305,6 +311,7 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(mam_amicphys_precision_opt,      1 , mpiint,  0, mpicom)
    call mpibcast(mam_amicphys_rpe_nsigbits,       1 , mpiint,  0, mpicom)
    call mpibcast(mam_amicphys_input_ptb,          1 , mpir8,   0, mpicom)
+   call mpibcast(mam_amicphys_rpe_for_env,        1 , mpilog,  0, mpicom)
    call mpibcast(mam_amicphys_ntsub_1,            1 , mpiint,  0, mpicom)
    call mpibcast(mam_amicphys_ntsub_2,            1 , mpiint,  0, mpicom)
    call mpibcast(mam_amicphys_optaa,              1 , mpiint,  0, mpicom)
@@ -494,7 +501,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
                         cld_macmic_num_steps_out, micro_do_icesupersat_out, &
                         fix_g1_err_ndrop_out, ssalt_tuning_out,resus_fix_out,convproc_do_aer_out,  &
                         convproc_do_gas_out, convproc_method_activate_out, mam_amicphys_optaa_out, n_so4_monolayers_pcage_out, &
-                        mam_amicphys_precision_opt_out, mam_amicphys_rpe_nsigbits_out, mam_amicphys_input_ptb_out, &
+                        mam_amicphys_precision_opt_out, mam_amicphys_rpe_nsigbits_out, mam_amicphys_input_ptb_out, mam_amicphys_rpe_for_env_out, &
                         mam_amicphys_ntsub_1_out, mam_amicphys_ntsub_2_out, &
                         micro_mg_accre_enhan_fac_out, liqcf_fix_out, regen_fix_out,demott_ice_nuc_out, pergro_mods_out, pergro_test_active_out &
                        ,l_tracer_aero_out, l_vdiff_out, l_rayleigh_out, l_gw_drag_out, l_ac_energy_chk_out  &
@@ -560,6 +567,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    integer,           intent(out), optional :: mam_amicphys_precision_opt_out
    integer,           intent(out), optional :: mam_amicphys_rpe_nsigbits_out
    real(r8),          intent(out), optional :: mam_amicphys_input_ptb_out
+   logical,           intent(out), optional :: mam_amicphys_rpe_for_env_out
    integer,           intent(out), optional :: mam_amicphys_ntsub_1_out
    integer,           intent(out), optional :: mam_amicphys_ntsub_2_out
    integer,           intent(out), optional :: mam_amicphys_optaa_out
@@ -643,6 +651,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    if ( present(mam_amicphys_precision_opt_out)) mam_amicphys_precision_opt_out = mam_amicphys_precision_opt
    if ( present(mam_amicphys_rpe_nsigbits_out)) mam_amicphys_rpe_nsigbits_out= mam_amicphys_rpe_nsigbits
    if ( present(mam_amicphys_input_ptb_out)) mam_amicphys_input_ptb_out = mam_amicphys_input_ptb
+   if ( present(mam_amicphys_rpe_for_env_out)) mam_amicphys_rpe_for_env_out = mam_amicphys_rpe_for_env
    if ( present(mam_amicphys_ntsub_1_out))   mam_amicphys_ntsub_1_out   = mam_amicphys_ntsub_1
    if ( present(mam_amicphys_ntsub_2_out))   mam_amicphys_ntsub_2_out   = mam_amicphys_ntsub_2
    if ( present(mam_amicphys_optaa_out  ) ) mam_amicphys_optaa_out  = mam_amicphys_optaa

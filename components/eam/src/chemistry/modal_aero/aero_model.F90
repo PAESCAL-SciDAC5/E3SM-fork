@@ -92,11 +92,19 @@ module aero_model
   integer :: strt_loop, end_loop, stride_loop !loop indices for the lphase loop
 
   ! Namelist variables
+
   integer :: amicphys_precision_opt = 1   ! 1= single call using default precision
   integer :: amicphys_rpe_nsigbits = 23   ! precision of additional variables if amicphys_precision_opt > 1
   real(r8):: amicphys_input_ptb = 0._r8   ! perturbation to be added if amicphys_precision_opt > 1
+
+  logical :: amicphys_rpe_for_env = .true.! when perturbing or using RPE for the input of amicphys, should the
+                                          ! modifications be applied to environmental (atmospheric) conditions?
+                                          ! .true.  = yes
+                                          ! .false. = no = only modify tracer mixing ratios, particle size and density etc.
+
   integer :: amicphys_ntsub_1 = 1         ! # of time substeps for the first (or only) amicphys call
   integer :: amicphys_ntsub_2 = 1         ! # of time substeps for the second, diagnostic amicphys call (if any)
+
   integer :: mam_amicphys_optaa
   logical :: sscav_tuning, convproc_do_aer, convproc_do_gas, resus_fix  
   character(len=16) :: wetdep_list(pcnst) = ' '
@@ -231,6 +239,7 @@ contains
          mam_amicphys_precision_opt_out = amicphys_precision_opt, &
          mam_amicphys_rpe_nsigbits_out  = amicphys_rpe_nsigbits, &
          mam_amicphys_input_ptb_out = amicphys_input_ptb, &
+         mam_amicphys_rpe_for_env_out = amicphys_rpe_for_env, &
          mam_amicphys_ntsub_1_out = amicphys_ntsub_1, &
          mam_amicphys_ntsub_2_out = amicphys_ntsub_2, &
          mam_amicphys_optaa_out = mam_amicphys_optaa ) ! REASTER 08/04/2015
@@ -2420,7 +2429,7 @@ do_lphase2_conditional: &
                                     airdens, invariants, del_h2so4_gasprod,  &
                                     vmr0, vmr, pbuf )
 
-    use mo_precision_utils,    only : change_precision
+    use mo_precision_utils,    only : change_precision, NSIGBITS_R8
     use time_manager,          only : get_nstep
     use modal_aero_amicphys,   only : modal_aero_amicphys_intr
     use modal_aero_coag,       only : modal_aero_coag_sub
@@ -2488,7 +2497,10 @@ do_lphase2_conditional: &
 
     !-- for pseudo-rx calculation +++
 
-    integer :: precision_out
+    integer :: precision_tcr
+    integer :: precision_env
+    real(r8):: ptb_scale_tcr
+    real(r8):: ptb_scale_env
 
     real(r8),allocatable ::         tfld_rx(:,:)
     real(r8),allocatable ::         pmid_rx(:,:)
@@ -2676,38 +2688,50 @@ do_lphase2_conditional: &
       !##################################################################################################
       if (amicphys_precision_opt > 1) then  ! need additional variables at a reduced precision
 
+       !----------------------------------------------------------------
        ! Create a copy of amicphys' input variables and change precision
+       !----------------------------------------------------------------
+       precision_tcr = amicphys_rpe_nsigbits
+       ptb_scale_tcr = amicphys_input_ptb
 
-       precision_out = amicphys_rpe_nsigbits
+       if (amicphys_rpe_for_env) then
+          precision_env = amicphys_rpe_nsigbits
+          ptb_scale_env = amicphys_input_ptb
+       else
+          precision_env = NSIGBITS_R8
+          ptb_scale_env = 0._r8
+       end if
 
+       !-------------------------
        ! Atmospheric conditions
 
-       call change_precision(  tfld, precision_out, amicphys_input_ptb,  tfld_rx )
-       call change_precision(  pmid, precision_out, amicphys_input_ptb,  pmid_rx )
-       call change_precision(  pdel, precision_out, amicphys_input_ptb,  pdel_rx )
-       call change_precision(    zm, precision_out, amicphys_input_ptb,    zm_rx )
-       call change_precision(  pblh, precision_out, amicphys_input_ptb,  pblh_rx )
-       call change_precision(  qh2o, precision_out, amicphys_input_ptb,  qh2o_rx )
-       call change_precision( cldfr, precision_out, amicphys_input_ptb, cldfr_rx )
+       call change_precision(  tfld, precision_env, ptb_scale_env,  tfld_rx )
+       call change_precision(  pmid, precision_env, ptb_scale_env,  pmid_rx )
+       call change_precision(  pdel, precision_env, ptb_scale_env,  pdel_rx )
+       call change_precision(    zm, precision_env, ptb_scale_env,    zm_rx )
+       call change_precision(  pblh, precision_env, ptb_scale_env,  pblh_rx )
+       call change_precision(  qh2o, precision_env, ptb_scale_env,  qh2o_rx )
+       call change_precision( cldfr, precision_env, ptb_scale_env, cldfr_rx )
 
+       !---------------------------
        ! Particle size and density
 
-       call change_precision(    dgnum, precision_out, amicphys_input_ptb,    dgnum_rx )
-       call change_precision( dgnumwet, precision_out, amicphys_input_ptb, dgnumwet_rx )
-       call change_precision(  wetdens, precision_out, amicphys_input_ptb,  wetdens_rx )
+       call change_precision(    dgnum, precision_tcr, ptb_scale_tcr,    dgnum_rx )
+       call change_precision( dgnumwet, precision_tcr, ptb_scale_tcr, dgnumwet_rx )
+       call change_precision(  wetdens, precision_tcr, ptb_scale_tcr,  wetdens_rx )
 
        ! Gases and interstitial aerosols vmrs
 
-       call change_precision(   vmr0, precision_out, amicphys_input_ptb,      vmr0_rx )
-       call change_precision( dvmrdt, precision_out, amicphys_input_ptb,    dvmrdt_rx )
-       call change_precision(    vmr, precision_out, amicphys_input_ptb,       vmr_rx )
-       call change_precision(    vmr, precision_out, amicphys_input_ptb, dvmr_amic_rx )  ! for diag and outfld only
+       call change_precision(   vmr0, precision_tcr, ptb_scale_tcr,      vmr0_rx )
+       call change_precision( dvmrdt, precision_tcr, ptb_scale_tcr,    dvmrdt_rx )
+       call change_precision(    vmr, precision_tcr, ptb_scale_tcr,       vmr_rx )
+       call change_precision(    vmr, precision_tcr, ptb_scale_tcr, dvmr_amic_rx )  ! for diag and outfld only
 
        ! Cloud-borne aerosol vmrs
 
-       call change_precision( dvmrcwdt, precision_out, amicphys_input_ptb,    dvmrcwdt_rx )
-       call change_precision(    vmrcw, precision_out, amicphys_input_ptb,       vmrcw_rx )
-       call change_precision(    vmrcw, precision_out, amicphys_input_ptb, dvmrcw_amic_rx )  ! for diag and outfld only
+       call change_precision( dvmrcwdt, precision_tcr, ptb_scale_tcr,    dvmrcwdt_rx )
+       call change_precision(    vmrcw, precision_tcr, ptb_scale_tcr,       vmrcw_rx )
+       call change_precision(    vmrcw, precision_tcr, ptb_scale_tcr, dvmrcw_amic_rx )  ! for diag and outfld only
 
       end if
       !##################
