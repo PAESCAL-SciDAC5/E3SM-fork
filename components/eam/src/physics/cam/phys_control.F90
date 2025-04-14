@@ -109,6 +109,8 @@ integer           :: mam_amicphys_rpe_nsigbits = 23    ! when applying pseudo re
 real(r8)          :: mam_amicphys_input_ptb = 0._r8    ! random perturbation (unitless) to be added to the input of amicphys
                                                        ! This only takes effect when mam_amicphys_precision_opt = 2 or 3
                                                        ! AND mam_amicphys_rpe_nsigbits = 52 (double precision). 
+integer           :: mam_amicphys_ntsub_1 = 1          ! # of time substeps for the first (or only) amicphys call
+integer           :: mam_amicphys_ntsub_2 = 1          ! # of time substeps for the second, diagnostic amicphys call (if any)
 real(r8)          :: n_so4_monolayers_pcage = huge(1.0_r8) ! number of so4(+nh4) monolayers needed to "age" a carbon particle
 real(r8)          :: micro_mg_accre_enhan_fac = huge(1.0_r8) !!Accretion enhancement factor
 logical           :: liqcf_fix            = .false.    ! liq cld fraction fix calc.                     
@@ -223,6 +225,7 @@ subroutine phys_ctl_readnl(nlfile)
       fix_g1_err_ndrop, ssalt_tuning, resus_fix, convproc_do_aer, &
       convproc_do_gas, convproc_method_activate, liqcf_fix, regen_fix, demott_ice_nuc, pergro_mods, pergro_test_active, &
       mam_amicphys_precision_opt, mam_amicphys_rpe_nsigbits, mam_amicphys_input_ptb, &
+      mam_amicphys_ntsub_1, mam_amicphys_ntsub_2, &
       mam_amicphys_optaa, n_so4_monolayers_pcage,micro_mg_accre_enhan_fac, &
       l_tracer_aero, l_vdiff, l_rayleigh, l_gw_drag, l_ac_energy_chk, &
       l_bc_energy_fix, l_dry_adj, l_st_mac, l_st_mic, l_rad, prc_coef1,prc_exp,prc_exp1,cld_sed,mg_prc_coeff_fix, &
@@ -302,6 +305,8 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(mam_amicphys_precision_opt,      1 , mpiint,  0, mpicom)
    call mpibcast(mam_amicphys_rpe_nsigbits,       1 , mpiint,  0, mpicom)
    call mpibcast(mam_amicphys_input_ptb,          1 , mpir8,   0, mpicom)
+   call mpibcast(mam_amicphys_ntsub_1,            1 , mpiint,  0, mpicom)
+   call mpibcast(mam_amicphys_ntsub_2,            1 , mpiint,  0, mpicom)
    call mpibcast(mam_amicphys_optaa,              1 , mpiint,  0, mpicom)
    call mpibcast(n_so4_monolayers_pcage,          1 , mpir8,   0, mpicom)
    call mpibcast(micro_mg_accre_enhan_fac,        1 , mpir8,   0, mpicom)
@@ -490,6 +495,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
                         fix_g1_err_ndrop_out, ssalt_tuning_out,resus_fix_out,convproc_do_aer_out,  &
                         convproc_do_gas_out, convproc_method_activate_out, mam_amicphys_optaa_out, n_so4_monolayers_pcage_out, &
                         mam_amicphys_precision_opt_out, mam_amicphys_rpe_nsigbits_out, mam_amicphys_input_ptb_out, &
+                        mam_amicphys_ntsub_1_out, mam_amicphys_ntsub_2_out, &
                         micro_mg_accre_enhan_fac_out, liqcf_fix_out, regen_fix_out,demott_ice_nuc_out, pergro_mods_out, pergro_test_active_out &
                        ,l_tracer_aero_out, l_vdiff_out, l_rayleigh_out, l_gw_drag_out, l_ac_energy_chk_out  &
                        ,l_bc_energy_fix_out, l_dry_adj_out, l_st_mac_out, l_st_mic_out, l_rad_out  &
@@ -554,6 +560,8 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    integer,           intent(out), optional :: mam_amicphys_precision_opt_out
    integer,           intent(out), optional :: mam_amicphys_rpe_nsigbits_out
    real(r8),          intent(out), optional :: mam_amicphys_input_ptb_out
+   integer,           intent(out), optional :: mam_amicphys_ntsub_1_out
+   integer,           intent(out), optional :: mam_amicphys_ntsub_2_out
    integer,           intent(out), optional :: mam_amicphys_optaa_out
    real(r8),          intent(out), optional :: n_so4_monolayers_pcage_out
    real(r8),          intent(out), optional :: micro_mg_accre_enhan_fac_out
@@ -635,6 +643,8 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    if ( present(mam_amicphys_precision_opt_out)) mam_amicphys_precision_opt_out = mam_amicphys_precision_opt
    if ( present(mam_amicphys_rpe_nsigbits_out)) mam_amicphys_rpe_nsigbits_out= mam_amicphys_rpe_nsigbits
    if ( present(mam_amicphys_input_ptb_out)) mam_amicphys_input_ptb_out = mam_amicphys_input_ptb
+   if ( present(mam_amicphys_ntsub_1_out))   mam_amicphys_ntsub_1_out   = mam_amicphys_ntsub_1
+   if ( present(mam_amicphys_ntsub_2_out))   mam_amicphys_ntsub_2_out   = mam_amicphys_ntsub_2
    if ( present(mam_amicphys_optaa_out  ) ) mam_amicphys_optaa_out  = mam_amicphys_optaa
    if ( present(n_so4_monolayers_pcage_out  ) ) n_so4_monolayers_pcage_out = n_so4_monolayers_pcage
    if ( present(micro_mg_accre_enhan_fac_out)) micro_mg_accre_enhan_fac_out = micro_mg_accre_enhan_fac

@@ -3653,6 +3653,7 @@ invokes new microphysics code (single call to amicphys routine) if > 0
 Default: 0
 </entry>
 
+<!-- Floating-point precision of amicphys calculation(s) -->
 <entry id="mam_amicphys_precision_opt" type="integer"  category="scavenging"
        group="phys_ctl_nl" valid_values="" >
 How many amicphys calculations to perform and with what precision.
@@ -3662,7 +3663,6 @@ How many amicphys calculations to perform and with what precision.
 Default: 1
 </entry>
 
-<!-- Floating-point precision of amicphys calculation with reduced-precision input -->
 <entry id="mam_amicphys_rpe_nsigbits" type="integer"  category="scavenging"
        group="phys_ctl_nl" valid_values="" >
 Floating-point precision of input to amicphys calculation with reduced-precision input,
@@ -3670,13 +3670,26 @@ expressed in terms of the number of significand bits.
 Default: 23
 </entry>
 
-<!-- perturbation (unitless) to be added to the input of amicphys -->
+<!-- perturbation to the input of amicphys -->
 <entry id="mam_amicphys_input_ptb" type="real"  category="scavenging"
        group="phys_ctl_nl" valid_values="" >
 Perturbation (unitless) to be added to the input of amicphys
 when mam_amicphys_precision_opt = 2 or 3
 and mam_amicphys_rpe_nsigbits = 52.
 Default: 0.
+</entry>
+
+<!-- amicphys time-stepping -->
+<entry id="mam_amicphys_ntsub_1" type="integer"  category="scavenging"
+       group="phys_ctl_nl" valid_values="" >
+Number of time substeps used in the first (or only) call of amicphys in each "physics" time step.
+Default: 1
+</entry>
+
+<entry id="mam_amicphys_ntsub_2" type="integer"  category="scavenging"
+       group="phys_ctl_nl" valid_values="" >
+Number of time substeps used in the second, diagnostic call of amicphys (if any) in each "physics" time step.
+Default: 1
 </entry>
 
 <!-- number of so4(+nh4) monolayers needed to "age" a carbon particle -->

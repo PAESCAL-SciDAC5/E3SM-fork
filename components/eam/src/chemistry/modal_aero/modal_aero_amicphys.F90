@@ -252,7 +252,7 @@ subroutine modal_aero_amicphys_intr(                             &
                         mdo_gasaerexch,     mdo_rename,          &
                         mdo_newnuc,         mdo_coag,            &
                         lchnk,    ncol,     nstep,               &
-                        loffset,  deltat,                        &
+                        loffset,  deltat,   ntsub_in,            &
                         latndx,   lonndx,                        &
                         t,        pmid,     pdel,                &
                         zm,       pblh,                          &
@@ -300,6 +300,7 @@ implicit none
 #endif
 
    real(r8), intent(in)    :: deltat               ! time step (s)
+   integer,  intent(in)    :: ntsub_in             ! # of time substeps
 
    real(r8), intent(inout) :: q(ncol,pver,pcnstxx) ! current tracer mixing ratios (TMRs)
                                                    ! these values are updated (so out /= in)
@@ -903,7 +904,7 @@ main_i_loop: &
          do_newnuc,           do_coag,            &
          nstep,    lchnk,     i,         k,       &
          latndx(i),           lonndx(i), lund,    &
-         loffset,  deltat,                        &
+         loffset,  deltat,    ntsub_in,           &
          nsubarea,  ncldy_subarea,                &
          iscldy_subarea,      afracsub,           &
          t(i,k),   pmid(i,k), pdel(i,k),          &
@@ -1129,7 +1130,7 @@ main_i_loop: &
          do_newnuc,          do_coag,             &
          nstep,    lchnk,    i,        k,         &
          latndx,   lonndx,   lund,                &
-         loffset,  deltat,                        &
+         loffset,  deltat,   ntsub_in,            &
          nsubarea,  ncldy_subarea,                &
          iscldy_subarea,     afracsub,            &
          temp,     pmid,     pdel,                &
@@ -1159,6 +1160,7 @@ main_i_loop: &
       integer,  intent(in)    :: nsubarea, ncldy_subarea
 
       real(r8), intent(in)    :: deltat                ! time step (s)
+      integer,  intent(in)    :: ntsub_in              ! # of time substeps
       real(r8), intent(in)    :: afracsub(maxsubarea)   ! sub-area fractional area (0-1)
 
       real(r8), intent(in)    :: temp                  ! temperature at model levels (K)
@@ -1337,7 +1339,7 @@ main_jsub_loop: &
          do_newnuc_sub,          do_coag_sub,        &
          nstep,      lchnk,      i,        k,        &
          latndx,     lonndx,     lund,               &
-         loffset,    deltat,                         &
+         loffset,    deltat,     ntsub_in,           &
          jsub,                   nsubarea,           &
          iscldy_subarea(jsub),   afracsub(jsub),     &
          temp,       pmid,       pdel,               &
@@ -1363,7 +1365,7 @@ main_jsub_loop: &
          do_newnuc_sub,          do_coag_sub,        &
          nstep,      lchnk,      i,        k,        &
          latndx,     lonndx,     lund,               &
-         loffset,    deltat,                         &
+         loffset,    deltat,     ntsub_in,           &
          jsub,                   nsubarea,           &
          iscldy_subarea(jsub),   afracsub(jsub),     &
          temp,       pmid,       pdel,               &
@@ -1443,7 +1445,7 @@ main_jsub_loop: &
          do_newnuc,              do_coag,            &
          nstep,      lchnk,      i,        k,        &
          latndx,     lonndx,     lund,               &
-         loffset,    deltat,                         &
+         loffset,    deltat,     ntsub_in,           &
          jsub,                   nsubarea,           &
          iscldy_subarea,         afracsub,           &
          temp,       pmid,       pdel,               &
@@ -1492,6 +1494,7 @@ main_jsub_loop: &
 
       real(r8), intent(in)    :: afracsub              ! fractional area of sub-area (0-1)
       real(r8), intent(in)    :: deltat                ! time step (s)
+      integer,  intent(in)    :: ntsub_in              ! # of time substeps
 
       real(r8), intent(in)    :: temp                  ! temperature at model levels (K)
       real(r8), intent(in)    :: pmid                  ! pressure at layer center (Pa)
@@ -1698,7 +1701,8 @@ main_jsub_loop: &
       dnclusterdt = 0.0_r8
 
 
-      ntsubstep = 1
+     !ntsubstep = 1
+      ntsubstep = ntsub_in
       dtsubstep = deltat
       if (ntsubstep > 1) dtsubstep = deltat/ntsubstep
 
@@ -1906,7 +1910,7 @@ do_rename_if_block30: &
          do_newnuc,              do_coag,            &
          nstep,      lchnk,      i,        k,        &
          latndx,     lonndx,     lund,               &
-         loffset,    deltat,                         &
+         loffset,    deltat,     ntsub_in,           &
          jsub,                   nsubarea,           &
          iscldy_subarea,         afracsub,           &
          temp,       pmid,       pdel,               &
@@ -1946,6 +1950,7 @@ do_rename_if_block30: &
 
       real(r8), intent(in)    :: afracsub              ! fractional area of sub-area (0-1)
       real(r8), intent(in)    :: deltat                ! time step (s)
+      integer,  intent(in)    :: ntsub_in              ! # of time substeps
 
       real(r8), intent(in)    :: temp                  ! temperature at model levels (K)
       real(r8), intent(in)    :: pmid                  ! pressure at layer center (Pa)
@@ -2121,7 +2126,8 @@ do_rename_if_block30: &
       dnclusterdt = 0.0_r8
 
 
-      ntsubstep = 1
+     !ntsubstep = 1
+      ntsubstep = ntsub_in
       dtsubstep = deltat
       if (ntsubstep > 1) dtsubstep = deltat/ntsubstep
 
