@@ -5,6 +5,15 @@ use shr_kind_mod,   only: r4 => shr_kind_r4
 use rp_emulator
 use cam_abortutils, only: endrun
 
+implicit none
+
+private
+public :: change_precision   ! interface
+public :: NSIGBITS_R8        ! parameter
+
+integer,parameter :: NSIGBITS_R8 = 52   ! # of bits for significand, r8 float
+integer,parameter :: NSIGBITS_R4 = 23   ! # of bits for significand, r4 float
+
 interface change_precision
   module procedure change_precision_for_1d_array
   module procedure change_precision_for_2d_array
@@ -42,7 +51,7 @@ subroutine change_precision_for_1d_array( array_in, precision_out, ptb, array_ou
   !-----------------------------------------------------------------------------------
   select case(precision_out)
 
-  case(52) ! Double precision ------------------------
+  case (NSIGBITS_R8) ! Double precision ------------------------
 
     if ( abs(ptb) > 1e-16_r8 ) then ! add perturbation
 
@@ -53,7 +62,7 @@ subroutine change_precision_for_1d_array( array_in, precision_out, ptb, array_ou
        array_out = array_in
     end if
 
-  case(23) ! Single precision -----------------------
+  case (NSIGBITS_R4) ! Single precision -----------------------
 
     array_out = real(real(array_in,kind=r4),kind=r8)
 
@@ -101,7 +110,7 @@ subroutine change_precision_for_2d_array( array_in, precision_out, ptb, array_ou
   ! Convert the input values to a different precision and assign to the output array
   !-----------------------------------------------------------------------------------
   select case(precision_out)
-  case(52) ! Double precision -------------------------------
+  case (NSIGBITS_R8) ! Double precision -------------------------------
 
     if ( abs(ptb) > 1e-16_r8 ) then ! add perturbation
 
@@ -112,7 +121,7 @@ subroutine change_precision_for_2d_array( array_in, precision_out, ptb, array_ou
        array_out = array_in
     end if
 
-  case(23) ! Single precision -------------------------------
+  case (NSIGBITS_R4) ! Single precision -------------------------------
 
     array_out = real(real(array_in,kind=r4),kind=r8)
 
@@ -160,7 +169,7 @@ subroutine change_precision_for_3d_array( array_in, precision_out, ptb, array_ou
   ! Convert the input values to a different precision and assigne to the output array
   !-----------------------------------------------------------------------------------
   select case(precision_out)
-  case(52) ! Double precision
+  case (NSIGBITS_R8) ! Double precision
 
     if ( abs(ptb) > 1e-16_r8 ) then ! add perturbation
 
@@ -171,7 +180,7 @@ subroutine change_precision_for_3d_array( array_in, precision_out, ptb, array_ou
        array_out = array_in
     end if
 
-  case(23) ! Single precision.
+  case (NSIGBITS_R4) ! Single precision.
 
     array_out = real(real(array_in,kind=r4),kind=r8)
 
