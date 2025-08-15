@@ -19,7 +19,7 @@ use spmd_utils,      only: masterproc, iam, npes
 use ppgrid,          only: pcols, pver, pverp, begchunk, endchunk
 use physics_types,   only: physics_state, physics_ptend
 use physconst,       only: cappa
-use time_manager,    only: get_nstep, is_first_restart_step
+use time_manager,    only: get_nstep, is_first_restart_step, is_first_step
 use cam_abortutils,      only: endrun
 use error_messages,  only: handle_err
 use cam_control_mod, only: lambm0, obliqr, mvelpp, eccen
@@ -1125,6 +1125,23 @@ end function radiation_nextsw_cday
 
     dosw     = radiation_do('sw')      ! do shortwave heating calc this timestep?
     dolw     = radiation_do('lw')      ! do longwave heating calc this timestep?
+
+    ! Initialize arrays with zero to avoid floating point exceptions in debug mode.
+    ! Do this separately for SW and LW, as these component might be set differently
+    ! in idealized experiments.
+
+    if ( is_first_step() .and. (.not.dosw) ) then
+       qrs(1:ncol,1:pver) = 0._r8
+       fsnt(1:ncol) = 0._r8
+       fsns(1:ncol) = 0._r8
+    end if
+
+    if ( is_first_step() .and. (.not.dolw) ) then
+       qrl(1:ncol,1:pver) = 0._r8
+       flnt(1:ncol) = 0._r8
+       flns(1:ncol) = 0._r8
+    end if
+    !-----------
 
     if (dosw .or. dolw) then
 
