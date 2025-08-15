@@ -690,6 +690,8 @@ subroutine readiopdata(iop_update_phase1,hyam,hybm)
 
    fill_ends= .false.
 
+   write(iulog,*) "readiopdata: fill_ends = ", fill_ends
+
    ! Open IOP dataset
 
    call handle_ncerr( nf90_open (iopfile, 0, ncid),&
@@ -924,6 +926,8 @@ endif !scm_observed_aero
 
    if (.not. iop_update_phase1) then
 
+     write(iulog,*) "readiopdata: .not.iop_update_phase1"
+
      status = nf90_inq_varid( ncid, 'Ps', varid   )
      if ( status .ne. nf90_noerr ) then
        have_ps = .false.
@@ -1067,6 +1071,7 @@ endif !scm_observed_aero
        have_srf = .true.
      endif
 
+     divq(:,:) = 0._r8  ! initialize to zero to avoid NaN in debug mode
      call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'divq', &
         have_srf, srf(1), fill_ends, dplevs, nlev,psobs, hyam, hybm, divq(:,1), status )
      if ( status .ne. nf90_noerr ) then
@@ -1283,6 +1288,20 @@ endif !scm_observed_aero
      call plevs0(1    ,plon   ,plev    ,psobs   ,pint,pmid ,pdel)
      call shr_sys_flush( iulog )
 
+     ! Read omega for the calculation of wfldh after this code block;
+     ! Otherwise we may get a crash in debug mode due to NaNs.
+
+     call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, &
+       'omega', .true., ptend, fill_ends, dplevs, nlev,psobs, hyam, hybm, wfld, status )
+     if ( status .ne. nf90_noerr ) then
+        have_omega = .false.
+        write(iulog,*)'Could not find variable omega'
+        status = nf90_close( ncid )
+        return
+     else
+        have_omega = .true.
+     endif
+
      ! Build interface vector for the specified omega profile
      !   (weighted average in pressure of specified level values)
 
@@ -1434,6 +1453,8 @@ endif !scm_observed_aero
      endif
    
    else ! if read in surface information
+
+     write(iulog,*) "readiopdata: ..else..read in surface information"
    
      status = nf90_inq_varid( ncid, 'Tg', varid   )
      if (status .ne. nf90_noerr) then
