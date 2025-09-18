@@ -162,6 +162,7 @@ module advance_clubb_core_module
                qclvar, thlprcp_out, &                               ! intent(out)
 #endif
                wprcp, ice_supersat_frac, &                          ! intent(out)
+               lscale_out, lscale_up_out, lscale_down_out, &        ! intent(out)
                rcm_in_layer, cloud_cover, &                         ! intent(out)
                upwp_sfc_pert, vpwp_sfc_pert, &                      ! intent(in)
                um_pert, vm_pert, upwp_pert, vpwp_pert )             ! intent(inout)
@@ -607,7 +608,10 @@ module advance_clubb_core_module
     ! Variables that need to be output for use in host models
     real( kind = core_rknd ), intent(out), dimension(gr%nz) ::  &
       wprcp,            & ! w'r_c' (momentum levels)                  [(kg/kg) m/s]
-      ice_supersat_frac   ! ice cloud fraction (thermodynamic levels) [-]
+      ice_supersat_frac, & ! ice cloud fraction (thermodynamic levels) [-]
+      lscale_out,       & ! CLUBB length scale (thermodynamic levels)   [m]
+      lscale_up_out,    & ! CLUBB upward length scale (thermodynamic levels) [m]
+      lscale_down_out     ! CLUBB downward length scale (thermodynamic levels) [m]
 
     real( kind = core_rknd ), dimension(gr%nz) ::  &
       uprcp,              & ! < u' r_c' >              [(m kg)/(s kg)]
@@ -1313,6 +1317,11 @@ module advance_clubb_core_module
         Lscale = tau_zt * sqrt_em_zt
 
       end if ! l_diag_Lscale_from_tau
+
+      ! Assign length scale values to output variables
+      lscale_out = Lscale
+      lscale_up_out = Lscale_up  
+      lscale_down_out = Lscale_down
 
       ! Modification to damp noise in stable region
 ! Vince Larson commented out because it may prevent turbulence from

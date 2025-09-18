@@ -97,7 +97,10 @@ module physics_types
           pintdry, &! interface pressure dry (Pa) 
           lnpint,  &! ln(pint)
           lnpintdry,&! log interface pressure dry (Pa) 
-          zi        ! geopotential height above surface at interfaces (m)
+          zi,      &! geopotential height above surface at interfaces (m)
+          lscale,  &! mixing length scale (m)
+          lscale_up, &! upward mixing length scale (m)
+          lscale_down ! downward mixing length scale (m)
 
      real(r8), dimension(:),allocatable          :: &
           te_ini,  &! vertically integrated total energy of initial state
@@ -1435,6 +1438,14 @@ end subroutine physics_ptend_copy
        end do
     end do
 
+    do k = 1, pverp
+       do i = 1, ncol
+          state_out%lscale(i,k)    = state_in%lscale(i,k)
+          state_out%lscale_up(i,k) = state_in%lscale_up(i,k)
+          state_out%lscale_down(i,k) = state_in%lscale_down(i,k)
+       end do
+    end do
+
 
        do i = 1, ncol
           state_out%psdry(i)  = state_in%psdry(i) 
@@ -1729,6 +1740,15 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   allocate(state%zi(psetcols,pver+1), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%zi')
   
+  allocate(state%lscale(psetcols,pver+1), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%lscale')
+  
+  allocate(state%lscale_up(psetcols,pver+1), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%lscale_up')
+  
+  allocate(state%lscale_down(psetcols,pver+1), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%lscale_down')
+  
   allocate(state%te_ini(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%te_ini')
   
@@ -1860,6 +1880,9 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   state%lnpint(:,:) = inf
   state%lnpintdry(:,:) = inf
   state%zi(:,:) = inf
+  state%lscale(:,:) = inf
+  state%lscale_up(:,:) = inf
+  state%lscale_down(:,:) = inf
       
   state%te_ini(:) = inf
   state%te_cur(:) = inf
@@ -1993,6 +2016,15 @@ subroutine physics_state_dealloc(state)
   
   deallocate(state%zi, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%zi')
+
+  deallocate(state%lscale, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%lscale')
+  
+  deallocate(state%lscale_up, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%lscale_up')
+  
+  deallocate(state%lscale_down, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%lscale_down')
 
   deallocate(state%te_ini, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%te_ini')

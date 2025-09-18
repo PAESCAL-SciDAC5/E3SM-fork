@@ -881,6 +881,9 @@ end subroutine clubb_init_cnst
     call addfld ('UP2_CLUBB',    (/ 'ilev' /), 'A',        'm2/s2', 'Zonal Velocity Variance')
     call addfld ('VP2_CLUBB',    (/ 'ilev' /), 'A',        'm2/s2', 'Meridional Velocity Variance')
     call addfld ('WP2_CLUBB',    (/ 'ilev' /), 'A',        'm2/s2', 'Vertical Velocity Variance')
+    call addfld ('LSCALE_CLUBB', (/ 'ilev' /), 'A',            'm', 'CLUBB Mixing Length Scale')
+    call addfld ('LSCALE_UP_CLUBB', (/ 'ilev' /), 'A',         'm', 'CLUBB Upward Mixing Length Scale')
+    call addfld ('LSCALE_DOWN_CLUBB', (/ 'ilev' /), 'A',       'm', 'CLUBB Downward Mixing Length Scale')
     call addfld ('UPWP_CLUBB',    (/ 'ilev' /), 'A',       'm2/s2', 'Zonal Momentum Flux')
     call addfld ('VPWP_CLUBB',    (/ 'ilev' /), 'A',       'm2/s2', 'Meridional Momentum Flux')
     call addfld ('WP3_CLUBB',    (/ 'ilev' /), 'A',        'm3/s3', 'Third Moment Vertical Velocity')
@@ -991,6 +994,9 @@ end subroutine clubb_init_cnst
        call add_default('SL',               1, ' ')
        call add_default('QT',               1, ' ')
        call add_default('CONCLD',           1, ' ')
+       call add_default('LSCALE_CLUBB',     1, ' ')
+       call add_default('LSCALE_UP_CLUBB',     1, ' ')
+       call add_default('LSCALE_DOWN_CLUBB',     1, ' ')
     else
        call add_default('CLOUDFRAC_CLUBB',  1, ' ')
        call add_default('CONCLD',           1, ' ')
@@ -1302,6 +1308,9 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: khzm_out(pverp)                  ! eddy diffusivity on momentum grids            [m^2/s]
    real(core_rknd) :: khzt_out(pverp)                  ! eddy diffusivity on thermo grids              [m^2/s]
    real(core_rknd) :: qclvar_out(pverp)                ! cloud water variance                          [kg^2/kg^2]
+   real(core_rknd) :: lscale_out(pverp)                ! CLUBB mixing length scale                     [m]
+   real(core_rknd) :: lscale_up_out(pverp)             ! CLUBB upward mixing length scale              [m]
+   real(core_rknd) :: lscale_down_out(pverp)           ! CLUBB downward mixing length scale            [m]
    real(core_rknd) :: varmu2
    real(core_rknd) :: qrl_clubb(pverp)
    real(core_rknd) :: qrl_zm(pverp)
@@ -2299,6 +2308,7 @@ end subroutine clubb_init_cnst
               pdf_params, pdf_params_zm, &                                 ! intent(inout)
               khzm_out, khzt_out, qclvar_out, thlprcp_out, &               ! intent(out)
               wprcp_out, ice_supersat_frac, &                              ! intent(out)
+              lscale_out, lscale_up_out, lscale_down_out, &                ! intent(out)
               rcm_in_layer_out, cloud_cover_out, &                         ! intent(out)
               upwp_sfc_pert, vpwp_sfc_pert, &                              ! intent(in)
               um_pert_col, vm_pert_col, upwp_pert_col, vpwp_pert_col)      ! intent(inout)
@@ -3013,6 +3023,9 @@ end subroutine clubb_init_cnst
    call outfld( 'WP2_CLUBB',        wp2,                     pcols, lchnk )
    call outfld( 'UP2_CLUBB',        up2,                     pcols, lchnk )
    call outfld( 'VP2_CLUBB',        vp2,                     pcols, lchnk )
+   call outfld( 'LSCALE_CLUBB',     lscale_out,              pcols, lchnk )
+   call outfld( 'LSCALE_UP_CLUBB',  lscale_up_out,           pcols, lchnk )
+   call outfld( 'LSCALE_DOWN_CLUBB', lscale_down_out,        pcols, lchnk )
    call outfld( 'WP3_CLUBB',        wp3_output,              pcols, lchnk )
    call outfld( 'UPWP_CLUBB',       upwp,                    pcols, lchnk )
    call outfld( 'VPWP_CLUBB',       vpwp,                    pcols, lchnk )
