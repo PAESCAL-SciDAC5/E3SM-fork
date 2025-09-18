@@ -176,6 +176,7 @@ subroutine phys_register
     use subcol_utils,       only: is_subcol_on
     use output_aerocom_aie, only: output_aerocom_aie_register, do_aerocom_ind3
     use mo_chm_diags,       only: chm_diags_inti_ac
+    use cam_history,        only: addfld, add_default
 
     !---------------------------Local variables-----------------------------
     !
@@ -290,6 +291,24 @@ subroutine phys_register
 
        ! register chemical constituents including aerosols ...
        call chem_register(species_class)
+
+      ! if (l_dycoms_rad) then
+         ! Register DYCOMS radiation diagnostic variables
+         call addfld ('DYCOMS_LWP',   (/ 'ilev' /), 'A', 'kg/m2', 'DYCOMS liquid water path profile')
+         call addfld ('DYCOMS_LWFLX', (/ 'ilev' /), 'A', 'W/m2',  'DYCOMS longwave flux profile')  
+         call addfld ('DYCOMS_QRL',   (/ 'lev' /),  'A', 'K/s',   'DYCOMS longwave heating rate')
+         call add_default('DYCOMS_LWP',   1, ' ')
+         call add_default('DYCOMS_LWFLX',  1, ' ')
+         call add_default('DYCOMS_QRL',   1, ' ')
+      ! end if
+
+      ! Register CLUBB mixing length scale diagnostic variables
+      call addfld ('LSCALE',    (/ 'ilev' /), 'A', 'm', 'Mixing Length Scale')
+      call addfld ('LSCALE_UP', (/ 'ilev' /), 'A', 'm', 'Upward Mixing Length Scale')
+      call addfld ('LSCALE_DOWN',(/ 'ilev' /), 'A', 'm', 'Downward Mixing Length Scale')
+      call add_default('LSCALE',     1, ' ')
+      call add_default('LSCALE_UP',  1, ' ')
+      call add_default('LSCALE_DOWN',1, ' ')
 
        ! NB: has to be after chem_register to use tracer names
        ! Fields for gas chemistry tracers
@@ -2225,6 +2244,9 @@ subroutine tphysbc (ztodt,               &
     use lnd_infodata,    only: precip_downscaling_method
     use cflx,            only: cflx_tend
 
+    use dycoms_rad,      only: dycoms_radiation_tend
+    use lscale_mod,      only: calculate_lscale
+
     implicit none
 
     !
@@ -2379,6 +2401,7 @@ subroutine tphysbc (ztodt,               &
     logical :: l_st_mac
     logical :: l_st_mic
     logical :: l_rad
+    logical :: l_dycoms_rad
     !HuiWan (2014/15): added for a short-term time step convergence test ==
 
     ! Numerical schemes for process coupling
@@ -2403,6 +2426,7 @@ subroutine tphysbc (ztodt,               &
                       ,l_st_mac_out           = l_st_mac           &
                       ,l_st_mic_out           = l_st_mic           &
                       ,l_rad_out              = l_rad              &
+                      ,l_dycoms_rad_out       = l_dycoms_rad       &
                       )
     
     !-----------------------------------------------------------------------
@@ -2840,6 +2864,15 @@ end if
     end if
 !!== KZ_WATCON 
 
+            ! calculate L_scale using subroutines taken from CLUBB
+            ! for output and for future AMR work - H. Xiao
+            call calculate_lscale(state, pbuf)
+
+            ! Output CLUBB mixing length scale diagnostic variables
+            call outfld('LSCALE',    state%lscale,      ncol, lchnk)
+            call outfld('LSCALE_UP', state%lscale_up,   ncol, lchnk)
+            call outfld('LSCALE_DOWN', state%lscale_down, ncol, lchnk)
+
              ! =====================================================
              !    CLUBB call (PBL, shallow convection, macrophysics)
              ! =====================================================  
@@ -3075,6 +3108,15 @@ if (l_rad) then
     call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
 
     call t_stopf('radiation')
+
+elseif (l_dycoms_rad) then
+   !===================================================
+   ! Simplified radiation for DYCOMS SCM case following Stevens et al. (2005)
+   !===================================================
+
+   call dycoms_radiation_tend(state, ptend, pbuf, ztodt)
+
+   call physics_update(state, ptend, ztodt, tend)
 
 end if ! l_rad
 
