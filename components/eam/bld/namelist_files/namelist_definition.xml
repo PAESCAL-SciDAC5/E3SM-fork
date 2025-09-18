@@ -3103,6 +3103,12 @@ Do radiative transfer and heating/cooling calculation.
 Default: TRUE
 </entry>
 
+<entry id="l_dycoms_rad" type="logical" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Do DYCOMS LW radiative transfer and heating/cooling calculation.
+Default: FALSE
+</entry>
+
 <entry id="cflx_cpl_opt" type="integer" category="process_coupling"
        group="phys_ctl_nl" valid_values="" >
 Numerical scheme for coupling surface tracer fluxes with the rest of model.

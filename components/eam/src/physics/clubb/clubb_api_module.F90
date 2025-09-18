@@ -543,6 +543,7 @@ contains
     qclvar, thlprcp_out, &                                  ! intent(out)
 #endif
     wprcp, ice_supersat_frac, &                             ! intent(out)
+    lscale_out, lscale_up_out, lscale_down_out, &           ! intent(out)
     rcm_in_layer, cloud_cover, &                            ! intent(out)
     upwp_sfc_pert, vpwp_sfc_pert, &                         ! intent(in)
     um_pert, vm_pert, upwp_pert, vpwp_pert )                ! intent(inout)
@@ -692,6 +693,11 @@ contains
       rcm_in_layer, & ! rcm in cloud layer                              [kg/kg]
       cloud_cover     ! cloud cover                                     [-]
 
+    real( kind = core_rknd ), intent(out), dimension(gr%nz) ::  &
+      lscale_out,      & ! mixing length (thermodynamic levels)       [m]
+      lscale_up_out,   & ! upward mixing length (thermodynamic levels) [m]
+      lscale_down_out   ! downward mixing length (thermodynamic levels) [m]   
+
     ! Variables that need to be output for use in host models
     real( kind = core_rknd ), intent(out), dimension(gr%nz) ::  &
       wprcp,            & ! w'r_c' (momentum levels)                  [(kg/kg) m/s]
@@ -767,6 +773,7 @@ contains
                qclvar, thlprcp_out, &                         ! intent(out)
 #endif
       wprcp, ice_supersat_frac, &                             ! intent(out)
+      lscale_out, lscale_up_out, lscale_down_out, &           ! intent(out)
       rcm_in_layer, cloud_cover, &                            ! intent(out)
       upwp_sfc_pert, vpwp_sfc_pert, &                         ! intent(in)
       um_pert, vm_pert, upwp_pert, vpwp_pert )                ! intent(inout)

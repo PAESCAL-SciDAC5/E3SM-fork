@@ -110,7 +110,7 @@ module iop_data_mod
   real(r8), public ::      asdifobs(1)         ! observed asdif
 
   real(r8), public ::      wfld(plev)          ! Vertical motion (slt)
-  real(r8), public ::      wfldh(plevp)        ! Vertical motion (slt)
+  ! real(r8), public ::      wfldh(plevp)        ! Vertical motion (slt)
   real(r8), public ::      divq(plev,pcnst)    ! Divergence of moisture
   real(r8), public ::      divt(plev)          ! Divergence of temperature
   real(r8), public ::      divu(plev)          ! Horiz Divergence of E/W
@@ -1288,31 +1288,32 @@ endif !scm_observed_aero
      call plevs0(1    ,plon   ,plev    ,psobs   ,pint,pmid ,pdel)
      call shr_sys_flush( iulog )
 
-     ! Read omega for the calculation of wfldh after this code block;
-     ! Otherwise we may get a crash in debug mode due to NaNs.
+    ! commenting all the code related to wfldh out as it is not used at all. - HX, 08-15-2025
+    !  ! Read omega for the calculation of wfldh after this code block;
+    !  ! Otherwise we may get a crash in debug mode due to NaNs.
 
-     call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, &
-       'omega', .true., ptend, fill_ends, dplevs, nlev,psobs, hyam, hybm, wfld, status )
-     if ( status .ne. nf90_noerr ) then
-        have_omega = .false.
-        write(iulog,*)'Could not find variable omega'
-        status = nf90_close( ncid )
-        return
-     else
-        have_omega = .true.
-     endif
+    !  call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, &
+    !    'omega', .true., ptend, fill_ends, dplevs, nlev,psobs, hyam, hybm, wfld, status )
+    !  if ( status .ne. nf90_noerr ) then
+    !     have_omega = .false.
+    !     write(iulog,*)'Could not find variable omega'
+    !     status = nf90_close( ncid )
+    !     return
+    !  else
+    !     have_omega = .true.
+    !  endif
 
      ! Build interface vector for the specified omega profile
      !   (weighted average in pressure of specified level values)
 
-     wfldh(1) = 0.0_r8
+    !  wfldh(1) = 0.0_r8
 
-     do k=2,plev
-       weight = (pint(k) - pmid(k-1))/(pmid(k) - pmid(k-1))
-       wfldh(k) = (1.0_r8 - weight)*wfld(k-1) + weight*wfld(k)
-     end do
+    !  do k=2,plev
+    !    weight = (pint(k) - pmid(k-1))/(pmid(k) - pmid(k-1))
+    !    wfldh(k) = (1.0_r8 - weight)*wfld(k-1) + weight*wfld(k)
+    !  end do
 
-     wfldh(plevp) = 0.0_r8
+    !  wfldh(plevp) = 0.0_r8
 
 
      status = nf90_inq_varid( ncid, 'usrf', varid   )
