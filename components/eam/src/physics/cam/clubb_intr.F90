@@ -1353,6 +1353,10 @@ end subroutine clubb_init_cnst
    real(r8) :: varmu(pcols)
    real(r8) :: zt_out(pcols,pverp)              ! output for the thermo CLUBB grid              [m]
    real(r8) :: zi_out(pcols,pverp)              ! output for momentum CLUBB grid                [m]
+   real(r8) :: lscale(pcols,pverp)
+   real(r8) :: lscale_up(pcols,pverp)
+   real(r8) :: lscale_down(pcols,pverp)
+
 
    real(r8) :: pdf_zm_w_1_inout(pverp)          ! work array for pdf_params_zm%w_1
    real(r8) :: pdf_zm_w_2_inout(pverp)          ! work array for pdf_params_zm%w_2
@@ -2442,6 +2446,9 @@ end subroutine clubb_init_cnst
           cloud_frac(i,k)   = min(real(cloud_frac_inout(pverp-k+1), kind = r8),1._r8)
           rcm_in_layer(i,k) = real(rcm_in_layer_out(pverp-k+1), kind = r8)
           cloud_cover(i,k)  = min(real(cloud_cover_out(pverp-k+1), kind = r8),1._r8)
+          lscale(i,k)       = real(lscale_out(pverp-k+1), kind = r8)
+          lscale_up(i,k)    = real(lscale_up_out(pverp-k+1), kind = r8)
+          lscale_down(i,k)  = real(lscale_down_out(pverp-k+1), kind = r8)
           zt_out(i,k)       = real(zt_g(pverp-k+1), kind = r8)
           zi_out(i,k)       = real(zi_g(pverp-k+1), kind = r8)
           khzm(i,k)         = real(khzm_out(pverp-k+1), kind = r8)
@@ -3023,9 +3030,9 @@ end subroutine clubb_init_cnst
    call outfld( 'WP2_CLUBB',        wp2,                     pcols, lchnk )
    call outfld( 'UP2_CLUBB',        up2,                     pcols, lchnk )
    call outfld( 'VP2_CLUBB',        vp2,                     pcols, lchnk )
-   call outfld( 'LSCALE_CLUBB',     lscale_out,              pcols, lchnk )
-   call outfld( 'LSCALE_UP_CLUBB',  lscale_up_out,           pcols, lchnk )
-   call outfld( 'LSCALE_DOWN_CLUBB', lscale_down_out,        pcols, lchnk )
+   call outfld( 'LSCALE_CLUBB',     lscale,                  pcols, lchnk )
+   call outfld( 'LSCALE_UP_CLUBB',  lscale_up,               pcols, lchnk )
+   call outfld( 'LSCALE_DOWN_CLUBB', lscale_down,            pcols, lchnk )
    call outfld( 'WP3_CLUBB',        wp3_output,              pcols, lchnk )
    call outfld( 'UPWP_CLUBB',       upwp,                    pcols, lchnk )
    call outfld( 'VPWP_CLUBB',       vpwp,                    pcols, lchnk )
