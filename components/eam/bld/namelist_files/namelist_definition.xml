@@ -3097,16 +3097,13 @@ macro and microphysics are either both on or both off.)
 Default: TRUE
 </entry>
 
-<entry id="l_rad" type="logical" category="physc_test"
+<entry id="i_rad_scheme" type="integer" category="physc_test"
        group="phys_ctl_nl" valid_values="" >
-Do radiative transfer and heating/cooling calculation.
-Default: TRUE
-</entry>
-
-<entry id="l_dycoms_rad" type="logical" category="physc_test"
-       group="phys_ctl_nl" valid_values="" >
-Do DYCOMS LW radiative transfer and heating/cooling calculation.
-Default: FALSE
+Formulation of the radiaiton parameterization.
+0: No radiation (no matter what values iradlw and iradsw are set to)
+1: idealized LWP-based formulation from DYCOMS-II RF01
+other values: EAM default (RRTMG)
+Default: 2
 </entry>
 
 <entry id="cflx_cpl_opt" type="integer" category="process_coupling"

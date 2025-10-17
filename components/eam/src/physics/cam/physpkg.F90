@@ -292,15 +292,10 @@ subroutine phys_register
        ! register chemical constituents including aerosols ...
        call chem_register(species_class)
 
-      ! if (l_dycoms_rad) then
-         ! Register DYCOMS radiation diagnostic variables
-         call addfld ('DYCOMS_LWP',   (/ 'ilev' /), 'A', 'kg/m2', 'DYCOMS liquid water path profile')
-         call addfld ('DYCOMS_LWFLX', (/ 'ilev' /), 'A', 'W/m2',  'DYCOMS longwave flux profile')  
-         call addfld ('DYCOMS_QRL',   (/ 'lev' /),  'A', 'K/s',   'DYCOMS longwave heating rate')
-         call add_default('DYCOMS_LWP',   1, ' ')
-         call add_default('DYCOMS_LWFLX',  1, ' ')
-         call add_default('DYCOMS_QRL',   1, ' ')
-      ! end if
+       ! Register DYCOMS radiation diagnostic variables
+       call addfld ('DYCOMS_LWP',   (/ 'ilev' /), 'A', 'kg/m2', 'DYCOMS liquid water path profile')
+       call addfld ('DYCOMS_LWFLX', (/ 'ilev' /), 'A', 'W/m2',  'DYCOMS longwave flux profile')  
+       call addfld ('DYCOMS_QRL',   (/ 'lev' /),  'A', 'K/s',   'DYCOMS longwave heating rate')
 
       ! Register CLUBB mixing length scale diagnostic variables
       call addfld ('LSCALE',    (/ 'ilev' /), 'A', 'm', 'Mixing Length Scale')
@@ -2400,9 +2395,9 @@ subroutine tphysbc (ztodt,               &
     logical :: l_tracer_aero
     logical :: l_st_mac
     logical :: l_st_mic
-    logical :: l_rad
-    logical :: l_dycoms_rad
     !HuiWan (2014/15): added for a short-term time step convergence test ==
+
+    integer :: i_rad_scheme  ! 0: no rad; 1: DYCOMS-II RF01; any other value: default scheme
 
     ! Numerical schemes for process coupling
     integer :: cflx_cpl_opt  ! When to apply surface tracer fluxes  (not including water vapor).
@@ -2425,8 +2420,7 @@ subroutine tphysbc (ztodt,               &
                       ,l_tracer_aero_out      = l_tracer_aero      &
                       ,l_st_mac_out           = l_st_mac           &
                       ,l_st_mic_out           = l_st_mic           &
-                      ,l_rad_out              = l_rad              &
-                      ,l_dycoms_rad_out       = l_dycoms_rad       &
+                      ,i_rad_scheme_out       = i_rad_scheme       &
                       )
     
     !-----------------------------------------------------------------------
@@ -3087,12 +3081,21 @@ end if
 
     call cnd_diag_checkpoint( diag, 'PBCDIAG', state, pbuf, cam_in, cam_out )
 
-if (l_rad) then
     !===================================================
     ! Radiation computations
     !===================================================
     call t_startf('radiation')
 
+select case (i_rad_scheme)
+case (0)
+   continue ! skip rad calculation
+
+case (1) ! Simplified radiation for DYCOMS SCM case following Stevens et al. (2005)
+
+    call dycoms_radiation_tend(state, ptend, pbuf, ztodt)
+    call physics_update(state, ptend, ztodt, tend)
+
+case default
 
     call radiation_tend(state,ptend, pbuf, &
          cam_out, cam_in, &
@@ -3107,20 +3110,11 @@ if (l_rad) then
     call physics_update(state, ptend, ztodt, tend)
     call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
 
+end select ! i_rad_scheme
+
     call t_stopf('radiation')
-
-elseif (l_dycoms_rad) then
-   !===================================================
-   ! Simplified radiation for DYCOMS SCM case following Stevens et al. (2005)
-   !===================================================
-
-   call dycoms_radiation_tend(state, ptend, pbuf, ztodt)
-
-   call physics_update(state, ptend, ztodt, tend)
-
-end if ! l_rad
-
     call cnd_diag_checkpoint( diag, 'RAD', state, pbuf, cam_in, cam_out )
+    !===================================================
 
     if(do_aerocom_ind3) then
        call cloud_top_aerocom(state, pbuf) 
