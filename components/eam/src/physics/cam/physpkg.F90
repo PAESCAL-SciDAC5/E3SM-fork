@@ -292,11 +292,6 @@ subroutine phys_register
        ! register chemical constituents including aerosols ...
        call chem_register(species_class)
 
-       ! Register DYCOMS radiation diagnostic variables
-       call addfld ('DYCOMS_LWP',   (/ 'ilev' /), 'A', 'kg/m2', 'DYCOMS liquid water path profile')
-       call addfld ('DYCOMS_LWFLX', (/ 'ilev' /), 'A', 'W/m2',  'DYCOMS longwave flux profile')  
-       call addfld ('DYCOMS_QRL',   (/ 'lev' /),  'A', 'K/s',   'DYCOMS longwave heating rate')
-
       ! Register CLUBB mixing length scale diagnostic variables
       call addfld ('LSCALE',    (/ 'ilev' /), 'A', 'm', 'Mixing Length Scale')
       call addfld ('LSCALE_UP', (/ 'ilev' /), 'A', 'm', 'Upward Mixing Length Scale')
@@ -763,6 +758,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use cam3_ozone_data,    only: cam3_ozone_data_on, cam3_ozone_data_init
     use radheat,            only: radheat_init
     use radiation,          only: radiation_init
+    use dycoms_rad,         only: dycoms_radiation_init
     use cloud_diagnostics,  only: cloud_diagnostics_init
     use co2_diagnostics,    only: co2_diags_init
     use stratiform,         only: stratiform_init
@@ -939,6 +935,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
 
     call t_startf ('radiation_init')
     call radiation_init(phys_state,pbuf2d)
+    call dycoms_radiation_init()
     call t_stopf ('radiation_init')
 
     call rad_solar_var_init()
@@ -3092,8 +3089,11 @@ case (0)
 
 case (1) ! Simplified radiation for DYCOMS SCM case following Stevens et al. (2005)
 
-    call dycoms_radiation_tend(state, ptend, pbuf, ztodt)
+    call dycoms_radiation_tend(state, ptend, net_flx)
+    tend%flx_net(:ncol) = net_flx(:ncol)
+
     call physics_update(state, ptend, ztodt, tend)
+    call check_energy_chng(state, tend, "dycoms_radheat", nstep, ztodt, zero, zero, zero, net_flx)
 
 case default
 
