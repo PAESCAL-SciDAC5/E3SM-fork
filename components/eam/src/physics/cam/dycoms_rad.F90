@@ -79,7 +79,7 @@ subroutine dycoms_radiation_tend(state, ptend, net_flx)
       lwp_abv(:ncol,k) = lwp_abv(:ncol,k-1) + lwp_in_layer(:ncol) 
    end do
 
-   ! Calculate upwelling LW flux at layer interfaces
+   ! Calculate net LW flux (positive upward) at layer interfaces
    ! using the first 2 RHS terms in Eq. (3) of Stevens et al. (2005), "Evaluation of
    ! Large-Eddy Simulations via Observations of Nocturnal Marine Stratocumulus"
 
@@ -102,7 +102,8 @@ subroutine dycoms_radiation_tend(state, ptend, net_flx)
    call physics_ptend_init(ptend, state%psetcols, 'dycoms_radheat', ls=.true.) 
    ptend%s(:ncol,:) = qrl(:ncol,:)
 
-   ! Net flux into the atm column = net incoming LW at sfc - net outgoing LW at TOP.
+   ! Net flux into the atm column =   net LW flux coming into the column at sfc
+   !                                - net LW flux going out of the column at model top
    ! SW fluxes are zero.
 
    net_flx(1:ncol) = radflux(:ncol,pverp) - radflux(:ncol,1)
