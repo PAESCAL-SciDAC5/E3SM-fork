@@ -49,13 +49,15 @@ subroutine dycoms_radiation_tend(state, ptend, net_flx)
    integer :: lchnk
    integer :: ixcldliq
 
-   real(r8) :: lwp_in_layer(pcols)
-   real(r8) :: lwp_abv(1:pcols,1:pverp)
-   real(r8) :: radflux(1:pcols,1:pverp)
-   real(r8) :: qrl(1:pcols,1:pver)
+   real(r8) :: lwp_in_layer(pcols)       ! Liquid water path (kg/m2) within a model layer
+   real(r8) ::      lwp_abv(pcols,pverp) ! Cumulative liquid water path above each model interface,
+                                         ! i.e., integral from model top to the current interface.
+                                         ! Equivalent to Q(z,inf)/kappa in Stevens et al 2005
+   real(r8) :: radflux(pcols,pverp)      ! Net longwave radiative flux (W/m2) at layer interface (positive upward)
+   real(r8) ::     qrl(pcols,pver)       ! cp*dT/dt due to longwave radiation (J/kg/s = W/kg)
 
    ! Diagnostic outputs - vertical profiles
-   real(r8) :: qrl_diag(1:pcols,1:pver) ! LW heating rate for diagnostics (K/s)
+   real(r8) :: qrl_diag(1:pcols,1:pver)  ! LW heating rate for diagnostics, i.e., dT/dt (K/s)
 
    real(r8), parameter :: F0 = 70.0_r8, &
                           F1 = 22.0_r8, &
