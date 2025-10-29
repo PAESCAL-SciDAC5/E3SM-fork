@@ -1353,9 +1353,9 @@ end subroutine clubb_init_cnst
    real(r8) :: varmu(pcols)
    real(r8) :: zt_out(pcols,pverp)              ! output for the thermo CLUBB grid              [m]
    real(r8) :: zi_out(pcols,pverp)              ! output for momentum CLUBB grid                [m]
-   real(r8) :: lscale(pcols,pverp)
-   real(r8) :: lscale_up(pcols,pverp)
-   real(r8) :: lscale_down(pcols,pverp)
+   real(r8) :: lscale(pcols,pverp)              ! CLUBB's mixing length scale, flipped to E3SM's layer indexing [m]
+   real(r8) :: lscale_up(pcols,pverp)           ! CLUBB's upward mixing length scale, flipped to E3SM's layer indexing [m]
+   real(r8) :: lscale_down(pcols,pverp)         ! CLUBB's CLUBB downward mixing length scale, flipped to E3SM's layer indexing [m]
 
 
    real(r8) :: pdf_zm_w_1_inout(pverp)          ! work array for pdf_params_zm%w_1
