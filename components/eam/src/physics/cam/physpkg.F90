@@ -2384,9 +2384,9 @@ subroutine tphysbc (ztodt,               &
     ! For diagnosing lscale
     real(r8),pointer :: tke(:,:)
     integer  :: ixq, ixcldliq
-    real(r8) :: lscale     (pcols,pverp)
-    real(r8) :: lscale_up  (pcols,pverp)
-    real(r8) :: lscale_down(pcols,pverp)
+    real(r8) :: lscale     (pcols,pver)
+    real(r8) :: lscale_up  (pcols,pver)
+    real(r8) :: lscale_down(pcols,pver)
 
     !HuiWan (2014/15): added for a short-term time step convergence test ++ 
     logical :: l_bc_energy_fix
