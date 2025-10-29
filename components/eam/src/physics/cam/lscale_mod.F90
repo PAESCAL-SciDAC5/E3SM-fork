@@ -18,9 +18,9 @@ subroutine lscale_init()
    
    ! Add output variables
 
-   call addfld ('LSCALE',     (/ 'ilev' /), 'A', 'm', 'Mixing Length Scale')
-   call addfld ('LSCALE_UP',  (/ 'ilev' /), 'A', 'm', 'Upward Mixing Length Scale')
-   call addfld ('LSCALE_DOWN',(/ 'ilev' /), 'A', 'm', 'Downward Mixing Length Scale')
+   call addfld ('LSCALE',     (/ 'lev' /), 'A', 'm', 'Mixing Length Scale')
+   call addfld ('LSCALE_UP',  (/ 'lev' /), 'A', 'm', 'Upward Mixing Length Scale')
+   call addfld ('LSCALE_DOWN',(/ 'lev' /), 'A', 'm', 'Downward Mixing Length Scale')
 
    call add_default('LSCALE',     1, ' ')
    call add_default('LSCALE_UP',  1, ' ')
@@ -48,6 +48,8 @@ subroutine calculate_lscale(ncol, pcols, pver, pverp,       &
     !--------------------
     integer, intent(in) :: ncol, pcols, pver, pverp     ! pverp = pver + 1
 
+    ! Meteorological fields needed to diagnose Lscale.
+
     real(r8), intent(in)  :: temp_in(pcols,pver)   ! temperature [K] at layer midpoints
     real(r8), intent(in)  :: pmid_in(pcols,pver)   ! pressure [Pa] at layer midpoints
     real(r8), intent(in)  ::   qv_in(pcols,pver)   ! water vapor mixing ratio [kg/kg] at layer midpoints
@@ -56,9 +58,11 @@ subroutine calculate_lscale(ncol, pcols, pver, pverp,       &
     real(r8), intent(in)  ::   zi_in(pcols,pverp)  ! geopotential height [m] at layer interfaces
     real(r8), intent(in)  ::  tke_in(pcols,pverp)  ! turbulent kinetic energy [m2/s2] at layer interfaces
 
-    real(r8), intent(out) :: lscale_out     (pcols,pverp)   ! turbulent mixing length scale [m]
-    real(r8), intent(out) :: lscale_up_out  (pcols,pverp)   ! turbulent mixing length scale, upward [m]
-    real(r8), intent(out) :: lscale_down_out(pcols,pverp)   ! turbulent mixing length scale, downward [m]
+    ! Lscale and its upward and downward components, defined at layer midpoints
+
+    real(r8), intent(out) :: lscale_out     (pcols,pver)   ! turbulent mixing length scale [m]
+    real(r8), intent(out) :: lscale_up_out  (pcols,pver)   ! turbulent mixing length scale, upward [m]
+    real(r8), intent(out) :: lscale_down_out(pcols,pver)   ! turbulent mixing length scale, downward [m]
 
     !-----------------------------------------------------------------------------------------
     ! Local arrays. Their shape and direction of indexing follow CLUBB:
@@ -81,7 +85,9 @@ subroutine calculate_lscale(ncol, pcols, pver, pverp,       &
     real(r8) :: exner    (pverp)  ! exner function
     real(r8) :: thv_ds   (pverp)  ! dry static virtual potential temperature
 
-    ! Input arrays of CLUBB's compute_mixing_length subroutine
+    ! Output arrays of CLUBB's compute_mixing_length subroutine.
+    ! These are defined at layer midpoints (CLUBB's thermodynamic levels)
+    ! and have a "ghost" level below Earth's surface.
 
     real(r8) :: lscale_tmp     (pverp)
     real(r8) :: lscale_up_tmp  (pverp) 
@@ -187,9 +193,10 @@ subroutine calculate_lscale(ncol, pcols, pver, pverp,       &
          lscale_tmp, lscale_up_tmp, lscale_down_tmp )
 
        !========================================================
-       ! 3. Flip the vertical indexing for output to host model
+       ! 3. Flip the vertical indexing for output to host model;
+       !    ignore the ghost level below Earth's surface.
        !========================================================
-       do kk = 1, pverp
+       do kk = 1, pver
           lscale_out     (ii,kk) = lscale_tmp     (pverp-kk+1)
           lscale_up_out  (ii,kk) = lscale_up_tmp  (pverp-kk+1)
           lscale_down_out(ii,kk) = lscale_down_tmp(pverp-kk+1)
