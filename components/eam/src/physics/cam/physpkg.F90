@@ -1860,7 +1860,7 @@ end if ! l_tracer_aero
           call physics_update(state, ptend, ztodt, tend)
        end if
 
-       call cnd_diag_checkpoint( diag, 'CFLXAPP', state, pbuf, cam_in, cam_out )
+       call cnd_diag_checkpoint( diag, 'CFLXAPP1', state, pbuf, cam_in, cam_out )
 
     else
     if (l_vdiff) then
@@ -1947,6 +1947,7 @@ if (l_gw_drag) then
     call physics_update(state, ptend, ztodt, tend)
     ! Check energy integrals
     call check_energy_chng(state, tend, "qborelax", nstep, ztodt, zero, zero, zero, zero)
+    call cnd_diag_checkpoint( diag, 'QBORELAX', state, pbuf, cam_in, cam_out )
 
     ! Ion drag calculation
     call t_startf ( 'iondrag' )
@@ -2772,6 +2773,8 @@ end if
           call physics_update(state, ptend, ztodt, tend)
        end if
 
+       call cnd_diag_checkpoint( diag, 'CFLXAPP2', state, pbuf, cam_in, cam_out )
+
        !========================================================================================
        ! Start co-substepping of macrophysics and microphysics
        cld_macmic_ztodt = ztodt/cld_macmic_num_steps
@@ -2810,7 +2813,9 @@ end if
 
           call t_startf('macrop_tend')
 
-          ! don't call Park macrophysics if CLUBB is called
+          !----------------------------------------------------
+          ! Park macrophysics (if not using CLUBB or SHOC)
+          !----------------------------------------------------
           if (macrop_scheme .ne. 'CLUBB_SGS' .and. macrop_scheme .ne. 'SHOC_SGS') then
 
              call macrop_driver_tend( &
@@ -2838,8 +2843,10 @@ end if
                   zero, flx_cnd/cld_macmic_num_steps, &
                   det_ice/cld_macmic_num_steps, flx_heat/cld_macmic_num_steps)
        
-          else ! Calculate CLUBB macrophysics
-
+          else
+          !----------------------------------------------------
+          ! CLUBB or SHOC
+          !----------------------------------------------------
 
 !!== KZ_WATCON 
 
@@ -2864,9 +2871,9 @@ end if
             call outfld('LSCALE_UP', state%lscale_up,   ncol, lchnk)
             call outfld('LSCALE_DOWN', state%lscale_down, ncol, lchnk)
 
-             ! =====================================================
-             !    CLUBB call (PBL, shallow convection, macrophysics)
-             ! =====================================================  
+           !============================================================
+           ! CLUBB or SHOC call (PBL, shallow convection, macrophysics)
+           !============================================================
            if (do_clubb_sgs) then
              call clubb_tend_cam(state,ptend,pbuf,diag,cld_macmic_ztodt,&
                 cmfmc, cam_in, cam_out, sgh30, macmic_it, cld_macmic_num_steps, &
@@ -2897,9 +2904,8 @@ end if
                      cam_in%cflx(:,1)/cld_macmic_num_steps, flx_cnd/cld_macmic_num_steps, &
                      det_ice/cld_macmic_num_steps, flx_heat/cld_macmic_num_steps)
 
-
  
-          endif
+          endif ! Park vs CLUBB/SHOC for macrophysics
 
           call t_stopf('macrop_tend')
         end if ! l_st_mac
@@ -2908,7 +2914,7 @@ end if
           !===================================================
           ! Calculate cloud microphysics 
           !===================================================
-        if (l_st_mic) then
+        if (l_st_mic) then ! Aerosol activation
 
           if (is_subcol_on()) then
              ! Allocate sub-column structures. 
@@ -2929,11 +2935,14 @@ end if
             call t_stopf('microp_aero_run')
 
           endif
-          call cnd_diag_checkpoint( diag, 'CLDAER'//char_macmic_it, state, pbuf, cam_in, cam_out )
 
+        end if ! l_st_mic
+
+          call cnd_diag_checkpoint( diag, 'CLDAER'//char_macmic_it, state, pbuf, cam_in, cam_out )
 
           call t_startf('microp_tend')
 
+        if (l_st_mic) then ! Cloud microphysics
 
           if (use_subcol_microp) then
              call microp_driver_tend(state_sc, ptend_sc, cld_macmic_ztodt, pbuf)
