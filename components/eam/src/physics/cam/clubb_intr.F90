@@ -877,13 +877,15 @@ end subroutine clubb_init_cnst
     endif
 
     !  These are default CLUBB output.  Not the higher order history budgets
+
+    call addfld ('LSCALE_CLUBB',     (/ 'lev' /), 'A',     'm',     'CLUBB Mixing Length Scale')
+    call addfld ('LSCALE_UP_CLUBB',  (/ 'lev' /), 'A',     'm',     'CLUBB Upward Mixing Length Scale')
+    call addfld ('LSCALE_DOWN_CLUBB',(/ 'lev' /), 'A',     'm',     'CLUBB Downward Mixing Length Scale')
+
     call addfld ('RHO_CLUBB',    (/ 'ilev' /), 'A',        'kg/m3', 'Air Density')
     call addfld ('UP2_CLUBB',    (/ 'ilev' /), 'A',        'm2/s2', 'Zonal Velocity Variance')
     call addfld ('VP2_CLUBB',    (/ 'ilev' /), 'A',        'm2/s2', 'Meridional Velocity Variance')
     call addfld ('WP2_CLUBB',    (/ 'ilev' /), 'A',        'm2/s2', 'Vertical Velocity Variance')
-    call addfld ('LSCALE_CLUBB', (/ 'ilev' /), 'A',            'm', 'CLUBB Mixing Length Scale')
-    call addfld ('LSCALE_UP_CLUBB', (/ 'ilev' /), 'A',         'm', 'CLUBB Upward Mixing Length Scale')
-    call addfld ('LSCALE_DOWN_CLUBB', (/ 'ilev' /), 'A',       'm', 'CLUBB Downward Mixing Length Scale')
     call addfld ('UPWP_CLUBB',    (/ 'ilev' /), 'A',       'm2/s2', 'Zonal Momentum Flux')
     call addfld ('VPWP_CLUBB',    (/ 'ilev' /), 'A',       'm2/s2', 'Meridional Momentum Flux')
     call addfld ('WP3_CLUBB',    (/ 'ilev' /), 'A',        'm3/s3', 'Third Moment Vertical Velocity')
@@ -995,8 +997,8 @@ end subroutine clubb_init_cnst
        call add_default('QT',               1, ' ')
        call add_default('CONCLD',           1, ' ')
        call add_default('LSCALE_CLUBB',     1, ' ')
-       call add_default('LSCALE_UP_CLUBB',     1, ' ')
-       call add_default('LSCALE_DOWN_CLUBB',     1, ' ')
+       call add_default('LSCALE_UP_CLUBB',  1, ' ')
+       call add_default('LSCALE_DOWN_CLUBB',1, ' ')
     else
        call add_default('CLOUDFRAC_CLUBB',  1, ' ')
        call add_default('CONCLD',           1, ' ')
@@ -1308,13 +1310,18 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: khzm_out(pverp)                  ! eddy diffusivity on momentum grids            [m^2/s]
    real(core_rknd) :: khzt_out(pverp)                  ! eddy diffusivity on thermo grids              [m^2/s]
    real(core_rknd) :: qclvar_out(pverp)                ! cloud water variance                          [kg^2/kg^2]
-   real(core_rknd) :: lscale_out(pverp)                ! CLUBB mixing length scale                     [m]
-   real(core_rknd) :: lscale_up_out(pverp)             ! CLUBB upward mixing length scale              [m]
-   real(core_rknd) :: lscale_down_out(pverp)           ! CLUBB downward mixing length scale            [m]
    real(core_rknd) :: varmu2
    real(core_rknd) :: qrl_clubb(pverp)
    real(core_rknd) :: qrl_zm(pverp)
    real(core_rknd) :: thlp2_rad_out(pverp)
+
+   ! Lscale diagnosed inside CLUBB and passed to the interface subroutine.
+   ! These are defined on thermodynamic levels and have an extra "ghost" level below Earth's surface.
+
+   real(core_rknd) :: lscale_out(pverp)                ! CLUBB mixing length scale                     [m]
+   real(core_rknd) :: lscale_up_out(pverp)             ! CLUBB upward mixing length scale              [m]
+   real(core_rknd) :: lscale_down_out(pverp)           ! CLUBB downward mixing length scale            [m]
+   !---
 
    real(core_rknd), dimension(nparams)  :: clubb_params ! These adjustable CLUBB parameters (C1, C2 ...)
    real(core_rknd), dimension(sclr_dim) :: sclr_tol     ! Tolerance on passive scalar       [units vary]
@@ -1353,10 +1360,15 @@ end subroutine clubb_init_cnst
    real(r8) :: varmu(pcols)
    real(r8) :: zt_out(pcols,pverp)              ! output for the thermo CLUBB grid              [m]
    real(r8) :: zi_out(pcols,pverp)              ! output for momentum CLUBB grid                [m]
-   real(r8) :: lscale(pcols,pverp)              ! CLUBB's mixing length scale, flipped to E3SM's layer indexing [m]
-   real(r8) :: lscale_up(pcols,pverp)           ! CLUBB's upward mixing length scale, flipped to E3SM's layer indexing [m]
-   real(r8) :: lscale_down(pcols,pverp)         ! CLUBB's CLUBB downward mixing length scale, flipped to E3SM's layer indexing [m]
 
+   ! lscale diagnosed inside CLUBB and passed to the interface subroutine.
+   ! The following arrays are used to send values to EAM's history output, hence the vertical indexing
+   ! follows EAM's top-to-bottom convention, and CLUBB's ghost thermodynamic layer is not included.
+
+   real(r8) :: lscale     (pcols,pver)          ! CLUBB's mixing length scale [m]
+   real(r8) :: lscale_up  (pcols,pver)          ! CLUBB's upward mixing length scale [m]
+   real(r8) :: lscale_down(pcols,pver)          ! CLUBB's CLUBB downward mixing length scale [m]
+   !---------------------
 
    real(r8) :: pdf_zm_w_1_inout(pverp)          ! work array for pdf_params_zm%w_1
    real(r8) :: pdf_zm_w_2_inout(pverp)          ! work array for pdf_params_zm%w_2
@@ -2446,9 +2458,6 @@ end subroutine clubb_init_cnst
           cloud_frac(i,k)   = min(real(cloud_frac_inout(pverp-k+1), kind = r8),1._r8)
           rcm_in_layer(i,k) = real(rcm_in_layer_out(pverp-k+1), kind = r8)
           cloud_cover(i,k)  = min(real(cloud_cover_out(pverp-k+1), kind = r8),1._r8)
-          lscale(i,k)       = real(lscale_out(pverp-k+1), kind = r8)
-          lscale_up(i,k)    = real(lscale_up_out(pverp-k+1), kind = r8)
-          lscale_down(i,k)  = real(lscale_down_out(pverp-k+1), kind = r8)
           zt_out(i,k)       = real(zt_g(pverp-k+1), kind = r8)
           zi_out(i,k)       = real(zi_g(pverp-k+1), kind = r8)
           khzm(i,k)         = real(khzm_out(pverp-k+1), kind = r8)
@@ -2465,6 +2474,12 @@ end subroutine clubb_init_cnst
               edsclr_out(k,ixind) = real(edsclr_in(pverp-k+1,ixind), kind = r8)
           enddo
 
+      enddo
+
+      do k=1,pver
+          lscale     (i,k) = real(lscale_out     (pverp-k+1), kind = r8)
+          lscale_up  (i,k) = real(lscale_up_out  (pverp-k+1), kind = r8)
+          lscale_down(i,k) = real(lscale_down_out(pverp-k+1), kind = r8)
       enddo
 
       !  Fill up arrays needed for McICA.  Note we do not want the ghost point,
