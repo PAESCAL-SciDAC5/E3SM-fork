@@ -256,7 +256,6 @@ subroutine phys_register
        
        ! Register SHOC_SGS here
        if (do_shoc_sgs) call shoc_register_e3sm()
-       
 
        call pbuf_add_field('PREC_STR',  'physpkg',dtype_r8,(/pcols/),prec_str_idx)
        call pbuf_add_field('SNOW_STR',  'physpkg',dtype_r8,(/pcols/),snow_str_idx)
@@ -291,14 +290,6 @@ subroutine phys_register
 
        ! register chemical constituents including aerosols ...
        call chem_register(species_class)
-
-      ! Register CLUBB mixing length scale diagnostic variables
-      call addfld ('LSCALE',    (/ 'ilev' /), 'A', 'm', 'Mixing Length Scale')
-      call addfld ('LSCALE_UP', (/ 'ilev' /), 'A', 'm', 'Upward Mixing Length Scale')
-      call addfld ('LSCALE_DOWN',(/ 'ilev' /), 'A', 'm', 'Downward Mixing Length Scale')
-      call add_default('LSCALE',     1, ' ')
-      call add_default('LSCALE_UP',  1, ' ')
-      call add_default('LSCALE_DOWN',1, ' ')
 
        ! NB: has to be after chem_register to use tracer names
        ! Fields for gas chemistry tracers
@@ -786,6 +777,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use majorsp_diffusion,  only: mspd_init   ! Initialization of major species diffusion module (WACCM-X)
     use clubb_intr,         only: clubb_ini_cam
     use shoc_intr,          only: shoc_init_e3sm
+    use lscale_mod,         only: lscale_init
     use sslt_rebin,         only: sslt_rebin_init
     use tropopause,         only: tropopause_init
     use solar_data,         only: solar_data_init
@@ -980,6 +972,8 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     
     ! initiate SHOC within E3SM
     if (do_shoc_sgs) call shoc_init_e3sm(pbuf2d,dp1)
+
+    call lscale_init
 
     call qbo_init
 
@@ -2386,6 +2380,14 @@ subroutine tphysbc (ztodt,               &
     real(r8), pointer, dimension(:) :: water_vap_ac_2d   ! Vertically integrated water vapor
     real(r8) :: CIDiff(pcols)            ! Difference in vertically integrated static energy
 
+
+    ! For diagnosing lscale
+    real(r8),pointer :: tke(:,:)
+    integer  :: ixq, ixcldliq
+    real(r8) :: lscale     (pcols,pverp)
+    real(r8) :: lscale_up  (pcols,pverp)
+    real(r8) :: lscale_down(pcols,pverp)
+
     !HuiWan (2014/15): added for a short-term time step convergence test ++ 
     logical :: l_bc_energy_fix
     logical :: l_dry_adj
@@ -2855,14 +2857,23 @@ end if
     end if
 !!== KZ_WATCON 
 
-            ! calculate L_scale using subroutines taken from CLUBB
-            ! for output and for future AMR work - H. Xiao
-            call calculate_lscale(state, pbuf)
+           !=======================================================
+           ! calculate L_scale using subroutines taken from CLUBB
+           ! for output and for future AMR work - H. Xiao & H. Wan
+           !=======================================================
+           call cnst_get_ind('Q',      ixq)
+           call cnst_get_ind('CLDLIQ', ixcldliq)
+           call pbuf_get_field(pbuf, pbuf_get_index('tke'), tke)
 
-            ! Output CLUBB mixing length scale diagnostic variables
-            call outfld('LSCALE',    state%lscale,      ncol, lchnk)
-            call outfld('LSCALE_UP', state%lscale_up,   ncol, lchnk)
-            call outfld('LSCALE_DOWN', state%lscale_down, ncol, lchnk)
+           call calculate_lscale(ncol,     pcols,      pver,             pverp,                 &! in
+                                 state%t,  state%pmid, state%q(:,:,ixq), state%q(:,:,ixcldliq), &! in
+                                 state%zm, state%zi,   tke,                                     &! in
+                                 lscale, lscale_up, lscale_down                                 )! out
+
+           ! Send the diagnosed lscales to history output
+           call outfld('LSCALE',      lscale,      pcols, lchnk)
+           call outfld('LSCALE_UP',   lscale_up,   pcols, lchnk)
+           call outfld('LSCALE_DOWN', lscale_down, pcols, lchnk)
 
              ! =====================================================
              !    CLUBB call (PBL, shallow convection, macrophysics)

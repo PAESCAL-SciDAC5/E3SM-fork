@@ -4,163 +4,198 @@ module lscale_mod
 
     private
     public :: calculate_lscale
+    public :: lscale_init
 
     contains
 
-subroutine calculate_lscale(state, pbuf)
-    !----------------------------------------------------------------------- 
-    ! 
+subroutine lscale_init()
+   !-----------------------------------------------------------------------
+   ! Purpose:
+   ! Initialization related to the calculation of turbulent length scales
+   ! in the physics driver.
+   !-----------------------------------------------------------------------
+   use cam_history,      only: addfld, add_default
+   
+   ! Add output variables
+
+   call addfld ('LSCALE',     (/ 'ilev' /), 'A', 'm', 'Mixing Length Scale')
+   call addfld ('LSCALE_UP',  (/ 'ilev' /), 'A', 'm', 'Upward Mixing Length Scale')
+   call addfld ('LSCALE_DOWN',(/ 'ilev' /), 'A', 'm', 'Downward Mixing Length Scale')
+
+   call add_default('LSCALE',     1, ' ')
+   call add_default('LSCALE_UP',  1, ' ')
+   call add_default('LSCALE_DOWN',1, ' ')
+
+end subroutine lscale_init
+
+subroutine calculate_lscale(ncol, pcols, pver, pverp,       &
+                            temp_in, pmid_in, qv_in, qc_in, &
+                            zm_in,   zi_in,   tke_in,       &
+                            lscale_out, lscale_up_out, lscale_down_out )
+    !------------------------------------------------------------------------------ 
     ! Purpose: 
     ! Calculate mixing length scales using CLUBB's compute_mixing_length subroutine
-    ! and store the results in physics_state for diagnostic output and future AMR work
-    ! 
-    !-----------------------------------------------------------------------
+    ! and pass the results back to the calling subroutine for diagnostic output
+    ! and future AMR work.
+    !------------------------------------------------------------------------------
     use shr_kind_mod,       only: r8 => shr_kind_r8
-    use ppgrid,             only: pver, pverp ! pverp = pver + 1
-    use physics_types,      only: physics_state
-    use physics_buffer,     only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
-    use constituents,       only: cnst_get_ind
     use physconst,          only: gravit, rair, cpair, latvap, zvir, epsilo
 
     implicit none
 
+    !--------------------
     ! Arguments
-    type(physics_state), intent(inout) :: state
-    type(physics_buffer_desc), pointer :: pbuf(:)
+    !--------------------
+    integer, intent(in) :: ncol, pcols, pver, pverp     ! pverp = pver + 1
 
-    real(r8), parameter :: p0_clubb = 100000._r8      ! reference pressure (Pa)
+    real(r8), intent(in)  :: temp_in(pcols,pver)   ! temperature [K] at layer midpoints
+    real(r8), intent(in)  :: pmid_in(pcols,pver)   ! pressure [Pa] at layer midpoints
+    real(r8), intent(in)  ::   qv_in(pcols,pver)   ! water vapor mixing ratio [kg/kg] at layer midpoints
+    real(r8), intent(in)  ::   qc_in(pcols,pver)   ! cloud liquid mixing ratio [kg/kg] at layer midpoints
+    real(r8), intent(in)  ::   zm_in(pcols,pver)   ! geopotential height [m] at layer midpoints
+    real(r8), intent(in)  ::   zi_in(pcols,pverp)  ! geopotential height [m] at layer interfaces
+    real(r8), intent(in)  ::  tke_in(pcols,pverp)  ! turbulent kinetic energy [m2/s2] at layer interfaces
 
-    ! Variables for compute_mixing_length
-    real(r8), allocatable :: zt(:)         ! height at thermodynamic levels
-    real(r8), allocatable :: zm(:)         ! height at momentum levels
-    real(r8), allocatable :: dzm(:)        ! grid spacing at momentum levels
-    real(r8), allocatable :: invrs_dzm(:)  ! 1/dzm
+    real(r8), intent(out) :: lscale_out     (pcols,pverp)   ! turbulent mixing length scale [m]
+    real(r8), intent(out) :: lscale_up_out  (pcols,pverp)   ! turbulent mixing length scale, upward [m]
+    real(r8), intent(out) :: lscale_down_out(pcols,pverp)   ! turbulent mixing length scale, downward [m]
 
-    real(r8), allocatable :: thvm(:)       ! virtual potential temperature
-    real(r8), allocatable :: thlm(:)       ! liquid water potential temperature
-    real(r8), allocatable :: rtm(:)        ! total water mixing ratio
-    real(r8), allocatable :: em(:)         ! turbulent kinetic energy
-    real(r8), allocatable :: p_in_Pa(:)    ! pressure in Pa
-    real(r8), allocatable :: exner(:)      ! exner function
-    real(r8), allocatable :: thv_ds(:)     ! dry static virtual potential temperature
+    !-----------------------------------------------------------------------------------------
+    ! Local arrays. Their shape and direction of indexing follow CLUBB:
+    !  - Variables defined on thermodynamic levels (corresponding to E3SM's layer midpoints)
+    !    have a extra ghost level below ground/Earth surface;
+    !  - Level indices start from the surface and increase upward.
+    !-----------------------------------------------------------------------------------------
+    ! Input arrays of CLUBB's compute_mixing_length subroutine
 
-    ! CLUBB output arrays
-    real(r8), allocatable :: lscale_out(:)
-    real(r8), allocatable :: lscale_up_out(:) 
-    real(r8), allocatable :: lscale_down_out(:)
+    real(r8) :: zt       (pverp)  ! height at thermodynamic levels
+    real(r8) :: zm       (pverp)  ! height at momentum levels
+    real(r8) :: dzm      (pverp)  ! grid spacing at momentum levels
+    real(r8) :: invrs_dzm(pverp)  ! 1/dzm
 
-    ! Physics buffer fields
-    real(r8), pointer :: tke(:,:)           ! turbulent kinetic energy
+    real(r8) :: thvm     (pverp)  ! virtual potential temperature
+    real(r8) :: thlm     (pverp)  ! liquid water potential temperature
+    real(r8) :: rtm      (pverp)  ! total water mixing ratio
+    real(r8) :: em       (pverp)  ! turbulent kinetic energy
+    real(r8) :: p_in_Pa  (pverp)  ! pressure in Pa
+    real(r8) :: exner    (pverp)  ! exner function
+    real(r8) :: thv_ds   (pverp)  ! dry static virtual potential temperature
 
-    ! Local variables
-    integer :: i, k, kflip, ncol
-    integer :: ixq, ixcldliq ! constituent indices
+    ! Input arrays of CLUBB's compute_mixing_length subroutine
+
+    real(r8) :: lscale_tmp     (pverp)
+    real(r8) :: lscale_up_tmp  (pverp) 
+    real(r8) :: lscale_down_tmp(pverp)
+
+    !--------------------
+    ! Local scalars
+    !--------------------
+    integer :: ii, kk, kflip    ! array indices
+
     real(r8) :: temp_k
     real(r8) :: theta_v
     real(r8) :: press_pa
     real(r8) :: qv, qc
     real(r8) :: exner_clubb
-   
-    ncol = state%ncol
 
-    ! Get constituent indices
-    call cnst_get_ind('Q', ixq)
-    call cnst_get_ind('CLDLIQ', ixcldliq)
-    ! Get physics buffer fields
-    call pbuf_get_field(pbuf, pbuf_get_index('tke'), tke)
+    real(r8), parameter :: p0_clubb = 100000._r8      ! reference pressure (Pa)
 
-    ! Allocate 1D arrays for single column processing
-    allocate(zt(pverp))
-    allocate(zm(pverp))
-    allocate(dzm(pverp))
-    allocate(invrs_dzm(pverp))
-
-    allocate(thvm(pverp))
-    allocate(thlm(pverp))
-    allocate(rtm(pverp))
-    allocate(em(pverp))
-    allocate(p_in_Pa(pverp))
-    allocate(exner(pverp))
-    allocate(thv_ds(pverp))
-
-    allocate(lscale_out(pverp))
-    allocate(lscale_up_out(pverp))
-    allocate(lscale_down_out(pverp))
-
+    !--------------------------------------
     ! Process each column separately
-    do i = 1, ncol
-       ! Prepare input variables for this column
-       ! could also have gotten them from pbuf,
-       ! but following clubb_tend_cam in clubb_intr.F90 here
-       do k = 1, pver
-          ! for flipping to CLUBB ordering
-          kflip = pver - k + 1
-          ! thermodynamic-level variables
-          temp_k = state%t(i, kflip)
-          press_pa = state%pmid(i, kflip)
+    !--------------------------------------
+    do ii = 1, ncol
+
+       !====================================================
+       ! 1. Prepare input variables for this column
+       !    following clubb_tend_cam in clubb_intr.F90.
+       !====================================================
+       do kk = 1, pver
+
+          !------------------------------------
+          ! 1.1 Thermodynamic-level variables
+          !------------------------------------
+          kflip = pver - kk + 1   ! for flipping to CLUBB ordering
+
+          temp_k = temp_in(ii, kflip)
+          press_pa = pmid_in(ii, kflip)
           exner_clubb = (p0_clubb/press_pa)**(rair/cpair)
-          qv = state%q(i, kflip, ixq)  ! water vapor
-          qc = state%q(i, kflip, ixcldliq)  ! cloud liquid
+
+          qv = qv_in(ii, kflip)  ! water vapor
+          qc = qc_in(ii, kflip)  ! cloud liquid
+
           ! virtual potential temperature per CLUBB
           theta_v = temp_k*exner_clubb*(1.0_r8 + zvir*qv - qc)
 
-          rtm(k+1) = qv + qc ! total water mixing ratio per CLUBB
-          thlm(k+1) = (temp_k - (latvap/cpair)*qc)*exner_clubb
-          p_in_Pa(k+1) = press_pa
-          exner(k+1) = 1.0_r8 / exner_clubb
+          rtm(kk+1) = qv + qc ! total water mixing ratio per CLUBB
+          thlm(kk+1) = (temp_k - (latvap/cpair)*qc)*exner_clubb
+          p_in_Pa(kk+1) = press_pa
+          exner(kk+1) = 1.0_r8 / exner_clubb
+
           ! note here thv_ds is assigned actual moist theta_v 
           ! following what is done in clubb_tend_cam in clubb_intr.F90
-          thv_ds(k+1) = theta_v
+          thv_ds(kk+1) = theta_v
+
           ! thvm is then calculated again in advance_clubb_core
           ! as follows:
-          thvm(k+1) = thlm(k+1) + ((1.0_r8 - epsilo)/epsilo) * thv_ds(k+1) *rtm(k+1) &
-                        + (latvap/(cpair*exner(k+1)) - (1.0_r8/epsilo) *thv_ds(k+1))*qc
+          thvm(kk+1) = thlm(kk+1) + ((1.0_r8 - epsilo)/epsilo) * thv_ds(kk+1) *rtm(kk+1) &
+                        + (latvap/(cpair*exner(kk+1)) - (1.0_r8/epsilo) *thv_ds(kk+1))*qc
+
           ! thermodynamic-level heights
-          zt(k+1) = state%zm(i, kflip) - state%zi(i, pver+1)
-          ! momentum-level variables
-          em(k) = tke(i, pverp-k+1)
-          ! momentum-level heights
-          zm(k) = state%zi(i,pverp-k+1)-state%zi(i,pver+1)
+          zt(kk+1) = zm_in(ii, kflip) - zi_in(ii, pver+1)
+
+          !-------------------------------
+          ! 1.2 Momentum-level variables
+          !-------------------------------
+          em(kk) = tke_in(ii,pverp-kk+1)                    ! TKE
+          zm(kk) =  zi_in(ii,pverp-kk+1) - zi_in(ii,pver+1) ! geopot. height above sfc (of layer interfaces) 
+
        end do
 
-       ! fill in for the first level of zt below surface
-       zt(1) = -1.0_r8 * zt(2)
-       exner(1) = exner(2)
+       !------------------------------------------------------------------------------------
+       ! 1.3 For variables on zt levels (layer midpoints), fill in values for ghost level.
+       !------------------------------------------------------------------------------------
+            zt(1) = -1.0_r8 * zt(2)
+         exner(1) =   exner(2)
        p_in_Pa(1) = p_in_Pa(2)
-       rtm(1) = rtm(2)
-       thlm(1) = thlm(2)
-       thv_ds(1) = thv_ds(2)
-       thvm(1) = thvm(2)
-       ! tke is asumed to be on momentum levels
-       ! simply copying whatever is at the topmost momentum level
-       em(pverp) = tke(i, 1)
-       ! pverp is the topmost momentum level
-       zm(pverp) = state%zi(i,1)-state%zi(i,pver+1)
-       do k = 1, pver
-         dzm(k) = zt(k+1) - zt(k)
-         invrs_dzm(k) = 1.0_r8 / dzm(k)
+           rtm(1) =     rtm(2)
+          thlm(1) =    thlm(2)
+        thv_ds(1) =  thv_ds(2)
+          thvm(1) =    thvm(2)
+
+       !------------------------------------------------------------------------------------
+       ! 1.5 For variables on zm levels (layer interfaces), set values at model top.
+       !------------------------------------------------------------------------------------
+       em(pverp) = tke_in(ii,1)
+       zm(pverp) =  zi_in(ii,1) - zi_in(ii,pver+1)
+
+       !------------------------------------------------------------------------------------
+       ! 1.6 Calculate dz and 1/dz.
+       !------------------------------------------------------------------------------------
+       do kk = 1, pver
+               dzm(kk) = zt(kk+1) - zt(kk)
+         invrs_dzm(kk) = 1.0_r8 / dzm(kk)
        end do
-       dzm(pverp) = dzm(pver)  ! does not matter much what we put here
+             dzm(pverp) =       dzm(pver)  ! does not matter much what we put here
        invrs_dzm(pverp) = invrs_dzm(pver)
 
-       ! Call CLUBB's compute_mixing_length for this column
+       !========================================================
+       ! 2. Call CLUBB's compute_mixing_length for this column
+       !========================================================
        call compute_mixing_length_standalone( &
          pverp, zt, zm, dzm, invrs_dzm, & 
          thvm, thlm, rtm, em, p_in_Pa, exner, thv_ds, &
-         lscale_out, lscale_up_out, lscale_down_out )
+         lscale_tmp, lscale_up_tmp, lscale_down_tmp )
 
-       ! Store results in physics_state (convert back to r8)
-       do k = 1, pverp
-          state%lscale(i, k) = lscale_out(pverp-k+1)  ! flip back to match EAM ordering
-          state%lscale_up(i, k) = lscale_up_out(pverp-k+1)
-          state%lscale_down(i, k) = lscale_down_out(pverp-k+1)
+       !========================================================
+       ! 3. Flip the vertical indexing for output to host model
+       !========================================================
+       do kk = 1, pverp
+          lscale_out     (ii,kk) = lscale_tmp     (pverp-kk+1)
+          lscale_up_out  (ii,kk) = lscale_up_tmp  (pverp-kk+1)
+          lscale_down_out(ii,kk) = lscale_down_tmp(pverp-kk+1)
        end do
-    end do
 
-    ! Clean up
-    deallocate(zt, zm, dzm, invrs_dzm)
-    deallocate(thvm, thlm, rtm, em, p_in_Pa, exner, thv_ds)
-    deallocate(lscale_out, lscale_up_out, lscale_down_out)
+    end do ! ii = 1,ncol
 
 end subroutine calculate_lscale
 
