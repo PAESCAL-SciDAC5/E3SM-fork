@@ -25,7 +25,8 @@ readonly PROJECT="m4359"
 readonly COMPSET="F2010"
 readonly RESOLUTION="ne30pg2_oECv3"
 # BEFORE RUNNING : CHANGE the following CASE_NAME to desired value
-readonly CASE_NAME="EAMv2_oldscheme_sfc_inout_"$RESOLUTION
+readonly CASE_NAME="EAMv2_newscheme_eps05_zetamax1000_tol3e-3_final_sfc_inout_"$RESOLUTION
+# readonly CASE_NAME="EAMv2_oldscheme_noregularization_withuniquenessfix_final_sfc_inout_"$RESOLUTION
 # readonly CASE_NAME="EAMv2_fullconvergence_unregularizedscheme_withuniquenessfix_zetamax20_10years_instantaneousoutput_sfc_inout_"$RESOLUTION
 # readonly CASE_NAME="EAMv2_regularizeduniquescheme_testMPASseaicestream_E1850C5ELM_sfc_inout_"$RESOLUTION
 # If this is part of a simulation campaign, ask your group lead about using a case_group label
@@ -52,7 +53,7 @@ readonly START_DATE="2009-09-01"
 #readonly RUN_REFDATE="1001-01-01"   # same as MODEL_START_DATE for 'branch', can be different for 'hybrid'
 
 # Set paths
-readonly CHECKOUT="E3SM-fork"
+readonly CHECKOUT="ocean_atm_flux_revision"
 readonly CODE_ROOT="/global/cfs/projectdirs/"${PROJECT}/${USER}"/sfc_cpl/code/${CHECKOUT}"
 readonly CASE_ROOT="${SCRATCH}/sfc_cpl/cases/${CASE_NAME}"
 
@@ -92,13 +93,25 @@ else
   readonly CASE_SCRIPTS_DIR=${CASE_ROOT}/case_scripts
   readonly CASE_RUN_DIR=${CASE_ROOT}/run
   readonly PELAYOUT="custom-8"
-  readonly WALLTIME="23:00:00"
+  readonly WALLTIME="20:00:00"
   readonly STOP_OPTION="nmonths"
-  readonly STOP_N="26"
+  readonly STOP_N="45"
   readonly REST_OPTION="nmonths"
   readonly REST_N="4"
-  readonly RESUBMIT="4"
+  readonly RESUBMIT="2"
   readonly DO_SHORT_TERM_ARCHIVING=false
+
+#   # Production simulation
+#   readonly CASE_SCRIPTS_DIR=${CASE_ROOT}/case_scripts
+#   readonly CASE_RUN_DIR=${CASE_ROOT}/run
+#   readonly PELAYOUT="custom-4"
+#   readonly WALLTIME="0:30:00"
+#   readonly STOP_OPTION="nmonths"
+#   readonly STOP_N="5"
+#   readonly REST_OPTION="nmonths"
+#   readonly REST_N="4"
+#   readonly RESUBMIT="0"
+#   readonly DO_SHORT_TERM_ARCHIVING=false
 fi
 
 # Coupler history
@@ -156,24 +169,117 @@ echo $'\n----- All done -----\n'
 
 custom_pelayout(){
 
-pushd ${CASE_SCRIPTS_DIR}
-if [ "${PELAYOUT}" == "custom-8" ]; then
+if [[ ${PELAYOUT} == custom-* ]];
+then
+    echo $'\n CUSTOMIZE PROCESSOR CONFIGURATION:'
 
-    echo $'\n Use custom-8 pelayout'
+    # Number of cores per node (machine specific)
+    if [ "${MACHINE}" == "chrysalis" ]; then
+        ncore=64
+        hthrd=1  # hyper-threading, default to non-threading
+    elif [ "${MACHINE}" == "pm-cpu" ]; then
+        ncore=128
+        hthrd=1  # including pm-cpu
+    fi
 
+    # Extract number of nodes
+    tmp=($(echo ${PELAYOUT} | tr "-" " "))
+    nnodes=${tmp[1]}
+
+    # Applicable to all custom layouts
+    pushd ${CASE_SCRIPTS_DIR}
     ./xmlchange NTASKS=1
+    ./xmlchange NTHRDS=1
     ./xmlchange ROOTPE=0
+    ./xmlchange MAX_MPITASKS_PER_NODE=$ncore
+    ./xmlchange MAX_TASKS_PER_NODE=$(( $ncore * $hthrd))
 
-    ./xmlchange ATM_NTASKS=512   
-    ./xmlchange CPL_NTASKS=512
-    ./xmlchange OCN_NTASKS=512
+    # Layout-specific customization
+    if [ "${nnodes}" == "1" ]; then
 
-    ./xmlchange LND_NTASKS=512
-    ./xmlchange ROF_NTASKS=512
-    ./xmlchange ICE_NTASKS=512
+       echo Using custom 1 nodes layout with pm-cpu
+
+      ./xmlchange CPL_NTASKS=128
+      ./xmlchange ATM_NTASKS=128
+      ./xmlchange OCN_NTASKS=128
+      ./xmlchange OCN_ROOTPE=0
+
+      ./xmlchange LND_NTASKS=128
+      ./xmlchange ROF_NTASKS=128
+      ./xmlchange ICE_NTASKS=128
+      ./xmlchange LND_ROOTPE=0
+      ./xmlchange ROF_ROOTPE=0
+
+    elif [ "${nnodes}" == "2" ]; then
+
+       echo Using custom 2 nodes layout with pm-cpu
+
+      ./xmlchange CPL_NTASKS=256
+      ./xmlchange ATM_NTASKS=256
+      ./xmlchange OCN_NTASKS=256
+      ./xmlchange OCN_ROOTPE=0
+
+      ./xmlchange LND_NTASKS=256
+      ./xmlchange ROF_NTASKS=256
+      ./xmlchange ICE_NTASKS=256
+      ./xmlchange LND_ROOTPE=0
+      ./xmlchange ROF_ROOTPE=0
+
+    elif [ "${nnodes}" == "4" ]; then
+
+       echo Using custom 4 nodes layout with pm-cpu
+
+      ./xmlchange CPL_NTASKS=512
+      ./xmlchange ATM_NTASKS=512
+      ./xmlchange OCN_NTASKS=512
+      ./xmlchange OCN_ROOTPE=0
+
+      ./xmlchange LND_NTASKS=512
+      ./xmlchange ROF_NTASKS=512
+      ./xmlchange ICE_NTASKS=512
+      ./xmlchange LND_ROOTPE=0
+      ./xmlchange ROF_ROOTPE=0
+
+    elif [ "${nnodes}" == "8" ]; then
+
+       echo Using custom 8 nodes layout with pm-cpu
+
+      ./xmlchange CPL_NTASKS=1024
+      ./xmlchange ATM_NTASKS=1024
+      ./xmlchange OCN_NTASKS=1024
+      ./xmlchange OCN_ROOTPE=0
+
+      ./xmlchange LND_NTASKS=1024
+      ./xmlchange ROF_NTASKS=1024
+      ./xmlchange ICE_NTASKS=1024
+      ./xmlchange LND_ROOTPE=0
+      ./xmlchange ROF_ROOTPE=0
+
+    elif [ "${nnodes}" == "16" ]; then
+
+       echo Using custom 16 nodes layout with pm-cpu
+
+      ./xmlchange CPL_NTASKS=2048
+      ./xmlchange ATM_NTASKS=2048
+      ./xmlchange OCN_NTASKS=2048
+      ./xmlchange OCN_ROOTPE=0
+
+      ./xmlchange LND_NTASKS=2048
+      ./xmlchange ROF_NTASKS=2048
+      ./xmlchange ICE_NTASKS=2048
+      ./xmlchange LND_ROOTPE=0
+      ./xmlchange ROF_ROOTPE=0
+
+    else
+
+       echo 'ERRROR: unsupported layout '${PELAYOUT}
+       exit 401
+
+    fi
+
+    popd
 
 fi
-popd
 
 }
 
