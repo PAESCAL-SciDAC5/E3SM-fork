@@ -642,6 +642,9 @@ end function shoc_implements_cnst
    real(r8) :: se_dis(pcols), se_a(pcols), se_b(pcols), shoc_s(pcols,pver)
    real(r8) :: shoc_t(pcols,pver)
 
+   ! For SHOC substep output
+   integer :: turb_nadv_out_nstep     ! # of substeps to write out
+
    ! --------------- !
    ! Pointers        !
    ! --------------- !
@@ -682,6 +685,7 @@ end function shoc_implements_cnst
    !------------------------------------------------------------------!
    !------------------------------------------------------------------!
    !------------------------------------------------------------------!
+   call phys_getopts(turb_nadv_out_nstep_out = turb_nadv_out_nstep)
 
  !  Get indicees for cloud and ice mass and cloud and ice number
    ic_limit   = 1.e-12_r8
@@ -876,6 +880,7 @@ end function shoc_implements_cnst
    ! ------------------------------------------------- !
 
    call shoc_main( &
+        turb_nadv_out_nstep, lchnk, & ! Input
         ncol, pver, pverp, dtime, nadv, & ! Input
         host_dx_in(:ncol), host_dy_in(:ncol), thv(:ncol,:),& ! Input
         zt_g(:ncol,:), zi_g(:ncol,:), state%pmid(:ncol,:pver), state%pint(:ncol,:pverp), state1%pdel(:ncol,:pver),& ! Input

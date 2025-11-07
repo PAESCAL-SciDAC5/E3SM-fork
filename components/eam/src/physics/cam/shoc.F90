@@ -221,6 +221,7 @@ end subroutine shoc_init
 ! Host models should call the following routine to call SHOC
 
 subroutine shoc_main ( &
+     turb_nadv_out_nstep, lchnk, &        ! Input
      shcol, nlev, nlevi, dtime, nadv, &   ! Input
      host_dx, host_dy,thv, &              ! Input
      zt_grid,zi_grid,pres,presi,pdel,&    ! Input
@@ -246,9 +247,15 @@ subroutine shoc_main ( &
     use shoc_iso_f, only: shoc_main_f
 #endif
 
+  use cam_history,    only: outfld
+
   implicit none
 
 ! INPUT VARIABLES
+
+  integer, intent(in) :: turb_nadv_out_nstep ! # of time steps (in this subr.) to write out fields for
+  integer, intent(in) :: lchnk               ! chunk ID related to the host model's domain decomposition
+
   ! number of SHOC columns in the array
   integer, intent(in) :: shcol
   ! number of levels [-]
@@ -372,6 +379,9 @@ subroutine shoc_main ( &
 
   ! time counter
   integer :: t
+
+  ! a string like "_0001" that corresponds to a single value of the time counter
+  character(len=8) :: numstr
 
   ! air density on thermo grid [kg/m3]
   real(rtype) :: rho_zt(shcol,nlev)
@@ -541,6 +551,24 @@ subroutine shoc_main ( &
     ! Check TKE to make sure values lie within acceptable
     !  bounds after vertical advection, etc.
     call check_tke(shcol,nlev,tke)
+
+    !---------------------------------------------
+    ! Send values to history output.
+    ! The outfld calls are placed here in order to capture field values
+    ! inside the time loop in this subroutine.
+    ! Here, we are relying on the assumption that the input variable shcol
+    ! equals ncol in tphysbc/tphysac, and that nlev/nlevi here equal
+    ! pver/pverp in tphysbc/tphysac.
+
+    if (t.le.turb_nadv_out_nstep) then
+
+       write(numstr,'(a1,i4.4)') '_',t
+
+       call outfld('SHOC_TKE'//trim(adjustl(numstr)),         tke,shcol,lchnk)
+       call outfld(  'THETAL'//trim(adjustl(numstr)),      thetal,shcol,lchnk)
+       call outfld( 'CLDFRAC'//trim(adjustl(numstr)),shoc_cldfrac,shcol,lchnk)
+    end if
+    !---------------------------------------------
 
   enddo ! end time loop
 
