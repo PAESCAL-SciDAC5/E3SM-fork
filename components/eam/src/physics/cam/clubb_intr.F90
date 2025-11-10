@@ -636,6 +636,9 @@ end subroutine clubb_init_cnst
 #endif
 
     use physics_buffer,         only: pbuf_get_index, pbuf_set_field, physics_buffer_desc
+    use iop_data_mod,           only: single_column
+    use cam_abortutils,         only: endrun
+
     implicit none
     !  Input Variables
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -667,6 +670,14 @@ end subroutine clubb_init_cnst
     real(core_rknd)  :: zt_g(pverp)                        ! Height dummy array
     real(core_rknd)  :: zi_g(pverp)                        ! Height dummy array
 
+    ! For writing out (to history files) the values from substeps used
+    ! by CLUBB w.r.t. the mac-mic timesteps
+
+    integer :: turb_nadv_out_nstep     ! # of substeps to write out
+    integer :: iadv                    ! substep index
+    character(len=8) :: numstr         ! a string like "_0001" to append to variable names in history files
+    !-----------------------------------
+
 
     !----- Begin Code -----
     !$OMP PARALLEL
@@ -694,6 +705,7 @@ end subroutine clubb_init_cnst
     call phys_getopts(prog_modal_aero_out=prog_modal_aero, &
                       history_amwg_out=history_amwg, &
                       history_clubb_out=history_clubb,&
+                      turb_nadv_out_nstep_out = turb_nadv_out_nstep, &
                       liqcf_fix_out   = liqcf_fix)
 
     !  Select variables to apply tendencies back to CAM
@@ -932,6 +944,34 @@ end subroutine clubb_init_cnst
     call addfld ('VMAGDP',        horiz_only,     'A',             '-', 'ZM gustiness enhancement')
     call addfld ('VMAGCL',        horiz_only,     'A',             '-', 'CLUBB gustiness enhancement')
     call addfld ('TPERTBLT',        horiz_only,     'A',             'K', 'perturbation temperature at PBL top')
+
+    ! Add output variables from CLUBB's internal substeps
+
+    if (turb_nadv_out_nstep.gt.0) then
+
+       if (single_column) then
+
+          do iadv = 1,turb_nadv_out_nstep
+
+             write(numstr,'(a1,i4.4)') '_',iadv
+
+             call addfld(    'QLIQ'//trim(adjustl(numstr)), (/'lev'/), 'A', 'kg/kg', 'liquid water mixing ratio')
+             call addfld(  'THETAL'//trim(adjustl(numstr)), (/'lev'/), 'A', 'K',     'liquid water potential temperature')
+             call addfld( 'CLDFRAC'//trim(adjustl(numstr)), (/'lev'/), 'A', '1',     'cloud fraction')
+
+             call add_default(    'QLIQ'//trim(adjustl(numstr)), 1, ' ') 
+             call add_default(  'THETAL'//trim(adjustl(numstr)), 1, ' ') 
+             call add_default( 'CLDFRAC'//trim(adjustl(numstr)), 1, ' ') 
+
+          end do
+
+       else
+          call endrun('clubb_ini_cam: when CLUBB is used as the turbulence parameterization,'// &
+                      'turb_nadv_out_nstep.gt.0 can only be used in single-column mode.'        )
+       end if
+    end if
+    !-------------
+
 
     !  Initialize statistics, below are dummy variables
     dum1 = 300._r8
@@ -1216,6 +1256,11 @@ end subroutine clubb_init_cnst
    integer :: icnt, clubbtop
 
    real(r8) :: frac_limit, ic_limit
+
+   ! for single-column mode only:
+   character(len=8) :: numstr         ! a string like "_0001" that corresponds to a single value of CLUBB's timestep counter t
+   integer :: turb_nadv_out_nstep     ! # of CLUBB's time steps to write out fields for
+   !-----
 
   !=====================================================================================
   ! The variables defined as core_rknd is required by the advance_clubb_core_api()
@@ -1570,6 +1615,7 @@ end subroutine clubb_init_cnst
    !-----------------------------------------------------------------------------------------------!
    !-----------------------------------------------------------------------------------------------!
    !-----------------------------------------------------------------------------------------------!
+   call phys_getopts(turb_nadv_out_nstep_out = turb_nadv_out_nstep)
 
    write(char_macmic_it,'(i2.2)') macmic_it
 
@@ -2385,6 +2431,21 @@ end subroutine clubb_init_cnst
           !  output arrays to make them conformable to CAM output
           if (l_stats) call stats_end_timestep_clubb(lchnk,i,out_zt,out_zm,&
                                                      out_radzt,out_radzm,out_sfc)
+
+          !---------------------------------------------------------------------------------------------------
+          ! Only in single-column mode: Send values to history output.
+          ! The outfld calls are placed here in order to capture field values inside 'adv_clubb_core_ts_loop'.
+          ! For multi-column/global simulations, outfld calls should not be placed inside the column loop.
+          !---------------------------------------------------------------------------------------------------
+          if (single_column.and.(t.le.turb_nadv_out_nstep)) then
+
+             write(numstr,'(a1,i4.4)') '_',t
+  
+             call outfld(    'QLIQ'//trim(adjustl(numstr)),        rcm_inout(pverp:2:-1),ncol,lchnk)
+             call outfld(  'THETAL'//trim(adjustl(numstr)),          thlm_in(pverp:2:-1),ncol,lchnk)
+             call outfld( 'CLDFRAC'//trim(adjustl(numstr)), cloud_frac_inout(pverp:2:-1),ncol,lchnk)
+          end if
+          !--------------------
 
       enddo  ! end time loop
       call t_stopf('adv_clubb_core_ts_loop')
