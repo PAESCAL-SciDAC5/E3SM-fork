@@ -27,6 +27,7 @@ module shoc_intr
   use shoc,          only: linear_interp, largeneg
   use spmd_utils,    only: masterproc
   use cam_abortutils, only: endrun
+  use iop_data_mod,   only: single_column
 
   implicit none
 
@@ -85,6 +86,9 @@ module shoc_intr
   logical            :: history_budget
   integer            :: history_budget_histfile_num
   logical            :: micro_do_icesupersat
+
+  logical            :: l_turb_standalone  ! .t. = use EAM's code infrastructure but test SHOC in
+                                           ! a single-column standalone mode
 
   character(len=16)  :: eddy_scheme      ! Default set in phys_control.F90
   character(len=16)  :: deep_scheme      ! Default set in phys_control.F90
@@ -323,8 +327,20 @@ end function shoc_implements_cnst
     ! ----------------------------------------------------------------- !
 
     call phys_getopts(prog_modal_aero_out=prog_modal_aero, &
+                      l_turb_standalone_out=l_turb_standalone, &
                       history_amwg_out = history_amwg, &
                       liqcf_fix_out   = liqcf_fix)
+
+    ! In case l_turb_standalone = .t., check if simulation is in single-column mode.
+    ! Abort if not.  
+
+    if (l_turb_standalone) then
+       if (single_column) then
+          if (masterproc) write(iulog,*)'shoc_init_e3sm: User has set l_turb_standalone = .t. and single_column = .t.'
+       else          
+          call endrun('shoc_init_e3sm: User has set l_turb_standalone = .t. but single_column = .f. Abort.')
+       end if        
+    end if           
 
     ! Define physics buffers indexes
     cld_idx     = pbuf_get_index('CLD')         ! Cloud fraction
@@ -841,9 +857,17 @@ end function shoc_implements_cnst
      end if
    enddo
 
+   ! ------------------------------------------------------------- !
+   ! (Placeholder for now:) Initialization for "standalone" test
+   ! ------------------------------------------------------------- !
+   if (single_column.and.l_turb_standalone) then
+      call endrun('shoc_tend_e3sm: standalone test not yet fully implemented.')
+   end if
+
    ! ------------------------------------------------- !
    ! Actually call SHOC                                !
    ! ------------------------------------------------- !
+   ! Note that this call includes nadv time steps of integration for SHOC
 
    call shoc_main( &
         ncol, pver, pverp, dtime, nadv, & ! Input
