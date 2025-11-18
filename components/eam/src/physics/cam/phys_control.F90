@@ -77,6 +77,11 @@ logical           :: use_subcol_microp    = .false.    ! if .true. then use sub-
 
 logical           :: atm_dep_flux         = .true.     ! true => deposition fluxes will be provided
                                                        ! to the coupler
+
+integer           :: turb_nadv_out_nstep  = 0          ! # of turb parameterization's internal substeps
+                                                       ! for which output will be added to history files.
+                                                       ! 0 means no such output.
+
 logical           :: history_amwg         = .true.     ! output the variables used by the AMWG diag package
 logical           :: history_verbose      = .false.    ! produce verbose output by default
 logical           :: history_vdiag        = .false.    ! output the variables used by the AMWG variability diag package
@@ -232,7 +237,7 @@ subroutine phys_ctl_readnl(nlfile)
       MMF_microphysics_scheme, MMF_orientation_angle, use_MMF, use_ECPP, &
       use_MMF_VT, MMF_VT_wn_max, use_MMF_ESMT, &
       use_crm_accel, crm_accel_factor, crm_accel_uv, &
-      use_subcol_microp, atm_dep_flux, history_amwg, history_verbose, history_vdiag, &
+      use_subcol_microp, atm_dep_flux, turb_nadv_out_nstep, history_amwg, history_verbose, history_vdiag, &
       get_presc_aero_data,history_aerosol, history_aero_optics, &
       is_output_interactive_volc, &
       history_eddy, history_budget,  history_budget_histfile_num, history_waccm, &
@@ -318,6 +323,7 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(crm_accel_uv,                    1 , mpilog,  0, mpicom)
    call mpibcast(use_subcol_microp,               1 , mpilog,  0, mpicom)
    call mpibcast(atm_dep_flux,                    1 , mpilog,  0, mpicom)
+   call mpibcast(turb_nadv_out_nstep,             1 , mpiint,  0, mpicom)
    call mpibcast(history_amwg,                    1 , mpilog,  0, mpicom)
    call mpibcast(history_verbose,                 1 , mpilog,  0, mpicom)
    call mpibcast(history_vdiag,                   1 , mpilog,  0, mpicom)
@@ -583,6 +589,7 @@ end function waccmx_is
 subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, & 
                         microp_scheme_out, &
                         radiation_scheme_out, use_subcol_microp_out, atm_dep_flux_out, &
+                        turb_nadv_out_nstep_out, &
                         history_amwg_out, history_verbose_out, history_vdiag_out, &
                         get_presc_aero_data_out,&
                         is_output_interactive_volc_out,&        
@@ -644,6 +651,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    logical,           intent(out), optional :: crm_accel_uv_out
    logical,           intent(out), optional :: use_subcol_microp_out
    logical,           intent(out), optional :: atm_dep_flux_out
+   integer,           intent(out), optional :: turb_nadv_out_nstep_out
    logical,           intent(out), optional :: history_amwg_out
    logical,           intent(out), optional :: history_verbose_out
    logical,           intent(out), optional :: history_vdiag_out
@@ -777,6 +785,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    if ( present(UCIgaschmbudget_2D_L3_e_out) ) UCIgaschmbudget_2D_L3_e_out = UCIgaschmbudget_2D_L3_e
    if ( present(UCIgaschmbudget_2D_L4_s_out) ) UCIgaschmbudget_2D_L4_s_out = UCIgaschmbudget_2D_L4_s
    if ( present(UCIgaschmbudget_2D_L4_e_out) ) UCIgaschmbudget_2D_L4_e_out = UCIgaschmbudget_2D_L4_e
+   if ( present(turb_nadv_out_nstep_out ) ) turb_nadv_out_nstep_out  = turb_nadv_out_nstep
    if ( present(history_amwg_out        ) ) history_amwg_out         = history_amwg
    if ( present(history_verbose_out     ) ) history_verbose_out         = history_verbose
    if ( present(history_vdiag_out       ) ) history_vdiag_out        = history_vdiag

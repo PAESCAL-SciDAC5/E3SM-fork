@@ -309,6 +309,14 @@ end function shoc_implements_cnst
 
     logical :: history_amwg
 
+    ! For writing out (to history files) the values from substeps used
+    ! by SHOC w.r.t. the mac-mic timesteps
+
+    integer :: turb_nadv_out_nstep     ! # of substeps to write out
+    integer :: iadv                    ! substep index
+    character(len=8) :: numstr         ! a string like "_0001" to append to variable names in history files
+    !-----------------------------------
+
     lq(1:pcnst) = .true.
     edsclr_dim = pcnst
 
@@ -324,6 +332,7 @@ end function shoc_implements_cnst
 
     call phys_getopts(prog_modal_aero_out=prog_modal_aero, &
                       history_amwg_out = history_amwg, &
+                      turb_nadv_out_nstep_out = turb_nadv_out_nstep, &
                       liqcf_fix_out   = liqcf_fix)
 
     ! Define physics buffers indexes
@@ -437,6 +446,24 @@ end function shoc_implements_cnst
     call add_default('PRECIPITATING_ICE_FRAC',1,' ')
     call add_default('LIQ_CLOUD_FRAC',1,' ')
     call add_default('TOT_CLOUD_FRAC',1,' ')
+
+    ! Add output variables from SHOC's internal substeps
+
+    if (turb_nadv_out_nstep.gt.0) then
+       do iadv = 1,turb_nadv_out_nstep
+
+          write(numstr,'(a1,i4.4)') '_',iadv
+
+          call addfld('SHOC_TKE'//trim(adjustl(numstr)), (/'lev'/), 'A', 'm2/s2', 'TKE')
+          call addfld(  'THETAL'//trim(adjustl(numstr)), (/'lev'/), 'A', 'K',     'liquid water potential temperature')
+          call addfld( 'CLDFRAC'//trim(adjustl(numstr)), (/'lev'/), 'A', '1',     'cloud fraction')
+
+          call add_default('SHOC_TKE'//trim(adjustl(numstr)), 1, ' ')
+          call add_default(  'THETAL'//trim(adjustl(numstr)), 1, ' ')
+          call add_default( 'CLDFRAC'//trim(adjustl(numstr)), 1, ' ')
+
+       end do
+    end if
 
     ! ---------------------------------------------------------------!
     ! Initialize SHOC                                                !
@@ -615,6 +642,9 @@ end function shoc_implements_cnst
    real(r8) :: se_dis(pcols), se_a(pcols), se_b(pcols), shoc_s(pcols,pver)
    real(r8) :: shoc_t(pcols,pver)
 
+   ! For SHOC substep output
+   integer :: turb_nadv_out_nstep     ! # of substeps to write out
+
    ! --------------- !
    ! Pointers        !
    ! --------------- !
@@ -655,6 +685,7 @@ end function shoc_implements_cnst
    !------------------------------------------------------------------!
    !------------------------------------------------------------------!
    !------------------------------------------------------------------!
+   call phys_getopts(turb_nadv_out_nstep_out = turb_nadv_out_nstep)
 
  !  Get indicees for cloud and ice mass and cloud and ice number
    ic_limit   = 1.e-12_r8
@@ -702,6 +733,7 @@ end function shoc_implements_cnst
    call pbuf_get_field(pbuf, icwmrdp_idx, dp_icwmr)
    call pbuf_get_field(pbuf, cmfmc_sh_idx, cmfmc_sh)
 
+   !--------------------
    !  Determine SHOC time step.
 
    dtime = shoc_timestep
@@ -731,6 +763,8 @@ end function shoc_implements_cnst
    !  determine number of timesteps SHOC core should be advanced,
    !  host time step divided by SHOC time step
    nadv = max(hdtime/dtime,1._r8)
+
+   !----------------------------
 
    ! Set grid space, in meters. If SCM, set to a grid size representative
    !  of a typical GCM.  Otherwise, compute locally.
@@ -846,6 +880,7 @@ end function shoc_implements_cnst
    ! ------------------------------------------------- !
 
    call shoc_main( &
+        turb_nadv_out_nstep, lchnk, & ! Input
         ncol, pver, pverp, dtime, nadv, & ! Input
         host_dx_in(:ncol), host_dy_in(:ncol), thv(:ncol,:),& ! Input
         zt_g(:ncol,:), zi_g(:ncol,:), state%pmid(:ncol,:pver), state%pint(:ncol,:pverp), state1%pdel(:ncol,:pver),& ! Input
