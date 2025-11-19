@@ -331,17 +331,6 @@ end function shoc_implements_cnst
                       history_amwg_out = history_amwg, &
                       liqcf_fix_out   = liqcf_fix)
 
-    ! In case l_turb_standalone = .t., check if simulation is in single-column mode.
-    ! Abort if not.  
-
-    if (l_turb_standalone) then
-       if (single_column) then
-          if (masterproc) write(iulog,*)'shoc_init_e3sm: User has set l_turb_standalone = .t. and single_column = .t.'
-       else          
-          call endrun('shoc_init_e3sm: User has set l_turb_standalone = .t. but single_column = .f. Abort.')
-       end if        
-    end if           
-
     ! Define physics buffers indexes
     cld_idx     = pbuf_get_index('CLD')         ! Cloud fraction
     tot_cloud_frac_idx     = pbuf_get_index('TOT_CLOUD_FRAC')         ! Cloud fraction

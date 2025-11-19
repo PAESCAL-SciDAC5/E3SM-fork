@@ -216,7 +216,7 @@ integer :: cflx_cpl_opt = 1  ! When to apply surface tracer fluxes (not includin
 contains
 !======================================================================= 
 
-subroutine phys_ctl_readnl(nlfile)
+subroutine phys_ctl_readnl(nlfile,single_column_in)
 
    use namelist_utils,  only: find_group_name
    use units,           only: getunit, freeunit
@@ -225,6 +225,7 @@ subroutine phys_ctl_readnl(nlfile)
    use physconst,       only: pi
 
    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
+   logical, intent(in) :: single_column_in ! is the simulation in a single-column mode 
 
    ! Local variables
    integer :: unitn, ierr
@@ -285,6 +286,7 @@ subroutine phys_ctl_readnl(nlfile)
       if (get_presc_aero_data) then
         history_aerosol = .true.
       endif
+
 
    end if
    if (history_chemdyg_summary) then
@@ -548,6 +550,15 @@ subroutine phys_ctl_readnl(nlfile)
      endif
    endif
     
+   ! Allow l_turb_standalone = .t. only in single-column mode.
+   if (l_turb_standalone) then
+      if (single_column_in) then
+         if (masterproc) write(iulog,*) subname//': User has set l_turb_standalone = .t. and single_column = .t.'
+      else      
+         call endrun(subname//': User has set l_turb_standalone = .t. but single_column = .f. Abort.')
+      end if        
+   end if
+
 end subroutine phys_ctl_readnl
 
 !===============================================================================

@@ -702,17 +702,6 @@ end subroutine clubb_init_cnst
                       history_clubb_out=history_clubb,&
                       liqcf_fix_out   = liqcf_fix)
 
-    ! In case l_turb_standalone = .t., check if simulation is in single-column mode.
-    ! Abort if not.
-
-    if (l_turb_standalone) then
-       if (single_column) then
-          if (masterproc) write(iulog,*)'clubb_ini_cam: User has set l_turb_standalone = .t. and single_column = .t.'
-       else
-          call endrun('clubb_ini_cam: User has set l_turb_standalone = .t. but single_column = .f. Abort.')
-       end if
-    end if
-
     !  Select variables to apply tendencies back to CAM
 
     ! Initialize all consituents to true to start
