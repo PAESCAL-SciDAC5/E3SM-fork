@@ -344,11 +344,23 @@ subroutine interplevs( inputdata,   dplevs,   nlev, &
 !     fill in the missing end values 
 !           (usually  done if this is global model dataset)
 !
+! Note from 2025-12-03 (hui.wan@pnnl.gov):
+! The original start and end values of the loop variables lead to the following results:
+!  - If the model domain exceeds the data domain on one side or both (top and/or bottom),
+!    not only the extra levels, but also the level(s) that is (are) just inside the data domain,
+!    are filled with values at the corresponding end(s) of the data domain. This is fine.
+!  - If the model domain is smaller than the data domain on one side or both sides,
+!    then the first and/or last level of data will always be copied to the first and/or last level
+!    of the model, which can cause big jumps at model top and/or bottom.
+! The revised loops only copy data to model levels that are outside the data domain.
+
    if ( fill_ends ) then 
-      do i=1, mstart_lev
+     !do i=1, mstart_lev
+      do i=1, mstart_lev-1
          outdata(i) = inputdata(1)
       end do
-      do i= mend_lev, plev
+     !do i= mend_lev, plev
+      do i= mend_lev+1, plev
          outdata(i) = inputdata(nlev)
       end do
    end if
