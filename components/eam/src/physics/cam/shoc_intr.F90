@@ -95,6 +95,9 @@ module shoc_intr
 
   real(r8), parameter :: unset_r8 = huge(1.0_r8)
 
+  real(r8) :: host_dx_dy_nml = unset_r8    ! Host model's horizontal grid spacing (m) read from namelist.
+                                           ! This variable is used only in SCM mode.
+
   real(r8) :: shoc_timestep = unset_r8  ! Default SHOC timestep set in namelist
   real(r8) :: dp1
 
@@ -338,7 +341,12 @@ end function shoc_implements_cnst
                       l_turb_standalone_out=l_turb_standalone, &
                       history_amwg_out = history_amwg, &
                       turb_nadv_out_nstep_out = turb_nadv_out_nstep, &
+                      host_dx_dy_out  = host_dx_dy_nml, &
                       liqcf_fix_out   = liqcf_fix)
+
+    write(iulog,*) 'shoc_init_e3sm: l_turb_standalone   = ',l_turb_standalone
+    write(iulog,*) 'shoc_init_e3sm: host_dx_dy_nml      = ',host_dx_dy_nml
+    write(iulog,*) 'shoc_init_e3sm: turb_nadv_out_nstep = ',turb_nadv_out_nstep
 
     ! Define physics buffers indexes
     cld_idx     = pbuf_get_index('CLD')         ! Cloud fraction
@@ -774,8 +782,8 @@ end function shoc_implements_cnst
    ! Set grid space, in meters. If SCM, set to a grid size representative
    !  of a typical GCM.  Otherwise, compute locally.
    if (single_column .and. .not. dp_crm) then
-     host_dx_in(:) = 100000._r8
-     host_dy_in(:) = 100000._r8
+     host_dx_in(:) = host_dx_dy_nml
+     host_dy_in(:) = host_dx_dy_nml
    else if (dp_crm) then
      call grid_size_planar_uniform(host_dx, host_dy)
      host_dx_in(:) = host_dx

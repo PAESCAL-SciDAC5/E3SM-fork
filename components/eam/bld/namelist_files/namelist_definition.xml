@@ -3351,6 +3351,16 @@ liq cloud fraction bug in macro and micro physics
 Default: .false.
 </entry>
 
+<!-- host model dx and dy assumed for turbulence parameterization -->
+<entry id="host_dx_dy" type="real" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Host model delta-x and delta-y (same value) assumed for
+- CLUBB;
+- SHOC when called in SCM mode.
+Default: 100000.
+Unit: m
+</entry>
+
 <!-- SHOC timestep -->
 <entry id="shoc_timestep" type="real" category="pblrad"
        group="shocpbl_diff_nl" valid_values="" >
