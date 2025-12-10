@@ -39,6 +39,9 @@ module clubb_intr
 
   use zm_conv,      only: zm_microp
 
+  use iop_data_mod,   only: single_column
+  use cam_abortutils, only: endrun
+
   implicit none
 
   private
@@ -129,6 +132,8 @@ module clubb_intr
     l_implemented    = .true.,        &  ! Implemented in a host model (always true)
     l_host_applies_sfc_fluxes = .false.  ! Whether the host model applies the surface fluxes
 
+  logical            :: l_turb_standalone  ! .t. = use EAM's code infrastructure but test CLUBB in
+                                           ! a single-column standalone mode
   logical            :: do_tms
   logical            :: linearize_pbl_winds
   logical            :: lq(pcnst)
@@ -703,6 +708,7 @@ end subroutine clubb_init_cnst
     ! ----------------------------------------------------------------- !
 
     call phys_getopts(prog_modal_aero_out=prog_modal_aero, &
+                      l_turb_standalone_out=l_turb_standalone, &
                       history_amwg_out=history_amwg, &
                       history_clubb_out=history_clubb,&
                       turb_nadv_out_nstep_out = turb_nadv_out_nstep, &
@@ -2326,6 +2332,16 @@ end subroutine clubb_init_cnst
          pdf_params_zm%mixt_frac = pdf_zm_mixt_frac_inout
       end if
 
+      ! ------------------------------------------------------------- !
+      ! (Placeholder for now:) Initialization for "standalone" test
+      ! ------------------------------------------------------------- !
+      if (single_column.and.l_turb_standalone) then
+         call endrun('clubb_tend_cam: standalone test not yet fully implemented.')
+      end if
+
+      ! ------------------------------------------------------------- !
+      ! Time integration for CLUBB only
+      ! ------------------------------------------------------------- !
       call t_startf('adv_clubb_core_ts_loop')
       do t=1,nadv    ! do needed number of "sub" timesteps for each CAM step
 
