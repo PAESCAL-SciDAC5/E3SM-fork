@@ -27,6 +27,7 @@ module shoc_intr
   use shoc,          only: linear_interp, largeneg
   use spmd_utils,    only: masterproc
   use cam_abortutils, only: endrun
+  use iop_data_mod,   only: single_column
 
   implicit none
 
@@ -85,6 +86,9 @@ module shoc_intr
   logical            :: history_budget
   integer            :: history_budget_histfile_num
   logical            :: micro_do_icesupersat
+
+  logical            :: l_turb_standalone  ! .t. = use EAM's code infrastructure but test SHOC in
+                                           ! a single-column standalone mode
 
   character(len=16)  :: eddy_scheme      ! Default set in phys_control.F90
   character(len=16)  :: deep_scheme      ! Default set in phys_control.F90
@@ -331,6 +335,7 @@ end function shoc_implements_cnst
     ! ----------------------------------------------------------------- !
 
     call phys_getopts(prog_modal_aero_out=prog_modal_aero, &
+                      l_turb_standalone_out=l_turb_standalone, &
                       history_amwg_out = history_amwg, &
                       turb_nadv_out_nstep_out = turb_nadv_out_nstep, &
                       liqcf_fix_out   = liqcf_fix)
@@ -875,9 +880,17 @@ end function shoc_implements_cnst
      end if
    enddo
 
+   ! ------------------------------------------------------------- !
+   ! (Placeholder for now:) Initialization for "standalone" test
+   ! ------------------------------------------------------------- !
+   if (single_column.and.l_turb_standalone) then
+      call endrun('shoc_tend_e3sm: standalone test not yet fully implemented.')
+   end if
+
    ! ------------------------------------------------- !
    ! Actually call SHOC                                !
    ! ------------------------------------------------- !
+   ! Note that this call includes nadv time steps of integration for SHOC
 
    call shoc_main( &
         turb_nadv_out_nstep, lchnk, & ! Input

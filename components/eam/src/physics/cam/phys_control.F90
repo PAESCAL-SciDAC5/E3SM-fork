@@ -207,6 +207,9 @@ integer :: i_rad_scheme    = 2  ! or any value other than 0 or 1: the default ra
                                 ! 0: no radiation
                                 ! 1: LWP-based simplification from DYCOMS-II RF01 (Stevens et al., 2005)
 
+logical :: l_turb_standalone = .false. ! Use EAM's code infrastructure but test the turbulence parameterization
+                                       ! in a single-column standalone mode.
+
 logical :: modal_strat_sulfate_aod_treatment = .false.
 ! Numerical schemes for process coupling
 
@@ -218,7 +221,7 @@ integer :: cflx_cpl_opt = 1  ! When to apply surface tracer fluxes (not includin
 contains
 !======================================================================= 
 
-subroutine phys_ctl_readnl(nlfile)
+subroutine phys_ctl_readnl(nlfile,single_column_in)
 
    use namelist_utils,  only: find_group_name
    use units,           only: getunit, freeunit
@@ -227,6 +230,7 @@ subroutine phys_ctl_readnl(nlfile)
    use physconst,       only: pi
 
    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
+   logical, intent(in) :: single_column_in ! is the simulation in a single-column mode 
 
    ! Local variables
    integer :: unitn, ierr
@@ -263,6 +267,7 @@ subroutine phys_ctl_readnl(nlfile)
       cflx_cpl_opt, &
       l_tracer_aero, l_vdiff, l_rayleigh, l_gw_drag, l_ac_energy_chk, &
       l_bc_energy_fix, l_dry_adj, l_st_mac, l_st_mic, i_rad_scheme, prc_coef1,prc_exp,prc_exp1,cld_sed,mg_prc_coeff_fix, &
+      l_turb_standalone, &
       rrtmg_temp_fix, ideal_phys_option, &
       modal_strat_sulfate_aod_treatment
    !-----------------------------------------------------------------------------
@@ -286,6 +291,7 @@ subroutine phys_ctl_readnl(nlfile)
       if (get_presc_aero_data) then
         history_aerosol = .true.
       endif
+
 
    end if
    if (history_chemdyg_summary) then
@@ -401,6 +407,7 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(l_st_mac,                        1 , mpilog,  0, mpicom)
    call mpibcast(l_st_mic,                        1 , mpilog,  0, mpicom)
    call mpibcast(i_rad_scheme,                    1 , mpiint,  0, mpicom)
+   call mpibcast(l_turb_standalone,               1 , mpilog,  0, mpicom)
    call mpibcast(cld_macmic_num_steps,            1 , mpiint,  0, mpicom)
    call mpibcast(prc_coef1,                       1 , mpir8,   0, mpicom)
    call mpibcast(prc_exp,                         1 , mpir8,   0, mpicom)
@@ -549,6 +556,15 @@ subroutine phys_ctl_readnl(nlfile)
      endif
    endif
     
+   ! Allow l_turb_standalone = .t. only in single-column mode.
+   if (l_turb_standalone) then
+      if (single_column_in) then
+         if (masterproc) write(iulog,*) subname//': User has set l_turb_standalone = .t. and single_column = .t.'
+      else      
+         call endrun(subname//': User has set l_turb_standalone = .t. but single_column = .f. Abort.')
+      end if        
+   end if
+
 end subroutine phys_ctl_readnl
 
 !===============================================================================
@@ -620,6 +636,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
                        ,cflx_cpl_opt_out &
                        ,l_tracer_aero_out, l_vdiff_out, l_rayleigh_out, l_gw_drag_out, l_ac_energy_chk_out  &
                        ,l_bc_energy_fix_out, l_dry_adj_out, l_st_mac_out, l_st_mic_out, i_rad_scheme_out  &
+                       ,l_turb_standalone_out &
                        ,prc_coef1_out,prc_exp_out,prc_exp1_out, cld_sed_out,mg_prc_coeff_fix_out,rrtmg_temp_fix_out &
                        ,modal_strat_sulfate_aod_treatment_out)
 
@@ -727,6 +744,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    logical,           intent(out), optional :: l_st_mac_out
    logical,           intent(out), optional :: l_st_mic_out
    integer,           intent(out), optional :: i_rad_scheme_out
+   logical,           intent(out), optional :: l_turb_standalone_out
    logical,           intent(out), optional :: mg_prc_coeff_fix_out
    logical,           intent(out), optional :: rrtmg_temp_fix_out
    logical,           intent(out), optional :: modal_strat_sulfate_aod_treatment_out
@@ -834,6 +852,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    if ( present(l_st_mac_out            ) ) l_st_mac_out          = l_st_mac
    if ( present(l_st_mic_out            ) ) l_st_mic_out          = l_st_mic
    if ( present(i_rad_scheme_out        ) ) i_rad_scheme_out      = i_rad_scheme
+   if ( present(l_turb_standalone_out   ) ) l_turb_standalone_out = l_turb_standalone
    if ( present(cld_macmic_num_steps_out) ) cld_macmic_num_steps_out = cld_macmic_num_steps
    if ( present(prc_coef1_out           ) ) prc_coef1_out            = prc_coef1
    if ( present(prc_exp_out             ) ) prc_exp_out              = prc_exp
