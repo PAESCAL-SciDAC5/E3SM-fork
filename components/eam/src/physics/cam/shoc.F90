@@ -595,7 +595,7 @@ subroutine shoc_main ( &
            write(102,*) 'time, ilay, u, v, tke, qv, qc, T, P'
       end if     
       do kk=nlev,1,-1
-         time_output =  t * 60  
+         time_output =  t * 60 !  hardwired assuming turbulent timestep is 60 s, need to change. 
          ilay_output =  kk-1   !  ilay is in C++ indexing convention
          u_output = u_wind(1,kk)
          v_output = v_wind(1,kk)
