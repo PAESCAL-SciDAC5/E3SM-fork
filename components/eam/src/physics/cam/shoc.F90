@@ -14,6 +14,8 @@ module shoc
 
   use physics_utils, only: rtype, rtype8, itype, btype
   use scream_abortutils, only: endscreamrun
+  use spmd_utils, only: masterproc
+  use cam_logfile, only: iulog
 
 ! Bit-for-bit math functions.
 #ifdef SCREAM_CONFIG_IS_CMAKE
@@ -408,6 +410,21 @@ subroutine shoc_main ( &
               se_a(shcol),ke_a(shcol),&
               wv_a(shcol),wl_a(shcol)
 
+  ! Variables for SHOC text output 
+
+  integer :: kk
+  integer :: time_output
+  integer :: ilay_output
+  real(rtype) :: u_output
+  real(rtype) :: v_output
+  real(rtype) :: tke_output
+  real(rtype) :: qv_output
+  real(rtype) :: qc_output
+  real(rtype) :: t_output
+  real(rtype) :: p_output
+
+
+
 #ifdef SCREAM_CONFIG_IS_CMAKE
   integer :: clock_count1, clock_count_rate, clock_count_max, clock_count2, clock_count_diff
 #endif
@@ -437,6 +454,7 @@ subroutine shoc_main ( &
 #ifdef SCREAM_CONFIG_IS_CMAKE
     call system_clock(clock_count1, clock_count_rate, clock_count_max)
 #endif
+
 
   ! Compute integrals of static energy, kinetic energy, water vapor, and liquid water
   ! for the computation of total energy before SHOC is called.  This is for an
@@ -567,8 +585,39 @@ subroutine shoc_main ( &
        call outfld('SHOC_TKE'//trim(adjustl(numstr)),         tke,shcol,lchnk)
        call outfld(  'THETAL'//trim(adjustl(numstr)),      thetal,shcol,lchnk)
        call outfld( 'CLDFRAC'//trim(adjustl(numstr)),shoc_cldfrac,shcol,lchnk)
+
+          ! Write out fields in specified format.
+          ! Output file will just be named 'fort.102'.
+
+   if(masterproc) then
+
+      if(t.eq.1) then 
+           write(102,*) 'time, ilay, u, v, tke, qv, qc, T, P'
+      end if     
+      do kk=nlev,1,-1
+         time_output =  t * 60  
+         ilay_output =  kk-1   !  ilay is in C++ indexing convention
+         u_output = u_wind(1,kk)
+         v_output = v_wind(1,kk)
+         tke_output = tke(1,kk)
+         qv_output = qw(1,kk) - shoc_ql(1,kk)
+         qc_output = shoc_ql(1,kk)
+         t_output = thetal(1,kk) / inv_exner(1,kk) + lcond/cp * shoc_ql(1,kk)
+         p_output = pres(1,kk)
+         write(102,104) time_output, ilay_output, u_output, v_output, tke_output, qv_output, qc_output, t_output, p_output
+      end do
+
+   end if
+
+104       format(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)
+
+
+
+
+
     end if
     !---------------------------------------------
+
 
   enddo ! end time loop
 
