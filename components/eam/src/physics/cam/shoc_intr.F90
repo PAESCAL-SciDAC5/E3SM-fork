@@ -91,6 +91,12 @@ module shoc_intr
   logical            :: l_turb_standalone  ! .t. = use EAM's code infrastructure but test SHOC in
                                            ! a single-column standalone mode
 
+  logical            :: l_shoc_outer_loop = .false.
+                                           ! .false. = experiment 1: single shoc_main call with nadv=360,
+                                           !           output written inside shoc.F90 (shoc_output_nadv360x1.txt)
+                                           ! .true.  = experiment 2: 360 shoc_main calls with nadv=1,
+                                           !           output written from shoc_intr (shoc_output_nadv1x360.txt)
+
   character(len=16)  :: eddy_scheme      ! Default set in phys_control.F90
   character(len=16)  :: deep_scheme      ! Default set in phys_control.F90
 
@@ -716,7 +722,10 @@ end function shoc_implements_cnst
   integer :: kt_cxx_read
   integer :: ierr
   integer :: unitn
+  integer :: unitn_out
   integer :: nstep
+  integer :: t_outer
+  integer :: n_outer_steps
 
   integer :: time_output
   integer :: ilay_output
@@ -1002,8 +1011,14 @@ end function shoc_implements_cnst
 
   host_dx_input(:) = 1000._r8
   host_dy_input(:) = 1000._r8
-!  nadv_input = 100
-  nadv_input = 360 
+
+  if (l_shoc_outer_loop) then
+     nadv_input = 1
+     n_outer_steps = 360
+  else
+     nadv_input = 360
+     n_outer_steps = 1
+  end if
 
   
    if(masterproc) then
@@ -1113,29 +1128,96 @@ end function shoc_implements_cnst
          
    end if
     
-   !  In call to shoc_main, use _input variables in place of the default variables 
-      
-     
-   call shoc_main( &
-        turb_nadv_out_nstep, lchnk, & ! Input
-        ncol, pver, pverp, dtime, nadv_input, & ! Input
-        host_dx_input(:ncol), host_dy_input(:ncol), thv_input(:ncol,:),& ! Input
-        zt_g_input(:ncol,:pver), zi_g_input(:ncol,:pverp), pres_input(:ncol,:pver), presi_input(:ncol,:pverp), pdel_input(:ncol,:pver),& ! Input
-        wpthlp_sfc_input(:ncol), wprtp_sfc_input(:ncol), upwp_sfc_input(:ncol), vpwp_sfc_input(:ncol), & ! Input
-        wtracer_sfc(:ncol,:), edsclr_dim, wm_zt_input(:ncol,:), & ! Input
-        inv_exner_input(:ncol,:),state1%phis(:ncol), & ! Input
-        shoc_s(:ncol,:), tke_zt_input(:ncol,:), thlm_input(:ncol,:), rtm_input(:ncol,:), & ! Input/Ouput
-        um_input(:ncol,:), vm_input(:ncol,:), edsclr_in(:ncol,:,:), & ! Input/Output
-        wthv(:ncol,:),tkh_input(:ncol,:),tk_input(:ncol,:), & ! Input/Output
-        rcm_input(:ncol,:),cloud_frac_input(:ncol,:), & ! Input/Output
-        pblh(:ncol), & ! Output
-        shoc_mix_out(:ncol,:), isotropy_out(:ncol,:), & ! Output (diagnostic)
-        w_sec_out(:ncol,:), thl_sec_out(:ncol,:), qw_sec_out(:ncol,:), qwthl_sec_out(:ncol,:), & ! Output (diagnostic)
-        wthl_sec_out(:ncol,:), wqw_sec_out(:ncol,:), wtke_sec_out(:ncol,:), & ! Output (diagnostic)
-        uw_sec_out(:ncol,:), vw_sec_out(:ncol,:), w3_out(:ncol,:), & ! Output (diagnostic)
-        wqls_out(:ncol,:),brunt_out(:ncol,:),rcm2(:ncol,:)) ! Output (diagnostic)
+   !  In call to shoc_main, use _input variables in place of the default variables
+   !
+   !  l_shoc_outer_loop = .false. (experiment 1):
+   !    Single shoc_main call with nadv=360. Output written inside shoc.F90 (shoc_output_nadv360x1.txt)
+   !  l_shoc_outer_loop = .true.  (experiment 2):
+   !    360 shoc_main calls with nadv=1. Output written here (shoc_output_nadv1x360.txt)
 
-   ! for '_input' that happend to be intent(inout), assign the output values to the variables the rest of the code is expecting.
+   if (l_shoc_outer_loop) then
+
+      ! Experiment 2: outer loop with nadv=1, output file from shoc_intr
+      ! Suppress the write inside shoc.F90 by passing turb_nadv_out_nstep=0
+
+      if(masterproc) then
+         unitn_out = getunit()
+         open(unitn_out, file='shoc_output_nadv1x360.txt', status='replace')
+         write(unitn_out,*) 'time, ilay, u, v, tke, qv, qc, T, P'
+      end if
+
+      do t_outer = 1, n_outer_steps
+
+        call shoc_main( &
+             0, lchnk, & ! Input (turb_nadv_out_nstep=0 to suppress internal write)
+             ncol, pver, pverp, dtime, nadv_input, & ! Input
+             host_dx_input(:ncol), host_dy_input(:ncol), thv_input(:ncol,:),& ! Input
+             zt_g_input(:ncol,:pver), zi_g_input(:ncol,:pverp), pres_input(:ncol,:pver), presi_input(:ncol,:pverp), pdel_input(:ncol,:pver),& ! Input
+             wpthlp_sfc_input(:ncol), wprtp_sfc_input(:ncol), upwp_sfc_input(:ncol), vpwp_sfc_input(:ncol), & ! Input
+             wtracer_sfc(:ncol,:), edsclr_dim, wm_zt_input(:ncol,:), & ! Input
+             inv_exner_input(:ncol,:),state1%phis(:ncol), & ! Input
+             shoc_s(:ncol,:), tke_zt_input(:ncol,:), thlm_input(:ncol,:), rtm_input(:ncol,:), & ! Input/Ouput
+             um_input(:ncol,:), vm_input(:ncol,:), edsclr_in(:ncol,:,:), & ! Input/Output
+             wthv(:ncol,:),tkh_input(:ncol,:),tk_input(:ncol,:), & ! Input/Output
+             rcm_input(:ncol,:),cloud_frac_input(:ncol,:), & ! Input/Output
+             pblh(:ncol), & ! Output
+             shoc_mix_out(:ncol,:), isotropy_out(:ncol,:), & ! Output (diagnostic)
+             w_sec_out(:ncol,:), thl_sec_out(:ncol,:), qw_sec_out(:ncol,:), qwthl_sec_out(:ncol,:), & ! Output (diagnostic)
+             wthl_sec_out(:ncol,:), wqw_sec_out(:ncol,:), wtke_sec_out(:ncol,:), & ! Output (diagnostic)
+             uw_sec_out(:ncol,:), vw_sec_out(:ncol,:), w3_out(:ncol,:), & ! Output (diagnostic)
+             wqls_out(:ncol,:),brunt_out(:ncol,:),rcm2(:ncol,:)) ! Output (diagnostic)
+
+        ! Write output variables after each shoc_main call
+        if(masterproc) then
+           do kk = pver, 1, -1
+              time_output = t_outer * 60
+              ilay_output = kk - 1
+              u_output = um_input(1,kk)
+              v_output = vm_input(1,kk)
+              tke_output = tke_zt_input(1,kk)
+              qv_output = rtm_input(1,kk) - rcm_input(1,kk)
+              qc_output = rcm_input(1,kk)
+              t_output = thlm_input(1,kk) / inv_exner_input(1,kk) + latvap/cpair * rcm_input(1,kk)
+              p_output = pres_input(1,kk)
+              write(unitn_out,104) time_output, ilay_output, u_output, v_output, tke_output, qv_output, qc_output, t_output, p_output
+           end do
+        end if
+
+      end do  ! end t_outer loop
+
+104   format(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)
+
+      if(masterproc) then
+         close(unitn_out)
+         call freeunit(unitn_out)
+      end if
+
+   else
+
+      ! Experiment 1: single shoc_main call with nadv=360, output written inside shoc.F90
+
+      call shoc_main( &
+           turb_nadv_out_nstep, lchnk, & ! Input
+           ncol, pver, pverp, dtime, nadv_input, & ! Input
+           host_dx_input(:ncol), host_dy_input(:ncol), thv_input(:ncol,:),& ! Input
+           zt_g_input(:ncol,:pver), zi_g_input(:ncol,:pverp), pres_input(:ncol,:pver), presi_input(:ncol,:pverp), pdel_input(:ncol,:pver),& ! Input
+           wpthlp_sfc_input(:ncol), wprtp_sfc_input(:ncol), upwp_sfc_input(:ncol), vpwp_sfc_input(:ncol), & ! Input
+           wtracer_sfc(:ncol,:), edsclr_dim, wm_zt_input(:ncol,:), & ! Input
+           inv_exner_input(:ncol,:),state1%phis(:ncol), & ! Input
+           shoc_s(:ncol,:), tke_zt_input(:ncol,:), thlm_input(:ncol,:), rtm_input(:ncol,:), & ! Input/Ouput
+           um_input(:ncol,:), vm_input(:ncol,:), edsclr_in(:ncol,:,:), & ! Input/Output
+           wthv(:ncol,:),tkh_input(:ncol,:),tk_input(:ncol,:), & ! Input/Output
+           rcm_input(:ncol,:),cloud_frac_input(:ncol,:), & ! Input/Output
+           pblh(:ncol), & ! Output
+           shoc_mix_out(:ncol,:), isotropy_out(:ncol,:), & ! Output (diagnostic)
+           w_sec_out(:ncol,:), thl_sec_out(:ncol,:), qw_sec_out(:ncol,:), qwthl_sec_out(:ncol,:), & ! Output (diagnostic)
+           wthl_sec_out(:ncol,:), wqw_sec_out(:ncol,:), wtke_sec_out(:ncol,:), & ! Output (diagnostic)
+           uw_sec_out(:ncol,:), vw_sec_out(:ncol,:), w3_out(:ncol,:), & ! Output (diagnostic)
+           wqls_out(:ncol,:),brunt_out(:ncol,:),rcm2(:ncol,:)) ! Output (diagnostic)
+
+   end if  ! l_shoc_outer_loop
+
+   ! for '_input' that happen to be intent(inout), assign the output values to the variables the rest of the code is expecting.
 
    tke_zt(:ncol,:) = tke_zt_input(:ncol,:)
    thlm(:ncol,:) = thlm_input(:ncol,:)

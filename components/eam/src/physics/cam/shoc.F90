@@ -16,6 +16,7 @@ module shoc
   use scream_abortutils, only: endscreamrun
   use spmd_utils, only: masterproc
   use cam_logfile, only: iulog
+  use units, only: getunit, freeunit
 
 ! Bit-for-bit math functions.
 #ifdef SCREAM_CONFIG_IS_CMAKE
@@ -410,9 +411,10 @@ subroutine shoc_main ( &
               se_a(shcol),ke_a(shcol),&
               wv_a(shcol),wl_a(shcol)
 
-  ! Variables for SHOC text output 
+  ! Variables for SHOC text output
 
   integer :: kk
+  integer :: unitn_out
   integer :: time_output
   integer :: ilay_output
   real(rtype) :: u_output
@@ -464,6 +466,13 @@ subroutine shoc_main ( &
      shcol,nlev,host_dse,pdel,&             ! Input
      qw,shoc_ql,u_wind,v_wind,&             ! Input
      se_b,ke_b,wv_b,wl_b)                   ! Input/Output
+
+  ! Open output file for SHOC text output (experiment 1)
+  if(masterproc .and. turb_nadv_out_nstep.gt.0) then
+     unitn_out = getunit()
+     open(unitn_out, file='shoc_output_nadv360x1.txt', status='replace')
+     write(unitn_out,*) 'time, ilay, u, v, tke, qv, qc, T, P'
+  end if
 
   do t=1,nadv
 
@@ -586,16 +595,11 @@ subroutine shoc_main ( &
        call outfld(  'THETAL'//trim(adjustl(numstr)),      thetal,shcol,lchnk)
        call outfld( 'CLDFRAC'//trim(adjustl(numstr)),shoc_cldfrac,shcol,lchnk)
 
-          ! Write out fields in specified format.
-          ! Output file will just be named 'fort.102'.
+          ! Write out fields to shoc_output_nadv360x1.txt
 
    if(masterproc) then
-
-      if(t.eq.1) then 
-           write(102,*) 'time, ilay, u, v, tke, qv, qc, T, P'
-      end if     
       do kk=nlev,1,-1
-         time_output =  t * 60  
+         time_output =  t * 60
          ilay_output =  kk-1   !  ilay is in C++ indexing convention
          u_output = u_wind(1,kk)
          v_output = v_wind(1,kk)
@@ -604,9 +608,8 @@ subroutine shoc_main ( &
          qc_output = shoc_ql(1,kk)
          t_output = thetal(1,kk) / inv_exner(1,kk) + lcond/cp * shoc_ql(1,kk)
          p_output = pres(1,kk)
-         write(102,104) time_output, ilay_output, u_output, v_output, tke_output, qv_output, qc_output, t_output, p_output
+         write(unitn_out,104) time_output, ilay_output, u_output, v_output, tke_output, qv_output, qc_output, t_output, p_output
       end do
-
    end if
 
 104       format(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)
@@ -620,6 +623,12 @@ subroutine shoc_main ( &
 
 
   enddo ! end time loop
+
+  ! Close output file
+  if(masterproc .and. turb_nadv_out_nstep.gt.0) then
+     close(unitn_out)
+     call freeunit(unitn_out)
+  end if
 
   ! End SHOC parameterization
 
