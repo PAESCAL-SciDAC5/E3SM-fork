@@ -24,7 +24,7 @@ module shoc_intr
   use pbl_utils,     only: calc_ustar, calc_obklen
   use perf_mod,      only: t_startf, t_stopf
   use cam_logfile,   only: iulog
-  use shoc,          only: linear_interp, largeneg
+  use shoc,          only: linear_interp, largeneg, shoc_output_prefix
   use spmd_utils,    only: masterproc
   use cam_abortutils, only: endrun
   use iop_data_mod,   only: single_column
@@ -91,11 +91,11 @@ module shoc_intr
   logical            :: l_turb_standalone  ! .t. = use EAM's code infrastructure but test SHOC in
                                            ! a single-column standalone mode
 
-  logical            :: l_shoc_outer_loop = .false.
+  logical            :: l_shoc_outer_loop = .true.
                                            ! .false. = experiment 1: single shoc_main call with nadv=360,
-                                           !           output written inside shoc.F90 (shoc_output_nadv360x1.txt)
+                                           !           output written inside shoc.F90 (*_exp1.txt)
                                            ! .true.  = experiment 2: 360 shoc_main calls with nadv=1,
-                                           !           output written from shoc_intr (shoc_output_nadv1x360.txt)
+                                           !           output written from shoc_intr (*_exp2.txt)
 
   character(len=16)  :: eddy_scheme      ! Default set in phys_control.F90
   character(len=16)  :: deep_scheme      ! Default set in phys_control.F90
@@ -240,7 +240,8 @@ end function shoc_implements_cnst
                                shoc_w2tune, shoc_length_fac, shoc_c_diag_3rd_mom, &
                                shoc_lambda_low, shoc_lambda_high, shoc_lambda_slope, &
                                shoc_lambda_thresh, shoc_Ckh, shoc_Ckm, shoc_Ckh_s, &
-                               shoc_Ckm_s
+                               shoc_Ckm_s, shoc_output_prefix, &
+                               l_shoc_outer_loop
 
     !  Read namelist to determine if SHOC history should be called
     if (masterproc) then
@@ -276,6 +277,8 @@ end function shoc_implements_cnst
       call mpibcast(shoc_Ckm,                1,   mpir8,   0, mpicom)
       call mpibcast(shoc_Ckh_s,              1,   mpir8,   0, mpicom)
       call mpibcast(shoc_Ckm_s,              1,   mpir8,   0, mpicom)
+      call mpibcast(shoc_output_prefix, len(shoc_output_prefix), mpichar, 0, mpicom)
+      call mpibcast(l_shoc_outer_loop,        1,   mpilog,  0, mpicom)
 #endif
 
   end subroutine shoc_readnl
@@ -723,6 +726,7 @@ end function shoc_implements_cnst
   integer :: ierr
   integer :: unitn
   integer :: unitn_out
+  character(len=512) :: outfname
   integer :: nstep
   integer :: t_outer
   integer :: n_outer_steps
@@ -1014,9 +1018,9 @@ end function shoc_implements_cnst
 
   if (l_shoc_outer_loop) then
      nadv_input = 1
-     n_outer_steps = 360
+     n_outer_steps = nadv
   else
-     nadv_input = 360
+     nadv_input = nadv
      n_outer_steps = 1
   end if
 
@@ -1131,9 +1135,9 @@ end function shoc_implements_cnst
    !  In call to shoc_main, use _input variables in place of the default variables
    !
    !  l_shoc_outer_loop = .false. (experiment 1):
-   !    Single shoc_main call with nadv=360. Output written inside shoc.F90 (shoc_output_nadv360x1.txt)
+   !    Single shoc_main call with nadv=360. Output written inside shoc.F90 (*_exp1.txt)
    !  l_shoc_outer_loop = .true.  (experiment 2):
-   !    360 shoc_main calls with nadv=1. Output written here (shoc_output_nadv1x360.txt)
+   !    360 shoc_main calls with nadv=1. Output written here (*_exp2.txt)
 
    if (l_shoc_outer_loop) then
 
@@ -1142,7 +1146,13 @@ end function shoc_implements_cnst
 
       if(masterproc) then
          unitn_out = getunit()
-         open(unitn_out, file='shoc_output_nadv1x360.txt', status='replace')
+         if (len_trim(shoc_output_prefix) > 0) then
+            write(outfname, '(A,A,I0,A,I0,A)') trim(shoc_output_prefix), &
+                  '_nadv', nadv_input, 'x', n_outer_steps, '_exp2.txt'
+         else
+            outfname = 'shoc_output_nadv1x360.txt'
+         end if
+         open(unitn_out, file=trim(outfname), status='replace')
          write(unitn_out,*) 'time, ilay, u, v, tke, qv, qc, T, P'
       end if
 
@@ -1170,7 +1180,7 @@ end function shoc_implements_cnst
         ! Write output variables after each shoc_main call
         if(masterproc) then
            do kk = pver, 1, -1
-              time_output = t_outer * 60
+              time_output = t_outer * nint(dtime)
               ilay_output = kk - 1
               u_output = um_input(1,kk)
               v_output = vm_input(1,kk)

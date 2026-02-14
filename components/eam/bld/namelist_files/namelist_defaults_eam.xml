@@ -833,6 +833,8 @@
 <shoc_Ckm                    > 0.1D0 </shoc_Ckm>
 <shoc_Ckh_s                  > 0.1D0 </shoc_Ckh_s>
 <shoc_Ckm_s                  > 0.1D0 </shoc_Ckm_s>
+<shoc_output_prefix          > '' </shoc_output_prefix>
+<l_shoc_outer_loop           > .true. </l_shoc_outer_loop>
 
 <!-- CLUBB options -->
 <clubb_rainevap_turb                              > .false. </clubb_rainevap_turb>

@@ -31,6 +31,9 @@ public  :: shoc_init, shoc_main
 
 logical :: use_cxx = .true.
 
+! Prefix for SHOC text output filenames (set via namelist shoc_output_prefix)
+character(len=256), public :: shoc_output_prefix = ''
+
 real(rtype), parameter, public :: largeneg = -99999999.99_rtype
 real(rtype), parameter, public :: pi = 3.14159265358979323_rtype
 
@@ -417,6 +420,7 @@ subroutine shoc_main ( &
   integer :: unitn_out
   integer :: time_output
   integer :: ilay_output
+  character(len=512) :: outfname
   real(rtype) :: u_output
   real(rtype) :: v_output
   real(rtype) :: tke_output
@@ -470,7 +474,12 @@ subroutine shoc_main ( &
   ! Open output file for SHOC text output (experiment 1)
   if(masterproc .and. turb_nadv_out_nstep.gt.0) then
      unitn_out = getunit()
-     open(unitn_out, file='shoc_output_nadv360x1.txt', status='replace')
+     if (len_trim(shoc_output_prefix) > 0) then
+        write(outfname, '(A,A,I0,A)') trim(shoc_output_prefix), '_nadv', nadv, 'x1_exp1.txt'
+     else
+        outfname = 'shoc_output_nadv360x1.txt'
+     end if
+     open(unitn_out, file=trim(outfname), status='replace')
      write(unitn_out,*) 'time, ilay, u, v, tke, qv, qc, T, P'
   end if
 
@@ -595,11 +604,11 @@ subroutine shoc_main ( &
        call outfld(  'THETAL'//trim(adjustl(numstr)),      thetal,shcol,lchnk)
        call outfld( 'CLDFRAC'//trim(adjustl(numstr)),shoc_cldfrac,shcol,lchnk)
 
-          ! Write out fields to shoc_output_nadv360x1.txt
+          ! Write out fields to SHOC text output file (exp1)
 
    if(masterproc) then
       do kk=nlev,1,-1
-         time_output =  t * 60
+         time_output =  t * nint(dtime)
          ilay_output =  kk-1   !  ilay is in C++ indexing convention
          u_output = u_wind(1,kk)
          v_output = v_wind(1,kk)
