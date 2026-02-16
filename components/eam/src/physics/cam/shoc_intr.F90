@@ -24,7 +24,7 @@ module shoc_intr
   use pbl_utils,     only: calc_ustar, calc_obklen
   use perf_mod,      only: t_startf, t_stopf
   use cam_logfile,   only: iulog
-  use shoc,          only: linear_interp, largeneg, shoc_output_prefix
+  use shoc,          only: linear_interp, largeneg
   use spmd_utils,    only: masterproc
   use cam_abortutils, only: endrun
   use iop_data_mod,   only: single_column
@@ -131,6 +131,9 @@ module shoc_intr
 
   logical :: liqcf_fix = .FALSE.  ! HW for liquid cloud fraction fix
   logical :: relvar_fix = .FALSE. !PMA for relvar fix
+
+  ! Prefix for SHOC text output filenames (set via namelist shoc_output_prefix)
+  character(len=256) :: shoc_output_prefix = ''
 
   contains
 
@@ -597,6 +600,7 @@ end function shoc_implements_cnst
    integer :: nadv                              ! Number of timesteps inside each call of shoc_main
 
    integer :: n_inner_write
+   character(len=256)  :: txt_output_prefix = ''
 
    integer :: ixcldice, ixcldliq, ixnumliq, ixnumice
    integer :: itim_old
@@ -1151,34 +1155,33 @@ end function shoc_implements_cnst
    !  l_shoc_outer_loop = .true.  (experiment 2):
    !    360 shoc_main calls with nadv=1. Output written here (*_exp2.txt)
 
-   if (l_shoc_outer_loop) then
+   if(masterproc) then
+      unitn_out = getunit()
 
-      ! Experiment 2: outer loop with nadv=1, output file from shoc_intr
-      ! Suppress the write inside shoc.F90 by passing turb_nadv_out_nstep=0
-
-      if(masterproc) then
-         unitn_out = getunit()
-         if (len_trim(shoc_output_prefix) > 0) then
-            write(outfname, '(A,A,I0,A,I0,A)') trim(shoc_output_prefix), &
-                  '_nadv', nadv, 'x', n_shoc_main_calls, '_exp2.txt'
-         else
-            outfname = 'shoc_output_nadv1x360.txt'
-         end if
-         open(unitn_out, file=trim(outfname), status='replace')
-         write(unitn_out,*) 'time, ilay, u, v, tke, qv, qc, T, P'
+      if (len_trim(shoc_output_prefix) > 0) then
+         txt_output_prefix = trim(shoc_output_prefix)
+      else
+         txt_output_prefix = 'shoc_output'
       end if
+ 
+      write(outfname, '(A,A,I0,A,I0,A)') trim(txt_output_prefix), '_nadv', nadv, '_x_shocm', n_shoc_main_calls, '.txt'
 
+      open(unitn_out, file=trim(outfname), status='replace')
+      write(unitn_out,*) 'time, ilay, u, v, tke, qv, qc, T, P'
+   end if
+
+   if (l_shoc_outer_loop) then
       n_inner_write = 0
    else
       n_inner_write = turb_nadv_out_nstep
-
    end if !l_shoc_outer_loop
 
    !============================
    do t_outer = 1, n_shoc_main_calls
 
       call shoc_main( &
-           n_inner_write, lchnk, & ! Input (turb_nadv_out_nstep=0 to suppress internal write)
+           unitn_out, & ! Input
+           n_inner_write, lchnk, & ! Input
            ncol, pver, pverp, dtime, nadv, & ! Input
            host_dx_input(:ncol), host_dy_input(:ncol), thv_input(:ncol,:),& ! Input
            zt_g_input(:ncol,:pver), zi_g_input(:ncol,:pverp), pres_input(:ncol,:pver), presi_input(:ncol,:pverp), pdel_input(:ncol,:pver),& ! Input

@@ -16,7 +16,6 @@ module shoc
   use scream_abortutils, only: endscreamrun
   use spmd_utils, only: masterproc
   use cam_logfile, only: iulog
-  use units, only: getunit, freeunit
 
 ! Bit-for-bit math functions.
 #ifdef SCREAM_CONFIG_IS_CMAKE
@@ -30,9 +29,6 @@ save ! for module variables
 public  :: shoc_init, shoc_main
 
 logical :: use_cxx = .true.
-
-! Prefix for SHOC text output filenames (set via namelist shoc_output_prefix)
-character(len=256), public :: shoc_output_prefix = ''
 
 real(rtype), parameter, public :: largeneg = -99999999.99_rtype
 real(rtype), parameter, public :: pi = 3.14159265358979323_rtype
@@ -229,6 +225,7 @@ end subroutine shoc_init
 ! Host models should call the following routine to call SHOC
 
 subroutine shoc_main ( &
+     unitn_out, &                         ! Input
      turb_nadv_out_nstep, lchnk, &        ! Input
      shcol, nlev, nlevi, dtime, nadv, &   ! Input
      host_dx, host_dy,thv, &              ! Input
@@ -261,6 +258,7 @@ subroutine shoc_main ( &
 
 ! INPUT VARIABLES
 
+  integer, intent(in) :: unitn_out
   integer, intent(in) :: turb_nadv_out_nstep ! # of time steps (in this subr.) to write out fields for
   integer, intent(in) :: lchnk               ! chunk ID related to the host model's domain decomposition
 
@@ -419,10 +417,8 @@ subroutine shoc_main ( &
   ! Variables for SHOC text output
 
   integer :: kk
-  integer :: unitn_out
   integer :: time_output
   integer :: ilay_output
-  character(len=512) :: outfname
   real(rtype) :: u_output
   real(rtype) :: v_output
   real(rtype) :: tke_output
@@ -472,18 +468,6 @@ subroutine shoc_main ( &
      shcol,nlev,host_dse,pdel,&             ! Input
      qw,shoc_ql,u_wind,v_wind,&             ! Input
      se_b,ke_b,wv_b,wl_b)                   ! Input/Output
-
-  ! Open output file for SHOC text output (experiment 1)
-  if(masterproc .and. turb_nadv_out_nstep.gt.0) then
-     unitn_out = getunit()
-     if (len_trim(shoc_output_prefix) > 0) then
-        write(outfname, '(A,A,I0,A)') trim(shoc_output_prefix), '_nadv', nadv, 'x1_exp1.txt'
-     else
-        outfname = 'shoc_output_nadv360x1.txt'
-     end if
-     open(unitn_out, file=trim(outfname), status='replace')
-     write(unitn_out,*) 'time, ilay, u, v, tke, qv, qc, T, P'
-  end if
 
   do t=1,nadv
 
@@ -628,12 +612,6 @@ subroutine shoc_main ( &
 
 
   enddo ! end time loop
-
-  ! Close output file
-  if(masterproc .and. turb_nadv_out_nstep.gt.0) then
-     close(unitn_out)
-     call freeunit(unitn_out)
-  end if
 
   ! End SHOC parameterization
 
