@@ -1148,37 +1148,32 @@ end function shoc_implements_cnst
          
    end if
     
-   !  In call to shoc_main, use _input variables in place of the default variables
-   !
-   !  l_shoc_outer_loop = .false. (experiment 1):
-   !    Single shoc_main call with nadv=360. Output written inside shoc.F90 (*_exp1.txt)
-   !  l_shoc_outer_loop = .true.  (experiment 2):
-   !    360 shoc_main calls with nadv=1. Output written here (*_exp2.txt)
 
-   if(masterproc) then
-      unitn_out = getunit()
+   if (masterproc) then
 
       if (len_trim(shoc_output_prefix) > 0) then
          txt_output_prefix = trim(shoc_output_prefix)
       else
          txt_output_prefix = 'shoc_output'
       end if
- 
       write(outfname, '(A,A,I0,A,I0,A)') trim(txt_output_prefix), '_nadv', nadv, '_x_shocm', n_shoc_main_calls, '.txt'
 
+      unitn_out = getunit()
       open(unitn_out, file=trim(outfname), status='replace')
-      write(unitn_out,*) 'time, ilay, u, v, tke, qv, qc, T, P'
+      write(unitn_out,*) 'time, k (upward, starting from 0), u, v, tke, qv, qc, T, P'
+
    end if
 
-   if (l_shoc_outer_loop) then
+   if (l_shoc_outer_loop) then  ! Make mulitple shoc_main calls with nadv=1. Output written here
       n_inner_write = 0
-   else
+   else ! Make a single shoc_main call with nadv = shoc_num_steps. Output written inside shoc.F90
       n_inner_write = turb_nadv_out_nstep
-   end if !l_shoc_outer_loop
+   end if
 
    !============================
    do t_outer = 1, n_shoc_main_calls
 
+      !  In call to shoc_main, use _input variables in place of the default variables
       call shoc_main( &
            unitn_out, & ! Input
            n_inner_write, lchnk, & ! Input
@@ -1220,12 +1215,10 @@ end function shoc_implements_cnst
   end do  ! end t_outer loop
   !============================
 
-   if (l_shoc_outer_loop) then
-      if(masterproc) then
-         close(unitn_out)
-         call freeunit(unitn_out)
-      end if
-   end if !l_shoc_outer_loop
+  if (masterproc) then
+     close(unitn_out)
+     call freeunit(unitn_out)
+  end if
 
    ! for '_input' that happen to be intent(inout), assign the output values to the variables the rest of the code is expecting.
 
