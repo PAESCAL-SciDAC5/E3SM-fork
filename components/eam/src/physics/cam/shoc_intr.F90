@@ -599,7 +599,7 @@ end function shoc_implements_cnst
    integer :: n_shoc_main_calls                 ! Number of times shoc_main is called within this interface
    integer :: nadv                              ! Number of timesteps inside each call of shoc_main
 
-   integer :: n_inner_write
+   logical :: l_inner_write
    character(len=256)  :: txt_output_prefix = ''
 
    integer :: ixcldice, ixcldliq, ixnumliq, ixnumice
@@ -739,21 +739,10 @@ end function shoc_implements_cnst
   integer :: kt_cxx_read
   integer :: ierr
   integer :: unitn
-  integer :: unitn_out
+  integer :: txtout_unit
   character(len=512) :: outfname
   integer :: nstep
-  integer :: t_outer
-
-  integer :: time_output
-  integer :: ilay_output
-  real(r8) :: u_output
-  real(r8) :: v_output
-  real(r8) :: tke_output
-  real(r8) :: qv_output
-  real(r8) :: qc_output
-  real(r8) :: t_output
-  real(r8) :: p_output
-  
+  integer :: i_shoc_main
 
    ! --------------- !
    ! Pointers        !
@@ -1148,7 +1137,6 @@ end function shoc_implements_cnst
          
    end if
     
-
    if (masterproc) then
 
       if (len_trim(shoc_output_prefix) > 0) then
@@ -1156,27 +1144,26 @@ end function shoc_implements_cnst
       else
          txt_output_prefix = 'shoc_output'
       end if
+ 
       write(outfname, '(A,A,I0,A,I0,A)') trim(txt_output_prefix), '_nadv', nadv, '_x_shocm', n_shoc_main_calls, '.txt'
 
-      unitn_out = getunit()
-      open(unitn_out, file=trim(outfname), status='replace')
-      write(unitn_out,*) 'time, k (upward, starting from 0), u, v, tke, qv, qc, T, P'
-
+      txtout_unit = getunit()
+      open(txtout_unit, file=trim(outfname), status='replace')
+      write(txtout_unit,*) 'time, k (upward, starting from 0), u, v, tke, qv, qc, T, P'
    end if
 
    if (l_shoc_outer_loop) then  ! Make mulitple shoc_main calls with nadv=1. Output written here
-      n_inner_write = 0
+      l_inner_write = .false.
    else ! Make a single shoc_main call with nadv = shoc_num_steps. Output written inside shoc.F90
-      n_inner_write = turb_nadv_out_nstep
+      l_inner_write = .true.
    end if
 
    !============================
-   do t_outer = 1, n_shoc_main_calls
+   do i_shoc_main = 1, n_shoc_main_calls
 
-      !  In call to shoc_main, use _input variables in place of the default variables
       call shoc_main( &
-           unitn_out, & ! Input
-           n_inner_write, lchnk, & ! Input
+           l_inner_write, txtout_unit,     & ! Input
+           turb_nadv_out_nstep, lchnk,     & ! Input
            ncol, pver, pverp, dtime, nadv, & ! Input
            host_dx_input(:ncol), host_dy_input(:ncol), thv_input(:ncol,:),& ! Input
            zt_g_input(:ncol,:pver), zi_g_input(:ncol,:pverp), pres_input(:ncol,:pver), presi_input(:ncol,:pverp), pdel_input(:ncol,:pver),& ! Input
@@ -1198,26 +1185,25 @@ end function shoc_implements_cnst
         ! Write output variables after each shoc_main call
         if(masterproc) then
            do kk = pver, 1, -1
-              time_output = t_outer * nint(dtime)
-              ilay_output = kk - 1
-              u_output = um_input(1,kk)
-              v_output = vm_input(1,kk)
-              tke_output = tke_zt_input(1,kk)
-              qv_output = rtm_input(1,kk) - rcm_input(1,kk)
-              qc_output = rcm_input(1,kk)
-              t_output = thlm_input(1,kk) / inv_exner_input(1,kk) + latvap/cpair * rcm_input(1,kk)
-              p_output = pres_input(1,kk)
-              write(unitn_out,fmt) time_output, ilay_output, u_output, v_output, tke_output, qv_output, qc_output, t_output, p_output
+              write(txtout_unit,fmt) i_shoc_main * nint(dtime), &!
+                                     kk - 1,                &!
+                                     um_input(1,kk),        &!
+                                     vm_input(1,kk),        &!
+                                     tke_zt_input(1,kk),    &!
+                                     rtm_input(1,kk) - rcm_input(1,kk), &! qv
+                                     rcm_input(1,kk),                   &! qc
+                                     thlm_input(1,kk) / inv_exner_input(1,kk) + latvap/cpair * rcm_input(1,kk), &! temperature
+                                     pres_input(1,kk) ! pressure
            end do
         end if ! masterproc
       end if ! l_shoc_outer_loop
 
-  end do  ! end t_outer loop
+  end do  ! end i_shoc_main loop
   !============================
 
   if (masterproc) then
-     close(unitn_out)
-     call freeunit(unitn_out)
+     close(txtout_unit)
+     call freeunit(txtout_unit)
   end if
 
    ! for '_input' that happen to be intent(inout), assign the output values to the variables the rest of the code is expecting.

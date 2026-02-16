@@ -15,7 +15,6 @@ module shoc
   use physics_utils, only: rtype, rtype8, itype, btype
   use scream_abortutils, only: endscreamrun
   use spmd_utils, only: masterproc
-  use cam_logfile, only: iulog
 
 ! Bit-for-bit math functions.
 #ifdef SCREAM_CONFIG_IS_CMAKE
@@ -225,7 +224,7 @@ end subroutine shoc_init
 ! Host models should call the following routine to call SHOC
 
 subroutine shoc_main ( &
-     unitn_out, &                         ! Input
+     l_txt_write, txtout_unit, &          ! Input
      turb_nadv_out_nstep, lchnk, &        ! Input
      shcol, nlev, nlevi, dtime, nadv, &   ! Input
      host_dx, host_dy,thv, &              ! Input
@@ -258,7 +257,8 @@ subroutine shoc_main ( &
 
 ! INPUT VARIABLES
 
-  integer, intent(in) :: unitn_out
+  logical, intent(in) :: l_txt_write         ! Whether results will be written out to a txt file within the nadv loop
+  integer, intent(in) :: txtout_unit         ! File handle for txt output
   integer, intent(in) :: turb_nadv_out_nstep ! # of time steps (in this subr.) to write out fields for
   integer, intent(in) :: lchnk               ! chunk ID related to the host model's domain decomposition
 
@@ -414,20 +414,7 @@ subroutine shoc_main ( &
               se_a(shcol),ke_a(shcol),&
               wv_a(shcol),wl_a(shcol)
 
-  ! Variables for SHOC text output
-
   integer :: kk
-  integer :: time_output
-  integer :: ilay_output
-  real(rtype) :: u_output
-  real(rtype) :: v_output
-  real(rtype) :: tke_output
-  real(rtype) :: qv_output
-  real(rtype) :: qc_output
-  real(rtype) :: t_output
-  real(rtype) :: p_output
-
-
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
   integer :: clock_count1, clock_count_rate, clock_count_max, clock_count2, clock_count_diff
@@ -458,7 +445,6 @@ subroutine shoc_main ( &
 #ifdef SCREAM_CONFIG_IS_CMAKE
     call system_clock(clock_count1, clock_count_rate, clock_count_max)
 #endif
-
 
   ! Compute integrals of static energy, kinetic energy, water vapor, and liquid water
   ! for the computation of total energy before SHOC is called.  This is for an
@@ -589,27 +575,23 @@ subroutine shoc_main ( &
        call outfld('SHOC_TKE'//trim(adjustl(numstr)),         tke,shcol,lchnk)
        call outfld(  'THETAL'//trim(adjustl(numstr)),      thetal,shcol,lchnk)
        call outfld( 'CLDFRAC'//trim(adjustl(numstr)),shoc_cldfrac,shcol,lchnk)
+    end if
 
-          ! Write out fields to SHOC text output file (exp1)
+    !---------------------------------------------
+    ! Write out fields to SHOC text output file
 
-   if(masterproc) then
+    if (l_txt_write.and.masterproc) then
       do kk=nlev,1,-1
-         time_output =  t * nint(dtime)
-         ilay_output =  kk-1   !  ilay is in C++ indexing convention
-         u_output = u_wind(1,kk)
-         v_output = v_wind(1,kk)
-         tke_output = tke(1,kk)
-         qv_output = qw(1,kk) - shoc_ql(1,kk)
-         qc_output = shoc_ql(1,kk)
-         t_output = thetal(1,kk) / inv_exner(1,kk) + lcond/cp * shoc_ql(1,kk)
-         p_output = pres(1,kk)
-         write(unitn_out,fmt) time_output, ilay_output, u_output, v_output, tke_output, qv_output, qc_output, t_output, p_output
+         write(txtout_unit,fmt) t*nint(dtime),                                           &! time elapsed inside this subroutine 
+                                kk-1,                                                    &! vertical layer index (upward, starting from 0)
+                                u_wind(1,kk), v_wind(1,kk), tke(1,kk),                   &! u, v, and tke
+                                    qw(1,kk)-shoc_ql(1,kk),                              &! qv
+                               shoc_ql(1,kk),                                            &! qc
+                                thetal(1,kk)/inv_exner(1,kk) + lcond/cp * shoc_ql(1,kk), &! temperature
+                                  pres(1,kk)                                              ! pressure
       end do
-   end if
-
     end if
     !---------------------------------------------
-
 
   enddo ! end time loop
 
