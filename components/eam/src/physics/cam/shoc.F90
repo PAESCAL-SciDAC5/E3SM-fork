@@ -37,6 +37,8 @@ character(len=256), public :: shoc_output_prefix = ''
 real(rtype), parameter, public :: largeneg = -99999999.99_rtype
 real(rtype), parameter, public :: pi = 3.14159265358979323_rtype
 
+!character(len=*), parameter, public :: fmt = '(i8,i4,20ES22.13)'
+character(len=*), parameter, public :: fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)'
 !=========================================================
 ! Physical constants used in SHOC
 !=========================================================
@@ -617,15 +619,9 @@ subroutine shoc_main ( &
          qc_output = shoc_ql(1,kk)
          t_output = thetal(1,kk) / inv_exner(1,kk) + lcond/cp * shoc_ql(1,kk)
          p_output = pres(1,kk)
-         write(unitn_out,104) time_output, ilay_output, u_output, v_output, tke_output, qv_output, qc_output, t_output, p_output
+         write(unitn_out,fmt) time_output, ilay_output, u_output, v_output, tke_output, qv_output, qc_output, t_output, p_output
       end do
    end if
-
-104       format(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)
-
-
-
-
 
     end if
     !---------------------------------------------

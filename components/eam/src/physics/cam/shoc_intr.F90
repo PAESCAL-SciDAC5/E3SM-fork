@@ -539,7 +539,7 @@ end function shoc_implements_cnst
     use micro_mg_cam,   only: micro_mg_version
     use cldfrc2m,                  only: aist_vector
     use trb_mtn_stress,            only: compute_tms
-    use shoc,           only: shoc_main
+    use shoc,           only: shoc_main, fmt
     use cam_history,    only: outfld
     use iop_data_mod,   only: single_column, dp_crm
 
@@ -586,7 +586,16 @@ end function shoc_implements_cnst
    type(physics_state) :: state1                ! Local copy of state variable
    type(physics_ptend) :: ptend_loc             ! Local tendency from processes, added up to return as ptend_all
 
-   integer :: i, j, k, t, ixind, nadv
+   integer :: i, j, k, t, ixind
+   integer :: shoc_num_steps                    ! Number of SHOC substeps within a host timestep of length hdtime.
+                                                ! This number should equal (n_shoc_main_calls * nadv).
+                                                ! In the current implementation, one of the two variables,
+                                                ! n_shoc_main_calls and nadv, is set to shoc_num_steps, leaving
+                                                ! the other to be 1.
+
+   integer :: n_shoc_main_calls                 ! Number of times shoc_main is called within this interface
+   integer :: nadv                              ! Number of timesteps inside each call of shoc_main
+
    integer :: ixcldice, ixcldliq, ixnumliq, ixnumice
    integer :: itim_old
    integer :: ncol, lchnk                       ! # of columns, and chunk identifier
@@ -689,7 +698,6 @@ end function shoc_implements_cnst
    
    real(r8) :: host_dx_input(pcols)
    real(r8) :: host_dy_input(pcols)
-   integer :: nadv_input
 
 
    character(len=72) :: junk   ! a string to hold comment lines in input text file
@@ -729,7 +737,6 @@ end function shoc_implements_cnst
   character(len=512) :: outfname
   integer :: nstep
   integer :: t_outer
-  integer :: n_outer_steps
 
   integer :: time_output
   integer :: ilay_output
@@ -859,7 +866,7 @@ end function shoc_implements_cnst
 
    !  determine number of timesteps SHOC core should be advanced,
    !  host time step divided by SHOC time step
-   nadv = max(hdtime/dtime,1._r8)
+   shoc_num_steps = max(hdtime/dtime,1._r8)
 
    !----------------------------
 
@@ -1017,11 +1024,11 @@ end function shoc_implements_cnst
   host_dy_input(:) = 1000._r8
 
   if (l_shoc_outer_loop) then
-     nadv_input = 1
-     n_outer_steps = nadv
+     nadv = 1
+     n_shoc_main_calls = shoc_num_steps
   else
-     nadv_input = nadv
-     n_outer_steps = 1
+     nadv = shoc_num_steps
+     n_shoc_main_calls = 1
   end if
 
   
@@ -1128,7 +1135,10 @@ end function shoc_implements_cnst
      
      write(iulog,*) 'host_dx value:  ', host_dx_in, ' to be set to ', host_dx_input
      write(iulog,*) 'host_dy value:  ', host_dy_in, ' to be set to ', host_dy_input
-     write(iulog,*) 'nadv value:  ', nadv, ' to be set to ', nadv_input
+
+     write(iulog,*) 'shoc_num_steps    = ', shoc_num_steps 
+     write(iulog,*) 'n_shoc_main_calls = ', n_shoc_main_calls
+     write(iulog,*) 'nadv              = ', nadv
          
    end if
     
@@ -1148,7 +1158,7 @@ end function shoc_implements_cnst
          unitn_out = getunit()
          if (len_trim(shoc_output_prefix) > 0) then
             write(outfname, '(A,A,I0,A,I0,A)') trim(shoc_output_prefix), &
-                  '_nadv', nadv_input, 'x', n_outer_steps, '_exp2.txt'
+                  '_nadv', nadv, 'x', n_shoc_main_calls, '_exp2.txt'
          else
             outfname = 'shoc_output_nadv1x360.txt'
          end if
@@ -1156,11 +1166,11 @@ end function shoc_implements_cnst
          write(unitn_out,*) 'time, ilay, u, v, tke, qv, qc, T, P'
       end if
 
-      do t_outer = 1, n_outer_steps
+      do t_outer = 1, n_shoc_main_calls
 
         call shoc_main( &
              0, lchnk, & ! Input (turb_nadv_out_nstep=0 to suppress internal write)
-             ncol, pver, pverp, dtime, nadv_input, & ! Input
+             ncol, pver, pverp, dtime, nadv, & ! Input
              host_dx_input(:ncol), host_dy_input(:ncol), thv_input(:ncol,:),& ! Input
              zt_g_input(:ncol,:pver), zi_g_input(:ncol,:pverp), pres_input(:ncol,:pver), presi_input(:ncol,:pverp), pdel_input(:ncol,:pver),& ! Input
              wpthlp_sfc_input(:ncol), wprtp_sfc_input(:ncol), upwp_sfc_input(:ncol), vpwp_sfc_input(:ncol), & ! Input
@@ -1189,13 +1199,12 @@ end function shoc_implements_cnst
               qc_output = rcm_input(1,kk)
               t_output = thlm_input(1,kk) / inv_exner_input(1,kk) + latvap/cpair * rcm_input(1,kk)
               p_output = pres_input(1,kk)
-              write(unitn_out,104) time_output, ilay_output, u_output, v_output, tke_output, qv_output, qc_output, t_output, p_output
+              write(unitn_out,fmt) time_output, ilay_output, u_output, v_output, tke_output, qv_output, qc_output, t_output, p_output
            end do
         end if
 
       end do  ! end t_outer loop
 
-104   format(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)
 
       if(masterproc) then
          close(unitn_out)
@@ -1208,7 +1217,7 @@ end function shoc_implements_cnst
 
       call shoc_main( &
            turb_nadv_out_nstep, lchnk, & ! Input
-           ncol, pver, pverp, dtime, nadv_input, & ! Input
+           ncol, pver, pverp, dtime, nadv, & ! Input
            host_dx_input(:ncol), host_dy_input(:ncol), thv_input(:ncol,:),& ! Input
            zt_g_input(:ncol,:pver), zi_g_input(:ncol,:pverp), pres_input(:ncol,:pver), presi_input(:ncol,:pverp), pdel_input(:ncol,:pver),& ! Input
            wpthlp_sfc_input(:ncol), wprtp_sfc_input(:ncol), upwp_sfc_input(:ncol), vpwp_sfc_input(:ncol), & ! Input
