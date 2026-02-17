@@ -675,74 +675,11 @@ end function shoc_implements_cnst
    ! For SHOC substep output
    integer :: turb_nadv_out_nstep     ! # of substeps to write out
 
-   ! For fields read in from SHOC text input files 
+   integer :: txtout_unit
+   character(len=512) :: outfname
+   integer :: i_shoc_main
 
-   real(r8) :: wprtp_sfc_input(pcols) 
-   real(r8) :: wpthlp_sfc_input(pcols) 
-   real(r8) :: upwp_sfc_input(pcols) 
-   real(r8) :: vpwp_sfc_input(pcols)
-   real(r8) :: zsurf
-
-   real(r8) :: zi_g_input(pcols,pverp)
-   real(r8) :: presi_input(pcols,pverp)
-   
-   real(r8) :: zt_g_input(pcols,pver)
-   real(r8) :: um_input(pcols,pver)
-   real(r8) :: vm_input(pcols,pver)
-   real(r8) :: wm_zt_input(pcols,pver)
-   real(r8) :: tke_zt_input(pcols,pver)
-   real(r8) :: thv_input(pcols,pver)
-   real(r8) :: thlm_input(pcols,pver)
-   real(r8) :: rtm_input(pcols,pver)
-   real(r8) :: rcm_input(pcols,pver)
-   real(r8) :: pres_input(pcols,pver)
-   real(r8) :: pdel_input(pcols,pver)
-   real(r8) :: inv_exner_input(pcols,pver)
-   real(r8) :: tk_input(pcols,pver)
-   real(r8) :: tkh_input(pcols,pver)
-   real(r8) :: cloud_frac_input(pcols,pver)
-   
-   real(r8) :: host_dx_input(pcols)
-   real(r8) :: host_dy_input(pcols)
-
-
-   character(len=72) :: junk   ! a string to hold comment lines in input text file
-  real(r8) :: wprtp_sfc_read
-  real(r8) :: wpthlp_sfc_read
-  real(r8) :: upwp_sfc_read
-  real(r8) :: vpwp_sfc_read
-  real(r8) :: pverread
-  real(r8) :: pverpread
-  real(r8) :: zi_g_read
-  real(r8) :: zt_g_read
-  real(r8) :: dz_zi_read
-  real(r8) :: um_read
-  real(r8) :: vm_read
-  real(r8) :: wm_zt_read
-  real(r8) :: tke_zt_read
-  real(r8) :: thv_read
-  real(r8) :: thlm_read
-  real(r8) :: rtm_read
-  real(r8) :: rcm_read
-  real(r8) :: presi_read
-  real(r8) :: pres_read
-  real(r8) :: pdel_read
-  real(r8) :: inv_exner_read
-  real(r8) :: tk_read
-  real(r8) :: tkh_read
-  real(r8) :: cloud_frac_read
-
-
-  integer :: kk
-  integer :: k_read
-  integer :: ki_cxx_read
-  integer :: kt_cxx_read
-  integer :: ierr
-  integer :: unitn
-  integer :: txtout_unit
-  character(len=512) :: outfname
-  integer :: nstep
-  integer :: i_shoc_main
+   integer :: kk
 
    ! --------------- !
    ! Pointers        !
@@ -974,189 +911,67 @@ end function shoc_implements_cnst
      end if
    enddo
 
-   ! ------------------------------------------------------------- !
-   ! (Placeholder for now:) Initialization for "standalone" test
-   ! ------------------------------------------------------------- !
-   if (single_column.and.l_turb_standalone) then
-      call endrun('shoc_tend_e3sm: standalone test not yet fully implemented.')
+   !-------------------------------------------
+   ! Substepping configuration (if applicable)
+   !-------------------------------------------
+   if (l_shoc_outer_loop) then
+      n_shoc_main_calls = shoc_num_steps
+      nadv = 1
+   else
+      n_shoc_main_calls = 1
+      nadv = shoc_num_steps
    end if
 
-   ! ------------------------------------------------- !
-   ! Actually call SHOC                                !
-   ! ------------------------------------------------- !
-   ! Note that this call includes nadv time steps of integration for SHOC
+   !----------------------------------------------------------------------------------
+   ! Initialization/preparation for "standalone"/"in-and-out" test (only in SCM mode)
+   !----------------------------------------------------------------------------------
+   ! Overwrite values of shoc_main's input variables using values from txt files
 
-   ! Initialize text input variables by the corresponding default values 
+   if (l_turb_standalone) then
 
-  wprtp_sfc_input = wprtp_sfc
-  wpthlp_sfc_input = wpthlp_sfc
-  upwp_sfc_input = upwp_sfc
-  vpwp_sfc_input = vpwp_sfc
-   
-  zi_g_input = zi_g
-  presi_input(:,:) = state%pint(:,:)
-
-  zt_g_input = zt_g
-  um_input = um
-  vm_input = vm
-  wm_zt_input = wm_zt
-  tke_zt_input = tke_zt
-  thv_input = thv
-  thlm_input = thlm
-  rtm_input = rtm
-  rcm_input = rcm
-  pres_input(:,:) = state%pmid(:,:)
-  pdel_input(:,:) = state1%pdel(:,:)
-  inv_exner_input = inv_exner
-  tk_input = tk
-  tkh_input = tkh
-  cloud_frac_input  = cloud_frac
-
-  !  The following are also SHOC input variables but are not present in the input text files.
-  !  So for now they will have the following values hardwired to be consistent with the in/out testing.
-
-  host_dx_input(:) = 1000._r8
-  host_dy_input(:) = 1000._r8
-
-  if (l_shoc_outer_loop) then
-     nadv = 1
-     n_shoc_main_calls = shoc_num_steps
-  else
-     nadv = shoc_num_steps
-     n_shoc_main_calls = 1
-  end if
-
-  
-   if(masterproc) then
-
-     write(iulog,*) 'Read in column surface vars initial conditions.'
-     unitn = getunit()
-     open( unitn, file='ShocInOut_IC_surface_vars.txt', status='old' )
-     read( unitn, *, iostat=ierr ) junk
-     if( ierr /= 0 ) then
-        call endrun('Error reading ShocInOut_IC_surface_vars.txt.')
-     end if
-     read( unitn, *, iostat=ierr ) junk
-     read(unitn, *)  pverread
-     write(iulog,*) 'pverread is:  ', pverread
-     pverpread = pverread + 1
-     read(unitn,*) dz_zi_read      !  dz_zi is computed in subroutine shoc_main/shoc_grid from zi_g, zt_g
-     !  So this is not directly used.
-     read(unitn,*) zsurf !  zsurf, assume zero for now and don't use
-     write(iulog,*) 'zsurf is:  ', zsurf
-     read(unitn,*) wprtp_sfc_read  ! kg/kg m/s
-     write(iulog,*) 'wprtp_sfc is:  ',wprtp_sfc_read
-     read(unitn,*) wpthlp_sfc_read  ! In SHOC this needs to be in kinematic units (K-m/s); for this input file format, it is
-     write(iulog,*) 'wpthlp_sfc is:  ',wpthlp_sfc_read
-     read(unitn,*) upwp_sfc_read
-     write(iulog,*) 'upwp_sfc is:  ',upwp_sfc_read
-     read(unitn,*) vpwp_sfc_read
-     write(iulog,*) 'vpwp_sfc is:  ',vpwp_sfc_read
-     wprtp_sfc_input(:ncol) = wprtp_sfc_read
-     wpthlp_sfc_input(:ncol) = wpthlp_sfc_read
-     upwp_sfc_input(:ncol) = upwp_sfc_read
-     vpwp_sfc_input(:ncol) = vpwp_sfc_read
-     close( unitn )
-     call freeunit( unitn )
-
-     write(iulog,*) 'Read in column zi profile initial conditions.'
-     unitn = getunit()
-     open( unitn, file='ShocInOut_IC_zi_grid.txt', status='old' )
-     read( unitn, *, iostat=ierr ) junk
-     if( ierr /= 0 ) then
-        call endrun('Error reading ShocInOut_IC_zi_grid.txt.')
-     end if
-     read( unitn, * ) junk
-     read( unitn, * ) junk
-     
-     !  This in-out exercise only makes sense if pverpread <= pverp, number of E3SM interface levels
-     !  In case pverpread > pverp, only utilize first pverp input values, ignore rest, but still read whole file.
-     
-     do k_read=1,pverpread
-      kk = pverp-k_read+1       ! Note that for SHOC k=1 is model top, but input file starts at model surface
-      read(unitn,*) ki_cxx_read, zi_g_read, presi_read   ! first column is interface index, but zero-based as in C++
-      if( (ki_cxx_read+1) .ne. k_read ) then
-        call endrun('Mismatch between interface count and k -- missing value?')
-      else if(kk.ge.1) then
-         zi_g_input(:ncol,kk) = zi_g_read
-         presi_input(:ncol,kk) = presi_read
-         write(iulog,*) kk,zi_g_read,presi_read
-      end if
-     end do
-     close( unitn )
-     call freeunit( unitn )
-
-     write(iulog,*) 'Read in column zt profile initial conditions.'
-     unitn = getunit()
-     open( unitn, file='ShocInOut_IC_zt_grid.txt', status='old' )
-     read( unitn, *, iostat=ierr ) junk
-     if( ierr /= 0 ) then
-        call endrun('Error reading ShocInOut_IC_zt_grid.txt.')
-     end if
-     read( unitn, * ) junk
-     read( unitn, * ) junk
-
-     do k_read=1,pverread
-        kk = pver-k_read+1
-     read(unitn,*) kt_cxx_read, zt_g_read, um_read, vm_read, wm_zt_read, tke_zt_read, thv_read, &
-             thlm_read, rtm_read, rcm_read, pres_read, pdel_read, inv_exner_read, tk_read, tkh_read, &
-             cloud_frac_read     ! first column is level index, but in zero-based indexing as in C++
-     if( (kt_cxx_read+1) .ne. k_read ) then
-        call endrun('Mismatch between level count and k -- missing value?')
-     else if(kk.ge.1) then
-         zt_g_input(:ncol,kk) = zt_g_read
-         um_input(:ncol,kk) = um_read
-         vm_input(:ncol,kk) = vm_read
-         wm_zt_input(:ncol,kk) = wm_zt_read
-         tke_zt_input(:ncol,kk) = tke_zt_read
-         thv_input(:ncol,kk) = thv_read
-         thlm_input(:ncol,kk) = thlm_read
-         rtm_input(:ncol,kk) = rtm_read
-         rcm_input(:ncol,kk) = rcm_read
-         pres_input(:ncol,kk) = pres_read
-         pdel_input(:ncol,kk) = pdel_read   !  Assumed to be consistent with presi(kk+1) - presi(kk)
-         inv_exner_input(:ncol,kk) = inv_exner_read  ! Assumed to be consistent with pres(kk) and interface constants
-         tk_input(:ncol,kk) = tk_read 
-         !  looks like tk, tkh are effectively intent(out), so initial values not actually used.
-         tkh_input(:ncol,kk) = tkh_read  
-         cloud_frac_input(:ncol,kk) = cloud_frac_read
-         write(iulog,*) kk, zt_g_read, um_read, vm_read, wm_zt_read, tke_zt_read, &
-              thv_read, thlm_read, rtm_read, rcm_read, pres_read, pdel_read, &
-              inv_exner_read, tk_read, tkh_read, cloud_frac_read
-      end if
-     end do
-     close( unitn )
-     call freeunit( unitn )
-     
-     write(iulog,*) 'host_dx value:  ', host_dx_in, ' to be set to ', host_dx_input
-     write(iulog,*) 'host_dy value:  ', host_dy_in, ' to be set to ', host_dy_input
-
-     write(iulog,*) 'shoc_num_steps    = ', shoc_num_steps 
-     write(iulog,*) 'n_shoc_main_calls = ', n_shoc_main_calls
-     write(iulog,*) 'nadv              = ', nadv
-         
+      call read_and_set_input_to_shoc_main( &
+             ncol, thv, zt_g, zi_g, state1%pmid, state1%pint, state1%pdel, &
+             wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, inv_exner, tke_zt, &
+             thlm, rtm, um, vm, wm_zt, rcm, cloud_frac, tkh, tk )
    end if
-    
-   if (masterproc) then
 
-      if (len_trim(shoc_output_prefix) > 0) then
-         txt_output_prefix = trim(shoc_output_prefix)
-      else
-         txt_output_prefix = 'shoc_output'
-      end if
- 
+   ! Open txt file for output
+
+   if (l_turb_standalone.and.masterproc) then
+
+      ! Determine name of txt output file
+
+      txt_output_prefix = 'shoc_output'
+      if (len_trim(shoc_output_prefix) > 0) txt_output_prefix = trim(shoc_output_prefix)
       write(outfname, '(A,A,I0,A,I0,A)') trim(txt_output_prefix), '_nadv', nadv, '_x_shocm', n_shoc_main_calls, '.txt'
+
+      ! Open txt file and write a header
 
       txtout_unit = getunit()
       open(txtout_unit, file=trim(outfname), status='replace')
       write(txtout_unit,*) 'time, k (upward, starting from 0), u, v, tke, qv, qc, T, P'
-   end if
 
-   if (l_shoc_outer_loop) then  ! Make mulitple shoc_main calls with nadv=1. Output written here
-      l_inner_write = .false.
-   else ! Make a single shoc_main call with nadv = shoc_num_steps. Output written inside shoc.F90
-      l_inner_write = .true.
-   end if
+      ! Send info to iulog to double check
+
+     !write(iulog,*) 'host_dx value:  ', host_dx_in, ' to be set to ', host_dx_input
+     !write(iulog,*) 'host_dy value:  ', host_dy_in, ' to be set to ', host_dy_input
+
+      write(iulog,*) 'shoc_num_steps    = ', shoc_num_steps
+      write(iulog,*) 'n_shoc_main_calls = ', n_shoc_main_calls
+      write(iulog,*) 'nadv              = ', nadv
+
+   end if ! l_turb_standalone.and.masterproc
+
+   ! Write statement inside shoc_main will only be executed when the simulation
+   ! is run in an SCM "turb standalone" model when the nadv loop inside shoc_main
+   ! is used to take multiple substeps.
+
+   l_inner_write = l_turb_standalone.and.(.not.l_shoc_outer_loop)
+
+   ! ------------------------------------------------- !
+   ! Actually call SHOC                                !
+   ! ------------------------------------------------- !
+   ! Note that each call includes nadv time steps of integration for SHOC
 
    !============================
    do i_shoc_main = 1, n_shoc_main_calls
@@ -1165,15 +980,17 @@ end function shoc_implements_cnst
            l_inner_write, txtout_unit,     & ! Input
            turb_nadv_out_nstep, lchnk,     & ! Input
            ncol, pver, pverp, dtime, nadv, & ! Input
-           host_dx_input(:ncol), host_dy_input(:ncol), thv_input(:ncol,:),& ! Input
-           zt_g_input(:ncol,:pver), zi_g_input(:ncol,:pverp), pres_input(:ncol,:pver), presi_input(:ncol,:pverp), pdel_input(:ncol,:pver),& ! Input
-           wpthlp_sfc_input(:ncol), wprtp_sfc_input(:ncol), upwp_sfc_input(:ncol), vpwp_sfc_input(:ncol), & ! Input
-           wtracer_sfc(:ncol,:), edsclr_dim, wm_zt_input(:ncol,:), & ! Input
-           inv_exner_input(:ncol,:),state1%phis(:ncol), & ! Input
-           shoc_s(:ncol,:), tke_zt_input(:ncol,:), thlm_input(:ncol,:), rtm_input(:ncol,:), & ! Input/Ouput
-           um_input(:ncol,:), vm_input(:ncol,:), edsclr_in(:ncol,:,:), & ! Input/Output
-           wthv(:ncol,:),tkh_input(:ncol,:),tk_input(:ncol,:), & ! Input/Output
-           rcm_input(:ncol,:),cloud_frac_input(:ncol,:), & ! Input/Output
+           host_dx_in(:ncol), host_dy_in(:ncol), thv(:ncol,:),& ! Input
+          !The line commended out below was in the orginal E3SM code. Was the use of state instead of state1 for pmid and pint a typo?
+          !zt_g(:ncol,:), zi_g(:ncol,:), state%pmid(:ncol,:pver), state%pint(:ncol,:pverp), state1%pdel(:ncol,:pver),& ! Input
+           zt_g(:ncol,:), zi_g(:ncol,:),state1%pmid(:ncol,:pver),state1%pint(:ncol,:pverp), state1%pdel(:ncol,:pver),& ! Input
+           wpthlp_sfc(:ncol), wprtp_sfc(:ncol), upwp_sfc(:ncol), vpwp_sfc(:ncol), & ! Input
+           wtracer_sfc(:ncol,:), edsclr_dim, wm_zt(:ncol,:), & ! Input
+           inv_exner(:ncol,:),state1%phis(:ncol), & ! Input
+           shoc_s(:ncol,:), tke_zt(:ncol,:), thlm(:ncol,:), rtm(:ncol,:), & ! Input/Ouput
+           um(:ncol,:), vm(:ncol,:), edsclr_in(:ncol,:,:), & ! Input/Output
+           wthv(:ncol,:),tkh(:ncol,:),tk(:ncol,:), & ! Input/Output
+           rcm(:ncol,:),cloud_frac(:ncol,:), & ! Input/Output
            pblh(:ncol), & ! Output
            shoc_mix_out(:ncol,:), isotropy_out(:ncol,:), & ! Output (diagnostic)
            w_sec_out(:ncol,:), thl_sec_out(:ncol,:), qw_sec_out(:ncol,:), qwthl_sec_out(:ncol,:), & ! Output (diagnostic)
@@ -1181,42 +998,30 @@ end function shoc_implements_cnst
            uw_sec_out(:ncol,:), vw_sec_out(:ncol,:), w3_out(:ncol,:), & ! Output (diagnostic)
            wqls_out(:ncol,:),brunt_out(:ncol,:),rcm2(:ncol,:)) ! Output (diagnostic)
 
-      if (l_shoc_outer_loop) then
-        ! Write output variables after each shoc_main call
-        if(masterproc) then
+      ! Write results to txt file after each shoc_main call
+
+      if (l_turb_standalone.and.l_shoc_outer_loop.and.masterproc) then
            do kk = pver, 1, -1
               write(txtout_unit,fmt) i_shoc_main * nint(dtime), &!
-                                     kk - 1,                &!
-                                     um_input(1,kk),        &!
-                                     vm_input(1,kk),        &!
-                                     tke_zt_input(1,kk),    &!
-                                     rtm_input(1,kk) - rcm_input(1,kk), &! qv
-                                     rcm_input(1,kk),                   &! qc
-                                     thlm_input(1,kk) / inv_exner_input(1,kk) + latvap/cpair * rcm_input(1,kk), &! temperature
-                                     pres_input(1,kk) ! pressure
+                                     kk - 1,                    &!
+                                     um(1,kk),                  &!
+                                     vm(1,kk),                  &!
+                                     tke_zt(1,kk),              &!
+                                     rtm(1,kk) - rcm(1,kk),     &! qv
+                                     rcm(1,kk),                 &! qc
+                                     thlm(1,kk) / inv_exner(1,kk) + latvap/cpair * rcm(1,kk), &! temperature
+                                     state1%pmid(1,kk)                                         ! pressure
            end do
-        end if ! masterproc
-      end if ! l_shoc_outer_loop
+      end if
 
   end do  ! end i_shoc_main loop
   !============================
 
-  if (masterproc) then
+  if (l_turb_standalone.and.masterproc) then
      close(txtout_unit)
      call freeunit(txtout_unit)
   end if
-
-   ! for '_input' that happen to be intent(inout), assign the output values to the variables the rest of the code is expecting.
-
-   tke_zt(:ncol,:) = tke_zt_input(:ncol,:)
-   thlm(:ncol,:) = thlm_input(:ncol,:)
-   rtm(:ncol,:) = rtm_input(:ncol,:)
-   rcm(:ncol,:) = rcm_input(:ncol,:)
-   um(:ncol,:) = um_input(:ncol,:)
-   vm(:ncol,:) = vm_input(:ncol,:)
-   tkh(:ncol,:) = tkh_input(:ncol,:)
-   tk(:ncol,:) = tk_input(:ncol,:)
-   cloud_frac(:ncol,:) = cloud_frac_input(:ncol,:)
+  !---------------------------------
    
    ! Transfer back to pbuf variables
 
@@ -1571,5 +1376,216 @@ end function shoc_implements_cnst
     grid_dy = grid_dx
 
   end subroutine grid_size_planar_uniform
+
+  subroutine read_and_set_input_to_shoc_main( &
+             ncol, thv_input, &
+             zt_g_input, zi_g_input, pres_input, presi_input, pdel_input, &
+             wpthlp_sfc_input, wprtp_sfc_input, upwp_sfc_input, vpwp_sfc_input, &
+             inv_exner_input, &
+             tke_zt_input, thlm_input, rtm_input, &
+             um_input, vm_input, &
+             wm_zt_input, &
+             rcm_input, cloud_frac_input, &
+             tkh_input, tk_input &
+             )
+
+    use ppgrid, only: pver, pverp, pcols
+
+    integer, intent(in) :: ncol
+
+    ! For fields read in from SHOC text input files
+
+    real(r8) :: wprtp_sfc_input(pcols)
+    real(r8) :: wpthlp_sfc_input(pcols)
+    real(r8) :: upwp_sfc_input(pcols)
+    real(r8) :: vpwp_sfc_input(pcols)
+    real(r8) :: zsurf
+
+    real(r8) :: zi_g_input(pcols,pverp)
+    real(r8) :: presi_input(pcols,pverp)
+
+    real(r8) :: zt_g_input(pcols,pver)
+    real(r8) :: um_input(pcols,pver)
+    real(r8) :: vm_input(pcols,pver)
+    real(r8) :: wm_zt_input(pcols,pver)
+    real(r8) :: tke_zt_input(pcols,pver)
+    real(r8) :: thv_input(pcols,pver)
+    real(r8) :: thlm_input(pcols,pver)
+    real(r8) :: rtm_input(pcols,pver)
+    real(r8) :: rcm_input(pcols,pver)
+    real(r8) :: pres_input(pcols,pver)
+    real(r8) :: pdel_input(pcols,pver)
+    real(r8) :: inv_exner_input(pcols,pver)
+    real(r8) :: tk_input(pcols,pver)
+    real(r8) :: tkh_input(pcols,pver)
+    real(r8) :: cloud_frac_input(pcols,pver)
+
+    real(r8) :: host_dx_input(pcols)
+    real(r8) :: host_dy_input(pcols)
+
+    character(len=72) :: junk   ! a string to hold comment lines in input text file
+
+    real(r8) :: wprtp_sfc_read
+    real(r8) :: wpthlp_sfc_read
+    real(r8) :: upwp_sfc_read
+    real(r8) :: vpwp_sfc_read
+    real(r8) :: pverread
+    real(r8) :: pverpread
+    real(r8) :: zi_g_read
+    real(r8) :: zt_g_read
+    real(r8) :: dz_zi_read
+    real(r8) :: um_read
+    real(r8) :: vm_read
+    real(r8) :: wm_zt_read
+    real(r8) :: tke_zt_read
+    real(r8) :: thv_read
+    real(r8) :: thlm_read
+    real(r8) :: rtm_read
+    real(r8) :: rcm_read
+    real(r8) :: presi_read
+    real(r8) :: pres_read
+    real(r8) :: pdel_read
+    real(r8) :: inv_exner_read
+    real(r8) :: tk_read
+    real(r8) :: tkh_read
+    real(r8) :: cloud_frac_read
+
+    integer :: kk
+    integer :: k_read
+    integer :: ki_cxx_read
+    integer :: kt_cxx_read
+    integer :: ierr
+    integer :: unitn
+   !integer :: nstep
+
+    if (.not.masterproc) then
+       call endrun('In SCM mode but calculating SHOC on multiple MPI processes?')
+    end if
+
+    if (masterproc) then
+
+       !----------------------------------------------------------------
+       ! Surface variables
+       !----------------------------------------------------------------
+       write(iulog,*) 'Read in column surface vars initial conditions.'
+
+       unitn = getunit()
+       open( unitn, file='ShocInOut_IC_surface_vars.txt', status='old' )
+       read( unitn, *, iostat=ierr ) junk
+       if( ierr /= 0 ) then
+          call endrun('Error reading ShocInOut_IC_surface_vars.txt.')
+       end if
+       read( unitn, *, iostat=ierr ) junk
+
+       read(unitn, *)  pverread
+       write(iulog,*) 'pverread is:  ', pverread
+       pverpread = pverread + 1
+
+       read(unitn,*) dz_zi_read      !  dz_zi is computed in subroutine shoc_main/shoc_grid from zi_g, zt_g
+                                     !  So this is not directly used.
+       read(unitn,*) zsurf           !  zsurf, assume zero for now and don't use
+       write(iulog,*) 'zsurf is:  ', zsurf
+
+       read(unitn,*) wprtp_sfc_read  ! kg/kg m/s
+       write(iulog,*) 'wprtp_sfc is:  ',wprtp_sfc_read
+
+       read(unitn,*) wpthlp_sfc_read  ! In SHOC this needs to be in kinematic units (K-m/s); for this input file format, it is
+       write(iulog,*) 'wpthlp_sfc is:  ',wpthlp_sfc_read
+
+       read(unitn,*) upwp_sfc_read
+       write(iulog,*) 'upwp_sfc is:  ',upwp_sfc_read
+
+       read(unitn,*) vpwp_sfc_read
+       write(iulog,*) 'vpwp_sfc is:  ',vpwp_sfc_read
+
+       wprtp_sfc_input(:ncol) = wprtp_sfc_read
+       wpthlp_sfc_input(:ncol) = wpthlp_sfc_read
+       upwp_sfc_input(:ncol) = upwp_sfc_read
+       vpwp_sfc_input(:ncol) = vpwp_sfc_read
+
+       close( unitn )
+       call freeunit( unitn )
+
+       !----------------------------------------------------------------
+       ! Variables at layer interfaces
+       !----------------------------------------------------------------
+       write(iulog,*) 'Read in column zi profile initial conditions.'
+       unitn = getunit()
+       open( unitn, file='ShocInOut_IC_zi_grid.txt', status='old' )
+       read( unitn, *, iostat=ierr ) junk
+       if( ierr /= 0 ) then
+          call endrun('Error reading ShocInOut_IC_zi_grid.txt.')
+       end if
+       read( unitn, * ) junk
+       read( unitn, * ) junk
+
+       !  This in-out exercise only makes sense if pverpread <= pverp, number of E3SM interface levels
+       !  In case pverpread > pverp, only utilize first pverp input values, ignore rest, but still read whole file.
+
+       do k_read=1,pverpread
+        kk = pverp-k_read+1       ! Note that for SHOC k=1 is model top, but input file starts at model surface
+        read(unitn,*) ki_cxx_read, zi_g_read, presi_read   ! first column is interface index, but zero-based as in C++
+        if( (ki_cxx_read+1) .ne. k_read ) then
+          call endrun('Mismatch between interface count and k -- missing value?')
+        else if(kk.ge.1) then
+           zi_g_input(:ncol,kk) = zi_g_read
+           presi_input(:ncol,kk) = presi_read
+           write(iulog,*) kk,zi_g_read,presi_read
+        end if
+       end do
+       close( unitn )
+       call freeunit( unitn )
+
+       !----------------------------------------------------------------
+       ! Variables at layer midpoints
+       !----------------------------------------------------------------
+       write(iulog,*) 'Read in column zt profile initial conditions.'
+       unitn = getunit()
+       open( unitn, file='ShocInOut_IC_zt_grid.txt', status='old' )
+       read( unitn, *, iostat=ierr ) junk
+       if( ierr /= 0 ) then
+          call endrun('Error reading ShocInOut_IC_zt_grid.txt.')
+       end if
+       read( unitn, * ) junk
+       read( unitn, * ) junk
+
+       do k_read=1,pverread
+          kk = pver-k_read+1
+          read(unitn,*) kt_cxx_read, zt_g_read, um_read, vm_read, wm_zt_read, tke_zt_read, thv_read, &
+               thlm_read, rtm_read, rcm_read, pres_read, pdel_read, inv_exner_read, tk_read, tkh_read, &
+               cloud_frac_read     ! first column is level index, but in zero-based indexing as in C++
+
+          if( (kt_cxx_read+1) .ne. k_read ) then
+             call endrun('Mismatch between level count and k -- missing value?')
+          else if(kk.ge.1) then
+              zt_g_input(:ncol,kk) = zt_g_read
+              um_input(:ncol,kk) = um_read
+              vm_input(:ncol,kk) = vm_read
+              wm_zt_input(:ncol,kk) = wm_zt_read
+              tke_zt_input(:ncol,kk) = tke_zt_read
+              thv_input(:ncol,kk) = thv_read
+              thlm_input(:ncol,kk) = thlm_read
+              rtm_input(:ncol,kk) = rtm_read
+              rcm_input(:ncol,kk) = rcm_read
+              pres_input(:ncol,kk) = pres_read
+              pdel_input(:ncol,kk) = pdel_read   !  Assumed to be consistent with presi(kk+1) - presi(kk)
+              inv_exner_input(:ncol,kk) = inv_exner_read  ! Assumed to be consistent with pres(kk) and interface constants
+              tk_input(:ncol,kk) = tk_read
+              !  looks like tk, tkh are effectively intent(out), so initial values not actually used.
+              tkh_input(:ncol,kk) = tkh_read
+              cloud_frac_input(:ncol,kk) = cloud_frac_read
+              write(iulog,*) kk, zt_g_read, um_read, vm_read, wm_zt_read, tke_zt_read, &
+                   thv_read, thlm_read, rtm_read, rcm_read, pres_read, pdel_read, &
+                   inv_exner_read, tk_read, tkh_read, cloud_frac_read
+           end if
+
+       end do
+
+       close( unitn )
+       call freeunit( unitn )
+
+    end if ! masterproc
+
+  end subroutine read_and_set_input_to_shoc_main
 
 end module shoc_intr
