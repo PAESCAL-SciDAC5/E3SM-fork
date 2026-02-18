@@ -937,7 +937,7 @@ end function shoc_implements_cnst
 
    ! Open txt file for output
 
-   if (l_turb_standalone.and.masterproc) then
+   if (single_column.and.masterproc) then
 
       ! Determine name of txt output file
 
@@ -960,13 +960,13 @@ end function shoc_implements_cnst
       write(iulog,*) 'n_shoc_main_calls = ', n_shoc_main_calls
       write(iulog,*) 'nadv              = ', nadv
 
-   end if ! l_turb_standalone.and.masterproc
+   end if ! single_column.and.masterproc
 
    ! Write statement inside shoc_main will only be executed when the simulation
    ! is run in an SCM "turb standalone" model when the nadv loop inside shoc_main
    ! is used to take multiple substeps.
 
-   l_inner_write = l_turb_standalone.and.(.not.l_shoc_outer_loop)
+   l_inner_write = single_column.and.(.not.l_shoc_outer_loop)
 
    ! ------------------------------------------------- !
    ! Actually call SHOC                                !
@@ -1000,7 +1000,7 @@ end function shoc_implements_cnst
 
       ! Write results to txt file after each shoc_main call
 
-      if (l_turb_standalone.and.l_shoc_outer_loop.and.masterproc) then
+      if (single_column.and.l_shoc_outer_loop.and.masterproc) then
            do kk = pver, 1, -1
               write(txtout_unit,fmt) i_shoc_main * nint(dtime), &!
                                      kk - 1,                    &!
@@ -1017,7 +1017,7 @@ end function shoc_implements_cnst
   end do  ! end i_shoc_main loop
   !============================
 
-  if (l_turb_standalone.and.masterproc) then
+  if (single_column.and.masterproc) then
      close(txtout_unit)
      call freeunit(txtout_unit)
   end if
