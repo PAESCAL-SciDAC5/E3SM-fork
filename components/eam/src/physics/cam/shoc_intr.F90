@@ -934,6 +934,8 @@ end function shoc_implements_cnst
              ncol, thv, zt_g, zi_g, state1%pmid, state1%pint, state1%pdel, &
              wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, inv_exner, tke_zt, &
              thlm, rtm, um, vm, wm_zt, rcm, cloud_frac, tkh, tk )
+
+      wthv(:ncol,:) = 0.0_r8
    end if
 
    ! Open txt file for output
