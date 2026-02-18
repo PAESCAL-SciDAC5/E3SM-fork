@@ -583,7 +583,7 @@ subroutine shoc_main ( &
     if (l_txt_write.and.masterproc) then
       do kk=nlev,1,-1
          write(txtout_unit,fmt) t*nint(dtime),                                           &! time elapsed inside this subroutine 
-                                kk-1,                                                    &! vertical layer index (upward, starting from 0)
+                                kk-1,                                                    &! vertical layer index (0 = TOM, nlev - 1 = sfc)
                                 u_wind(1,kk), v_wind(1,kk), tke(1,kk),                   &! u, v, and tke
                                     qw(1,kk)-shoc_ql(1,kk),                              &! qv
                                shoc_ql(1,kk),                                            &! qc

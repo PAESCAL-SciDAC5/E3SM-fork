@@ -949,7 +949,7 @@ end function shoc_implements_cnst
 
       txtout_unit = getunit()
       open(txtout_unit, file=trim(outfname), status='replace')
-      write(txtout_unit,*) 'time, k (upward, starting from 0), u, v, tke, qv, qc, T, P'
+      write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), u, v, tke, qv, qc, T, P'
 
       ! Send info to iulog to double check
 
@@ -1003,7 +1003,7 @@ end function shoc_implements_cnst
       if (single_column.and.l_shoc_outer_loop.and.masterproc) then
            do kk = pver, 1, -1
               write(txtout_unit,fmt) i_shoc_main * nint(dtime), &!
-                                     kk - 1,                    &!
+                                     kk - 1,                    &! 0 = TOM, pver - 1 = sfc
                                      um(1,kk),                  &!
                                      vm(1,kk),                  &!
                                      tke_zt(1,kk),              &!
