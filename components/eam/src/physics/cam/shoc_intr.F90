@@ -29,6 +29,7 @@ module shoc_intr
   use cam_abortutils, only: endrun
   use iop_data_mod,   only: single_column
   use units, only:  getunit, freeunit
+  use time_manager,  only: get_nstep
 
   implicit none
 
@@ -943,7 +944,9 @@ end function shoc_implements_cnst
 
       txt_output_prefix = 'shoc_output'
       if (len_trim(shoc_output_prefix) > 0) txt_output_prefix = trim(shoc_output_prefix)
-      write(outfname, '(A,A,I0,A,I0,A)') trim(txt_output_prefix), '_nadv', nadv, '_x_shocm', n_shoc_main_calls, '.txt'
+      write(outfname, '(A,3(A,I0),A)') trim(txt_output_prefix), &
+                                       '_nadv', nadv, '_x_shocm',n_shoc_main_calls, &
+                                       '_nstep',get_nstep(), '.txt'
 
       ! Open txt file and write a header
 
