@@ -987,7 +987,7 @@ end function shoc_implements_cnst
            turb_nadv_out_nstep, lchnk,     & ! Input
            ncol, pver, pverp, dtime, nadv, & ! Input
            host_dx_in(:ncol), host_dy_in(:ncol), thv(:ncol,:),& ! Input
-          !The line commended out below was in the orginal E3SM code. Was the use of state instead of state1 for pmid and pint a typo?
+          !The line commented out below was in the orginal E3SM code. Was the use of state instead of state1 for pmid and pint a typo?
           !zt_g(:ncol,:), zi_g(:ncol,:), state%pmid(:ncol,:pver), state%pint(:ncol,:pverp), state1%pdel(:ncol,:pver),& ! Input
            zt_g(:ncol,:), zi_g(:ncol,:),state1%pmid(:ncol,:pver),state1%pint(:ncol,:pverp), state1%pdel(:ncol,:pver),& ! Input
            wpthlp_sfc(:ncol), wprtp_sfc(:ncol), upwp_sfc(:ncol), vpwp_sfc(:ncol), & ! Input
