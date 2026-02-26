@@ -1461,10 +1461,7 @@ end function shoc_implements_cnst
 
     if (.not.masterproc) then
        call endrun('In SCM mode but calculating SHOC on multiple MPI processes?')
-    end if
-
-    if (masterproc) then
-
+    else
        !----------------------------------------------------------------
        ! Surface variables
        !----------------------------------------------------------------
