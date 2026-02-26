@@ -1426,9 +1426,6 @@ end function shoc_implements_cnst
     real(r8) :: tkh_input(pcols,pver)
     real(r8) :: cloud_frac_input(pcols,pver)
 
-    real(r8) :: host_dx_input(pcols)
-    real(r8) :: host_dy_input(pcols)
-
     character(len=72) :: junk   ! a string to hold comment lines in input text file
 
     real(r8) :: wprtp_sfc_read
