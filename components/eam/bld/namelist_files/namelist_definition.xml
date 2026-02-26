@@ -3448,8 +3448,8 @@ Default: set by build-namelist
 <entry id="shoc_output_prefix" type="char*256" category="pblrad"
        group="shocpbl_diff_nl" valid_values="" >
 Prefix for SHOC text output filenames used in in-and-out experiments.
-When set, output files are named {prefix}_nadv{N}x{M}_exp{1|2}.txt.
-When empty (default), the old hardcoded filenames are used.
+Output files are named {prefix}_nadv{N}_x_shocm{M}_nstep{NSTEPS}_macmicsub{MACMICSUB}.txt.
+When empty (default), a built-in prefix 'shoc_output' is used.
 Default: ''
 </entry>
 
