@@ -89,14 +89,16 @@ module shoc_intr
   integer            :: history_budget_histfile_num
   logical            :: micro_do_icesupersat
 
-  logical            :: l_turb_standalone  ! .t. = use EAM's code infrastructure but test SHOC in
-                                           ! a single-column standalone mode
+  logical :: l_turb_standalone = .false.  ! .true. = use EAM's code infrastructure but test SHOC in
+                                          !          a single-column standalone mode
 
-  logical            :: l_shoc_outer_loop = .true.
-                                           ! .false. = experiment 1: single shoc_main call with nadv=360,
-                                           !           output written inside shoc.F90 (*_exp1.txt)
-                                           ! .true.  = experiment 2: 360 shoc_main calls with nadv=1,
-                                           !           output written from shoc_intr (*_exp2.txt)
+  logical :: l_shoc_outer_loop = .false.  ! .false. = Use a single shoc_main call with nadv calculated from
+                                          !           the host model's and SHOC's step sizes. When l_turb_standalone = .t.,
+                                          !           text output is written from the subroutine shoc_main inside shoc.F90
+                                          ! .true.  = The number of shoc_main calls is calculated from the
+                                          !           host model's and SHOC's step sizes; each call uses nadv=1.
+                                          !           When l_turb_standalone = .t.,, text output is written from
+                                          !           subroutine shoc_tend_e3sm in this module.
 
   character(len=16)  :: eddy_scheme      ! Default set in phys_control.F90
   character(len=16)  :: deep_scheme      ! Default set in phys_control.F90
