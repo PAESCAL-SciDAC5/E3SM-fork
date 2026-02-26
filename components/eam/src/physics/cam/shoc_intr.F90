@@ -1435,8 +1435,8 @@ end function shoc_implements_cnst
     real(r8) :: wpthlp_sfc_read
     real(r8) :: upwp_sfc_read
     real(r8) :: vpwp_sfc_read
-    real(r8) :: pverread
-    real(r8) :: pverpread
+    integer  :: pverread
+    integer  :: pverpread
     real(r8) :: zi_g_read
     real(r8) :: zt_g_read
     real(r8) :: dz_zi_read
