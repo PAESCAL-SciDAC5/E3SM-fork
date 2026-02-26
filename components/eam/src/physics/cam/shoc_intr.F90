@@ -799,7 +799,7 @@ end function shoc_implements_cnst
 
    !  determine number of timesteps SHOC core should be advanced,
    !  host time step divided by SHOC time step
-   shoc_num_steps = max(hdtime/dtime,1._r8)
+   shoc_num_steps = max(nint(hdtime/dtime), 1)
 
    !----------------------------
 
