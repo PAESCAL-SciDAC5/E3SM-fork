@@ -928,9 +928,9 @@ end function shoc_implements_cnst
    !----------------------------------------------------------------------------------
    ! Initialization/preparation for "standalone"/"in-and-out" test (only in SCM mode)
    !----------------------------------------------------------------------------------
-   ! Overwrite values of shoc_main's input variables using values from txt files
-
    if (l_turb_standalone) then
+
+      ! Overwrite values of shoc_main's input variables using values from txt files
 
       call read_and_set_input_to_shoc_main( &
              ncol, thv, zt_g, zi_g, state1%pmid, state1%pint, state1%pdel, &
@@ -938,43 +938,39 @@ end function shoc_implements_cnst
              thlm, rtm, um, vm, wm_zt, rcm, cloud_frac, tkh, tk )
 
       wthv(:ncol,:) = 0.0_r8
-   end if
 
-   ! Open txt file for output
+      if (masterproc) then
 
-   if (single_column.and.masterproc) then
+         ! Determine name of txt output file
 
-      ! Determine name of txt output file
+         txt_output_prefix = 'shoc_output'
+         if (len_trim(shoc_output_prefix) > 0) txt_output_prefix = trim(shoc_output_prefix)
+         write(outfname, '(A,4(A,I0),A)') trim(txt_output_prefix), &
+                                          '_nadv', nadv, '_x_shocm',n_shoc_main_calls, &
+                                          '_nstep',get_nstep(), '_macmicsub',macmic_it,&
+                                          '.txt'
 
-      txt_output_prefix = 'shoc_output'
-      if (len_trim(shoc_output_prefix) > 0) txt_output_prefix = trim(shoc_output_prefix)
-      write(outfname, '(A,4(A,I0),A)') trim(txt_output_prefix), &
-                                       '_nadv', nadv, '_x_shocm',n_shoc_main_calls, &
-                                       '_nstep',get_nstep(), '_macmicsub',macmic_it,&
-                                       '.txt'
+         ! Open txt file and write a header
 
-      ! Open txt file and write a header
+         txtout_unit = getunit()
+         open(txtout_unit, file=trim(outfname), status='replace')
+         write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), u, v, tke, qv, qc, T, P'
 
-      txtout_unit = getunit()
-      open(txtout_unit, file=trim(outfname), status='replace')
-      write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), u, v, tke, qv, qc, T, P'
+         ! Send info to iulog to double check
 
-      ! Send info to iulog to double check
+         write(iulog,*) 'shoc_num_steps    = ', shoc_num_steps
+         write(iulog,*) 'n_shoc_main_calls = ', n_shoc_main_calls
+         write(iulog,*) 'nadv              = ', nadv
 
-     !write(iulog,*) 'host_dx value:  ', host_dx_in, ' to be set to ', host_dx_input
-     !write(iulog,*) 'host_dy value:  ', host_dy_in, ' to be set to ', host_dy_input
+      end if  ! masterproc
 
-      write(iulog,*) 'shoc_num_steps    = ', shoc_num_steps
-      write(iulog,*) 'n_shoc_main_calls = ', n_shoc_main_calls
-      write(iulog,*) 'nadv              = ', nadv
-
-   end if ! single_column.and.masterproc
+   end if ! l_turb_standalone
 
    ! Write statement inside shoc_main will only be executed when the simulation
    ! is run in an SCM "turb standalone" model when the nadv loop inside shoc_main
    ! is used to take multiple substeps.
 
-   l_inner_write = single_column.and.(.not.l_shoc_outer_loop)
+   l_inner_write = l_turb_standalone .and. (.not.l_shoc_outer_loop)
 
    ! ------------------------------------------------- !
    ! Actually call SHOC                                !
@@ -1006,9 +1002,9 @@ end function shoc_implements_cnst
            uw_sec_out(:ncol,:), vw_sec_out(:ncol,:), w3_out(:ncol,:), & ! Output (diagnostic)
            wqls_out(:ncol,:),brunt_out(:ncol,:),rcm2(:ncol,:)) ! Output (diagnostic)
 
-      ! Write results to txt file after each shoc_main call
+      ! Write results to txt file after each shoc_main call if conditions are met.
 
-      if (single_column.and.l_shoc_outer_loop.and.masterproc) then
+      if (l_turb_standalone .and. l_shoc_outer_loop .and. masterproc) then
            do kk = pver, 1, -1
               write(txtout_unit,fmt) i_shoc_main * nint(dtime), &!
                                      kk - 1,                    &! 0 = TOM, pver - 1 = sfc
@@ -1025,7 +1021,7 @@ end function shoc_implements_cnst
   end do  ! end i_shoc_main loop
   !============================
 
-  if (single_column.and.masterproc) then
+  if (l_turb_standalone.and.masterproc) then
      close(txtout_unit)
      call freeunit(txtout_unit)
   end if
