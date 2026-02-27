@@ -3455,6 +3455,22 @@ Coefficient for eddy diffusivity for momentum for stable boundary layers.
 Default: set by build-namelist
 </entry>
 
+<entry id="shoc_output_prefix" type="char*256" category="pblrad"
+       group="shocpbl_diff_nl" valid_values="" >
+Prefix for SHOC text output filenames used in in-and-out experiments.
+Output files are named {prefix}_nadv{N}_x_shocm{M}_nstep{NSTEPS}_macmicsub{MACMICSUB}.txt.
+When empty (default), a built-in prefix 'shoc_output' is used.
+Default: ''
+</entry>
+
+<entry id="l_shoc_outer_loop" type="logical" category="pblrad"
+       group="shocpbl_diff_nl" valid_values="" >
+Controls in-and-out experiment mode for SHOC.
+  .false. = experiment 1: single shoc_main call with large nadv (output from shoc.F90)
+  .true.  = experiment 2: many shoc_main calls with nadv=1 (output from shoc_intr.F90)
+Default: .true.
+</entry>
+
 <entry id="clubb_cloudtop_cooling" type="logical"  category="pblrad"
        group="clubbpbl_diff_nl" valid_values="" >
 Apply cloud top radiative cooling parameterization

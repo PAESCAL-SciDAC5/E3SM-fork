@@ -3816,6 +3816,8 @@ if ($shoc_sgs  =~ /$TRUE/io) {
    add_default($nl, 'shoc_Ckm');
    add_default($nl, 'shoc_Ckh_s');
    add_default($nl, 'shoc_Ckm_s');
+   add_default($nl, 'shoc_output_prefix');
+   add_default($nl, 'l_shoc_outer_loop');
 }
 
 

@@ -14,6 +14,7 @@ module shoc
 
   use physics_utils, only: rtype, rtype8, itype, btype
   use scream_abortutils, only: endscreamrun
+  use spmd_utils, only: masterproc
 
 ! Bit-for-bit math functions.
 #ifdef SCREAM_CONFIG_IS_CMAKE
@@ -31,6 +32,8 @@ logical :: use_cxx = .true.
 real(rtype), parameter, public :: largeneg = -99999999.99_rtype
 real(rtype), parameter, public :: pi = 3.14159265358979323_rtype
 
+!character(len=*), parameter, public :: fmt = '(i8,i4,20ES22.13)'
+character(len=*), parameter, public :: fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)'
 !=========================================================
 ! Physical constants used in SHOC
 !=========================================================
@@ -221,6 +224,7 @@ end subroutine shoc_init
 ! Host models should call the following routine to call SHOC
 
 subroutine shoc_main ( &
+     l_txt_write, txtout_unit, &          ! Input
      turb_nadv_out_nstep, lchnk, &        ! Input
      shcol, nlev, nlevi, dtime, nadv, &   ! Input
      host_dx, host_dy,thv, &              ! Input
@@ -253,6 +257,8 @@ subroutine shoc_main ( &
 
 ! INPUT VARIABLES
 
+  logical, intent(in) :: l_txt_write         ! Whether results will be written out to a txt file within the nadv loop
+  integer, intent(in) :: txtout_unit         ! File handle for txt output
   integer, intent(in) :: turb_nadv_out_nstep ! # of time steps (in this subr.) to write out fields for
   integer, intent(in) :: lchnk               ! chunk ID related to the host model's domain decomposition
 
@@ -407,6 +413,8 @@ subroutine shoc_main ( &
               wv_b(shcol),wl_b(shcol),&
               se_a(shcol),ke_a(shcol),&
               wv_a(shcol),wl_a(shcol)
+
+  integer :: kk
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
   integer :: clock_count1, clock_count_rate, clock_count_max, clock_count2, clock_count_diff
@@ -567,6 +575,21 @@ subroutine shoc_main ( &
        call outfld('SHOC_TKE'//trim(adjustl(numstr)),         tke,shcol,lchnk)
        call outfld(  'THETAL'//trim(adjustl(numstr)),      thetal,shcol,lchnk)
        call outfld( 'CLDFRAC'//trim(adjustl(numstr)),shoc_cldfrac,shcol,lchnk)
+    end if
+
+    !---------------------------------------------
+    ! Write out fields to SHOC text output file
+
+    if (l_txt_write.and.masterproc) then
+      do kk=nlev,1,-1
+         write(txtout_unit,fmt) t*nint(dtime),                                           &! time elapsed inside this subroutine 
+                                kk-1,                                                    &! vertical layer index (0 = TOM, nlev - 1 = sfc)
+                                u_wind(1,kk), v_wind(1,kk), tke(1,kk),                   &! u, v, and tke
+                                    qw(1,kk)-shoc_ql(1,kk),                              &! qv
+                               shoc_ql(1,kk),                                            &! qc
+                                thetal(1,kk)/inv_exner(1,kk) + lcond/cp * shoc_ql(1,kk), &! temperature
+                                  pres(1,kk)                                              ! pressure
+      end do
     end if
     !---------------------------------------------
 
