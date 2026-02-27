@@ -88,9 +88,10 @@ module clubb_intr
       ts_nudge = 86400._core_rknd, &    ! Time scale for u/v nudging (not used)     [s]
       p0_clubb = 100000._core_rknd
 
-  real(core_rknd), parameter :: &
-      host_dx = 100000._core_rknd, &    ! Host model deltax [m]
-      host_dy = 100000._core_rknd       ! Host model deltay [m]
+  real(core_rknd) :: host_dx  ! Host model deltax [m]
+  real(core_rknd) :: host_dy  ! Host model deltay [m]
+
+  real(r8) :: host_dx_dy_nml  ! Host model delta-x, delta-y set in namelist [m]
 
   integer, parameter :: &
     sclr_dim = 0                        ! Higher-order scalars, set to zero
@@ -712,7 +713,15 @@ end subroutine clubb_init_cnst
                       history_amwg_out=history_amwg, &
                       history_clubb_out=history_clubb,&
                       turb_nadv_out_nstep_out = turb_nadv_out_nstep, &
+                      host_dx_dy_out  = host_dx_dy_nml, &
                       liqcf_fix_out   = liqcf_fix)
+
+    write(iulog,*) 'clubb_init_e3sm: l_turb_standalone   = ',l_turb_standalone
+    write(iulog,*) 'clubb_init_e3sm: host_dx_dy_nml      = ',host_dx_dy_nml
+    write(iulog,*) 'clubb_init_e3sm: turb_nadv_out_nstep = ',turb_nadv_out_nstep
+
+    host_dx = real(host_dx_dy_nml, kind=core_rknd)
+    host_dy = real(host_dx_dy_nml, kind=core_rknd)
 
     !  Select variables to apply tendencies back to CAM
 
