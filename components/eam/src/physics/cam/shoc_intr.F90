@@ -647,7 +647,7 @@ end function shoc_implements_cnst
    real(r8) :: liq_cloud_frac(pcols,pver)
    real(r8) :: dlf2(pcols,pver)
    real(r8) :: isotropy(pcols,pver)
-   real(r8) :: host_dx, host_dy
+   real(r8) :: host_dx_crm, host_dy_crm
    real(r8) :: host_temp(pcols,pver)
    real(r8) :: host_dx_in(pcols), host_dy_in(pcols)
    real(r8) :: shoc_mix_out(pcols,pver), tk_in(pcols,pver), tkh_in(pcols,pver)
@@ -819,9 +819,9 @@ end function shoc_implements_cnst
      host_dx_in(:) = host_dx_dy_nml
      host_dy_in(:) = host_dx_dy_nml
    else if (dp_crm) then
-     call grid_size_planar_uniform(host_dx, host_dy)
-     host_dx_in(:) = host_dx
-     host_dy_in(:) = host_dy
+     call grid_size_planar_uniform(host_dx_crm, host_dy_crm)
+     host_dx_in(:) = host_dx_crm
+     host_dy_in(:) = host_dy_crm
    else
      call grid_size(state1, host_dx_in, host_dy_in)
    endif
