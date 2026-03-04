@@ -3859,6 +3859,10 @@ if ($clubb_sgs  =~ /$TRUE/io) {
    add_default($nl, 'clubb_tk1');
    add_default($nl, 'clubb_tk2');
    add_default($nl, 'clubb_wpxp_L_thresh');
+    # >>> SCM_INOUT_CHANGES BEGIN
+    add_default($nl, 'clubb_output_prefix');
+    add_default($nl, 'l_clubb_outer_loop');
+    # <<< SCM_INOUT_CHANGES END
    add_default($nl, 'relvar_fix');
    add_default($nl, 'clubb_use_sgv');
 

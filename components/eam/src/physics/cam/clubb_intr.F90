@@ -30,6 +30,10 @@ module clubb_intr
   use perf_mod,      only: t_startf, t_stopf
   use mpishorthand
   use cam_history_support, only: fillvalue
+   ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
+   use units,         only: getunit, freeunit
+   use time_manager,  only: get_nstep
+   ! <<< CLUBB_INOUT_CHANGES END
 #ifdef CLUBB_SGS
   use clubb_api_module, only: pdf_parameter, clubb_fatal_error, fstderr
   use clubb_precision,  only: core_rknd
@@ -135,6 +139,10 @@ module clubb_intr
 
   logical            :: l_turb_standalone  ! .t. = use EAM's code infrastructure but test CLUBB in
                                            ! a single-column standalone mode
+   ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
+   logical            :: l_clubb_outer_loop = .true.  ! .false. = experiment 1: single advance_clubb_core_api loop with large nadv
+                                                      ! .true.  = experiment 2: many advance_clubb_core_api calls with nadv=1
+   ! <<< CLUBB_INOUT_CHANGES END
   logical            :: do_tms
   logical            :: linearize_pbl_winds
   logical            :: lq(pcnst)
@@ -259,6 +267,11 @@ module clubb_intr
 
   logical :: liqcf_fix = .FALSE.  ! HW for liquid cloud fraction fix
   logical :: relvar_fix = .FALSE. !PMA for relvar fix
+
+   ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
+   ! Prefix for CLUBB text output filenames (set via namelist clubb_output_prefix)
+   character(len=256) :: clubb_output_prefix = ''
+   ! <<< CLUBB_INOUT_CHANGES END
 
   real(r8) :: micro_mg_accre_enhan_fac = huge(1.0_r8) !Accretion enhancement factor from namelist
 
@@ -465,11 +478,14 @@ end subroutine clubb_init_cnst
     integer :: iunit, read_status
 
     namelist /clubb_his_nl/ clubb_history, clubb_rad_history
-    namelist /clubbpbl_diff_nl/ clubb_cloudtop_cooling, clubb_rainevap_turb, clubb_expldiff, &
-                                clubb_do_adv, clubb_do_deep, clubb_timestep, clubb_stabcorrect, &
-                                clubb_rnevap_effic, clubb_liq_deep, clubb_liq_sh, clubb_ice_deep, &
-                                clubb_ice_sh, clubb_tk1, clubb_tk2, relvar_fix, clubb_use_sgv, &
-                                clubb_vert_avg_closure, clubb_ipdf_call_placement
+   namelist /clubbpbl_diff_nl/ clubb_cloudtop_cooling, clubb_rainevap_turb, clubb_expldiff, &
+                        clubb_do_adv, clubb_do_deep, clubb_timestep, clubb_stabcorrect, &
+                        clubb_rnevap_effic, clubb_liq_deep, clubb_liq_sh, clubb_ice_deep, &
+                        clubb_ice_sh, clubb_tk1, clubb_tk2, relvar_fix, clubb_use_sgv, &
+                        clubb_vert_avg_closure, clubb_ipdf_call_placement, &
+   ! >>> SCM_INOUT_CHANGES BEGIN
+                        clubb_output_prefix, l_clubb_outer_loop
+   ! <<< SCM_INOUT_CHANGES END
 
 
     !----- Begin Code -----
@@ -487,6 +503,10 @@ end subroutine clubb_init_cnst
     use_sgv            = .false.
     clubb_vert_avg_closure = .true.
     clubb_ipdf_call_placement = -999
+   ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
+   clubb_output_prefix = ''
+   l_clubb_outer_loop = .true.
+   ! <<< CLUBB_INOUT_CHANGES END
 
 
     !  Read namelist to determine if CLUBB history should be called
@@ -536,6 +556,10 @@ end subroutine clubb_init_cnst
       call mpibcast(clubb_use_sgv,            1,   mpilog,   0, mpicom)
       call mpibcast(clubb_vert_avg_closure,   1,   mpilog,   0, mpicom)
       call mpibcast(clubb_ipdf_call_placement,   1,   mpiint,   0, mpicom)
+      ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
+      call mpibcast(clubb_output_prefix, len(clubb_output_prefix), mpichar, 0, mpicom)
+      call mpibcast(l_clubb_outer_loop,        1,   mpilog,  0, mpicom)
+      ! <<< CLUBB_INOUT_CHANGES END
 #endif
 
     !  Overwrite defaults if they are true
@@ -1264,6 +1288,10 @@ end subroutine clubb_init_cnst
    type(physics_ptend) :: ptend_loc             ! Local tendency from processes, added up to return as ptend_all
 
    integer :: i, j, k, t, ixind, nadv
+   ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
+   integer :: clubb_num_steps
+   integer :: n_clubb_main_calls
+   ! <<< CLUBB_INOUT_CHANGES END
    integer :: ixcldice, ixcldliq, ixnumliq, ixnumice, ixq
    integer :: itim_old
    integer :: ncol, lchnk                       ! # of columns, and chunk identifier
@@ -1275,6 +1303,17 @@ end subroutine clubb_init_cnst
    ! for single-column mode only:
    character(len=8) :: numstr         ! a string like "_0001" that corresponds to a single value of CLUBB's timestep counter t
    integer :: turb_nadv_out_nstep     ! # of CLUBB's time steps to write out fields for
+   ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
+   integer :: i_clubb_main
+   integer :: txtout_unit
+   integer :: kk
+   logical :: l_inner_write
+   character(len=256) :: txt_output_prefix
+   character(len=512) :: outfname
+   character(len=*), parameter :: clubb_txt_fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)'
+   ! this one is for getting input for CLUBB in-n-out mode
+   real(core_rknd) :: pdel_input(pverp)
+   ! <<< CLUBB_INOUT_CHANGES END
    !-----
 
   !=====================================================================================
@@ -1902,6 +1941,17 @@ end subroutine clubb_init_cnst
    !  determine number of timesteps CLUBB core should be advanced,
    !  host time step divided by CLUBB time step
    nadv = max(hdtime_core_rknd/dtime,1._core_rknd)
+   ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
+   clubb_num_steps = max(int(hdtime_core_rknd/dtime),1)
+
+   if (l_clubb_outer_loop) then
+      n_clubb_main_calls = clubb_num_steps
+      nadv = 1
+   else
+      n_clubb_main_calls = 1
+      nadv = clubb_num_steps
+   end if
+   ! <<< CLUBB_INOUT_CHANGES END
 
    minqn = 0._r8
    newfice(:,:) = 0._r8
@@ -2341,17 +2391,102 @@ end subroutine clubb_init_cnst
          pdf_params_zm%mixt_frac = pdf_zm_mixt_frac_inout
       end if
 
-      ! ------------------------------------------------------------- !
-      ! (Placeholder for now:) Initialization for "standalone" test
-      ! ------------------------------------------------------------- !
+      ! ---------------------------------------------------------------------------
+      ! Initialization/preparation for "standalone"/"in-and-out" test (only in SCM mode)
+      ! - Heng XIAO
+      ! ---------------------------------------------------------------------------
       if (single_column.and.l_turb_standalone) then
-         call endrun('clubb_tend_cam: standalone test not yet fully implemented.')
+
+         ! (1) Set the height levels (zt_g, zi_g), 
+         ! mean state (thlm_in, rtm_in, um_in, vm_in, rcm_inout, cloud_frac_inout),
+         ! misc variables that won't change throughout the CLUBB calls
+         ! (p_in_Pa, exner, thv_ds_zt, pdel_input),
+         ! and sfc fluxes (wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc)
+         ! directly using SHOC IC file.
+         ! All the profile variables are on zt_g levels with the ghost level filled already.
+         call read_and_set_input_to_clubb_core( &
+              ncol, zt_g, zi_g, p_in_Pa, exner, thv_ds_zt, pdel_input, &
+              wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, &
+              thlm_in, rtm_in, um_in, vm_in, rcm_inout, cloud_frac_inout )
+         ! (2) Calculate derived variables 
+         do k = 1, pver
+            dz_g(k) = zi_g(k+1) - zi_g(k)
+            rho_ds_zt(k+1) = invrs_gravit * pdel_input(k+1) / dz_g(k)
+         enddo
+         rho_ds_zt(1) = rho_ds_zt(2)
+         sfc_elevation = zi_g(1) ! zi_g(1) should be zero
+         rho_ds_zm = zt2zm_api(rho_ds_zt)
+         thv_ds_zm = zt2zm_api(thv_ds_zt)
+         rho_in = rho_ds_zt
+         rho_zm = rho_ds_zm
+         do k=1,pverp
+            invrs_rho_ds_zt(k) = 1.0_core_rknd/rho_ds_zt(k)
+         enddo 
+         invrs_rho_ds_zm = zt2zm_api(invrs_rho_ds_zt)
+         
+         ! (3) OTHER RELEVANT IN OR INOUT VARIABLES to advance_clubb_core_api include:
+         !     (i) those set to the default initial values in `clubb_ini_cam` and 
+         !     read in through pbuf_get_field:
+         !     radf,
+         !     upwp_in, vpwp_in, up2_in, vp2_in, wprtp_in, wpthlp_in, wp2_in, wp3_in,
+         !     rtp2_in, thlp2_in, rtpthlp_in,
+         !     wpthvp_inout, wp2thvp_inout, rtpthvp_inout, thlpthvp_inout
+         !     pdf_params, pdf_params_zm),
+         !     (ii) those set to zero at the top of clubb_tend_cam:
+         !     fcor,
+         !     thlm_forcing, rtm_forcing, um_forcing, vm_forcing, sclrm_forcing, edsclrm_forcing,
+         !     wprtp_forcing, wpthlp_forcing, rtp2_forcing, thlp2_forcing, rtpthlp_forcing,
+         !     rtp3_in, thlp3_in,
+         !     hydromet, wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt,
+         !     wpsclrp_sfc, wpedsclrp_sfc,
+         !     sclrpthvp_inout, sclrm, wpsclrp, sclrp2, sclrprtp, sclrpthlp,)
+         !     (iii) rfrzm and edscrl_in
+         !     these two seems to be read in through the state data structure.
+         !     edscrl_in is probably irrelevant for now,
+         !     rfrzm is set to zero here just to be safe,
+         rfrzm(:) = 0._core_rknd
+         !     (iv) wm_zm and wm_zts,
+         !     also set to zero here to be safe,
+         wm_zm = 0._core_rknd
+         wm_zt = 0._core_rknd
+         !     (v) upwp_sfc_pert, vpwp_sfc_pert, um_pert_col, vm_pert_col,
+         !     upwp_pert_col, vpwp_pert_col for linearize_pbl_winds
+         !     (vi) varmu2 for clubb_do_deep 
+         !     (vii) misc: dtime, l_implemented, error_code, host_dx, host_dy, hydromet_dim
+
+         ! (4) set the heights and parameters again for CLUBB internals
+         call setup_grid_heights_api(l_implemented, grid_type, zi_g(2), &
+            zi_g(1), zi_g, zt_g)
+         call setup_parameters_api(zi_g(2), clubb_params, pverp, grid_type, &
+            zi_g, zt_g, err_code)     
       end if
+
+      ! Open txt file for output (SCM only)
+      if (single_column.and.masterproc) then
+         txt_output_prefix = 'clubb_output'
+         if (len_trim(clubb_output_prefix) > 0) txt_output_prefix = trim(clubb_output_prefix)
+         write(outfname, '(A,4(A,I0),A)') trim(txt_output_prefix), &
+                                          '_nadv', nadv, '_x_clubb', n_clubb_main_calls, &
+                                          '_nstep', get_nstep(), '_macmicsub', macmic_it, &
+                                          '.txt'
+
+         txtout_unit = getunit()
+         open(txtout_unit, file=trim(outfname), status='replace')
+         write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), u, v, tke, qv, qc, T, P'
+
+         write(iulog,*) 'clubb_num_steps    = ', clubb_num_steps
+         write(iulog,*) 'n_clubb_main_calls = ', n_clubb_main_calls
+         write(iulog,*) 'nadv              = ', nadv
+      end if
+
+      l_inner_write = single_column.and.(.not.l_clubb_outer_loop)
 
       ! ------------------------------------------------------------- !
       ! Time integration for CLUBB only
       ! ------------------------------------------------------------- !
       call t_startf('adv_clubb_core_ts_loop')
+      ! added outer loop for CLUBB main calls to mimic SHOC setup for IN-AND-OUT test - Heng XIAO
+      do i_clubb_main = 1, n_clubb_main_calls
       do t=1,nadv    ! do needed number of "sub" timesteps for each CAM step
 
          !  Increment the statistics then being stats timestep
@@ -2470,10 +2605,52 @@ end subroutine clubb_init_cnst
              call outfld(  'THETAL'//trim(adjustl(numstr)),          thlm_in(pverp:2:-1),ncol,lchnk)
              call outfld( 'CLDFRAC'//trim(adjustl(numstr)), cloud_frac_inout(pverp:2:-1),ncol,lchnk)
           end if
-          !--------------------
+
+          ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
+          ! inner loop output
+          if (l_inner_write.and.masterproc) then
+             do kk=pver,1,-1
+                ixind = pverp-kk+1
+                write(txtout_unit,clubb_txt_fmt) t*nint(real(dtime, kind=r8)), &
+                     kk-1, &
+                     real(um_in(ixind), kind=r8), &
+                     real(vm_in(ixind), kind=r8), &
+                     0.5_r8*(real(up2_in(ixind), kind=r8)+real(vp2_in(ixind), kind=r8)+real(wp2_in(ixind), kind=r8)), &
+                     real(rtm_in(ixind)-rcm_inout(ixind), kind=r8), &
+                     real(rcm_inout(ixind), kind=r8), &
+                     real(thlm_in(ixind)*exner(ixind) + (latvap/cpair)*rcm_inout(ixind), kind=r8), &
+                     real(p_in_Pa(ixind), kind=r8)
+             end do
+          end if
+          ! <<< CLUBB_INOUT_CHANGES END
 
       enddo  ! end time loop
       call t_stopf('adv_clubb_core_ts_loop')
+
+      ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
+      ! outer loop output
+      if (single_column.and.l_clubb_outer_loop.and.masterproc) then
+         do kk=pver,1,-1
+            ixind = pverp-kk+1
+            write(txtout_unit,clubb_txt_fmt) i_clubb_main*nint(real(dtime, kind=r8)), &
+                 kk-1, &
+                 real(um_in(ixind), kind=r8), &
+                 real(vm_in(ixind), kind=r8), &
+                 0.5_r8*(real(up2_in(ixind), kind=r8)+real(vp2_in(ixind), kind=r8)+real(wp2_in(ixind), kind=r8)), &
+                 real(rtm_in(ixind)-rcm_inout(ixind), kind=r8), &
+                 real(rcm_inout(ixind), kind=r8), &
+                 real(thlm_in(ixind)*exner(ixind) + (latvap/cpair)*rcm_inout(ixind), kind=r8), &
+                 real(p_in_Pa(ixind), kind=r8)
+         end do
+      end if
+
+      end do  ! end i_clubb_main loop
+
+      if (single_column.and.masterproc) then
+         close(txtout_unit)
+         call freeunit(txtout_unit)
+      end if
+      ! <<< CLUBB_INOUT_CHANGES END
 
       if (clubb_do_adv) then
          if (macmic_it .eq. cld_macmic_num_steps) then
@@ -4244,5 +4421,185 @@ end function diag_ustar
   end subroutine stats_avg
 
 #endif
+
+   ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
+   subroutine read_and_set_input_to_clubb_core( &
+             ncol, zt_g_input, zi_g_input, p_in_Pa_input, exner_input, pdel_input, thv_input, &
+             wpthlp_sfc_input, wprtp_sfc_input, upwp_sfc_input, vpwp_sfc_input, &
+             thlm_input, rtm_input, um_input, vm_input, rcm_input, cloud_frac_input )
+
+    use ppgrid, only: pver, pverp, pcols
+
+    integer, intent(in) :: ncol
+
+    real(core_rknd), intent(inout) :: zt_g_input(pverp)
+    real(core_rknd), intent(inout) :: zi_g_input(pverp)
+    real(core_rknd), intent(inout) :: p_in_Pa_input(pverp)
+    real(core_rknd), intent(inout) :: exner_input(pverp)
+    real(core_rknd), intent(inout) :: pdel_input(pverp)
+    real(core_rknd), intent(inout) :: thv_input(pverp)
+    real(core_rknd), intent(inout) :: wpthlp_sfc_input
+    real(core_rknd), intent(inout) :: wprtp_sfc_input
+    real(core_rknd), intent(inout) :: upwp_sfc_input
+    real(core_rknd), intent(inout) :: vpwp_sfc_input
+    real(core_rknd), intent(inout) :: thlm_input(pverp)
+    real(core_rknd), intent(inout) :: rtm_input(pverp)
+    real(core_rknd), intent(inout) :: um_input(pverp)
+    real(core_rknd), intent(inout) :: vm_input(pverp)
+    real(core_rknd), intent(inout) :: rcm_input(pverp)
+    real(core_rknd), intent(inout) :: cloud_frac_input(pverp)
+
+    character(len=72) :: junk   ! a string to hold comment lines in input text file
+    real(r8) :: wprtp_sfc_read
+    real(r8) :: wpthlp_sfc_read
+    real(r8) :: upwp_sfc_read
+    real(r8) :: vpwp_sfc_read
+    real(r8) :: pverread
+    real(r8) :: pverpread
+    real(r8) :: zi_g_read
+    real(r8) :: zt_g_read
+    real(r8) :: dz_zi_read
+    real(r8) :: zsurf
+   real(r8) :: um_read
+   real(r8) :: vm_read
+   real(r8) :: wm_zt_read
+   real(r8) :: tke_zt_read
+   real(r8) :: thv_read
+   real(r8) :: thlm_read
+   real(r8) :: rtm_read
+   real(r8) :: rcm_read
+   real(r8) :: presi_read
+   real(r8) :: pres_read
+   real(r8) :: pdel_read
+   real(r8) :: inv_exner_read
+   real(r8) :: tk_read
+   real(r8) :: tkh_read
+   real(r8) :: cloud_frac_read
+
+    integer :: kk
+    integer :: k_read
+    integer :: ki_cxx_read
+    integer :: kt_cxx_read
+    integer :: ierr
+    integer :: unitn
+
+   if (ncol < 1) return
+
+    if (.not.masterproc) then
+       call endrun('In SCM mode but calculating CLUBB on multiple MPI processes?')
+    end if
+
+    if (masterproc) then
+
+       !----------------------------------------------------------------
+       ! Surface variables
+       !----------------------------------------------------------------
+      write(iulog,*) 'Read in column surface vars initial conditions (CLUBB/SHOC format).'
+
+       unitn = getunit()
+      open( unitn, file='ShocInOut_IC_surface_vars.txt', status='old' )
+       read( unitn, *, iostat=ierr ) junk
+       if( ierr /= 0 ) then
+          call endrun('Error reading ShocInOut_IC_surface_vars.txt.')
+       end if
+       read( unitn, *, iostat=ierr ) junk
+
+       read(unitn, *)  pverread
+       pverpread = pverread + 1
+
+       read(unitn,*) dz_zi_read      ! dz_zi is computed from zi_g, zt_g
+       read(unitn,*) zsurf           ! zsurf, assume zero for now and don't use
+
+       read(unitn,*) wprtp_sfc_read  ! kg/kg m/s
+       read(unitn,*) wpthlp_sfc_read ! K-m/s
+       read(unitn,*) upwp_sfc_read
+       read(unitn,*) vpwp_sfc_read
+
+       wprtp_sfc_input = real(wprtp_sfc_read, kind=core_rknd)
+       wpthlp_sfc_input = real(wpthlp_sfc_read, kind=core_rknd)
+       upwp_sfc_input = real(upwp_sfc_read, kind=core_rknd)
+       vpwp_sfc_input = real(vpwp_sfc_read, kind=core_rknd)
+
+       close( unitn )
+       call freeunit( unitn )
+
+       !----------------------------------------------------------------
+       ! Variables at layer interfaces
+       !----------------------------------------------------------------
+      write(iulog,*) 'Read in column zi profile initial conditions (CLUBB/SHOC format).'
+       unitn = getunit()
+      open( unitn, file='ShocInOut_IC_zi_grid.txt', status='old' )
+       read( unitn, *, iostat=ierr ) junk
+       if( ierr /= 0 ) then
+          call endrun('Error reading ShocInOut_IC_zi_grid.txt.')
+       end if
+       read( unitn, * ) junk
+       read( unitn, * ) junk
+
+       do k_read=1,int(pverpread)
+        read(unitn,*) ki_cxx_read, zi_g_read, presi_read
+        if( (ki_cxx_read+1) .ne. k_read ) then
+          call endrun('Mismatch between interface count and k -- missing value?')
+        else if(k_read .ge. 1) then
+           zi_g_input(k_read) = real(zi_g_read, kind=core_rknd)
+        end if
+       end do
+       close( unitn )
+       call freeunit( unitn )
+
+       !----------------------------------------------------------------
+       ! Variables at layer midpoints
+       !----------------------------------------------------------------
+      write(iulog,*) 'Read in column zt profile initial conditions (CLUBB/SHOC format).'
+       unitn = getunit()
+      open( unitn, file='ShocInOut_IC_zt_grid.txt', status='old' )
+       read( unitn, *, iostat=ierr ) junk
+       if( ierr /= 0 ) then
+          call endrun('Error reading ShocInOut_IC_zt_grid.txt.')
+       end if
+       read( unitn, * ) junk
+       read( unitn, * ) junk
+
+       do k_read=1,int(pverread)
+         read(unitn,*) kt_cxx_read, zt_g_read, um_read, vm_read, wm_zt_read, tke_zt_read, thv_read, &
+                       thlm_read, rtm_read, rcm_read, pres_read, pdel_read, inv_exner_read, tk_read, tkh_read, &
+                       cloud_frac_read
+         if( (kt_cxx_read+1) .ne. k_read ) then
+           call endrun('Mismatch between level count and k -- missing value?')
+         else if(k_read.ge.1) then
+           zt_g_input(k_read+1) = real(zt_g_read, kind=core_rknd)
+           um_input(k_read+1) = real(um_read, kind=core_rknd)
+           vm_input(k_read+1) = real(vm_read, kind=core_rknd)
+           thlm_input(k_read+1) = real(thlm_read, kind=core_rknd)
+           rtm_input(k_read+1) = real(rtm_read, kind=core_rknd)
+           rcm_input(k_read+1) = real(rcm_read, kind=core_rknd)
+           p_in_Pa_input(k_read+1) = real(pres_read, kind=core_rknd)
+           exner_input(k_read+1) = 1.0_core_rknd / real(inv_exner_read, kind=core_rknd)
+           thv_input(k_read+1) = real(thv_read, kind=core_rknd)
+           pdel_input(k_read+1) = real(pdel_read, kind=core_rknd)
+           cloud_frac_input(k_read+1) = real(cloud_frac_read, kind=core_rknd)
+         end if
+       end do
+
+       close( unitn )
+       call freeunit( unitn )
+
+       ! Ghost level fill-in
+       zt_g_input(1) = -1.0_core_rknd * zt_g_input(2)
+       p_in_Pa_input(1) = p_in_Pa_input(2)
+       exner_input(1) = exner_input(2)
+       pdel_input(1) = pdel_input(2)
+       thv_input(1) = thv_input(2)
+       thlm_input(1) = thlm_input(2)
+       rtm_input(1) = rtm_input(2)
+       um_input(1) = um_input(2)
+       vm_input(1) = vm_input(2)
+       rcm_input(1) = rcm_input(2)
+       cloud_frac_input(1) = cloud_frac_input(2)
+
+    end if ! masterproc
+
+   end subroutine read_and_set_input_to_clubb_core
+   ! <<< CLUBB_INOUT_CHANGES END
 
 end module clubb_intr

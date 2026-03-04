@@ -862,6 +862,10 @@
 <clubb_tk1                                        > 268.15D0  </clubb_tk1>
 <clubb_tk2                                        > 238.15D0  </clubb_tk2>
 <clubb_wpxp_L_thresh                              > 60.0D0   </clubb_wpxp_L_thresh>
+<!-- >>> SCM_INOUT_CHANGES BEGIN -->
+<clubb_output_prefix                              > ''       </clubb_output_prefix>
+<l_clubb_outer_loop                               > .true.   </l_clubb_outer_loop>
+<!-- <<< SCM_INOUT_CHANGES END -->
 <relvar_fix                                       > .false.  </relvar_fix>      
 <clubb_use_sgv                                    > .false. </clubb_use_sgv>
 <clubb_vert_avg_closure                           > .true.  </clubb_vert_avg_closure>

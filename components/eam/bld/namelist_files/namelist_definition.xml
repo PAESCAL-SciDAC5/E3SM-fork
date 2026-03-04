@@ -3508,6 +3508,22 @@ CLUBB timestep.
 Default: set by build-namelist
 </entry>
 
+<entry id="clubb_output_prefix" type="char*256" category="pblrad"
+       group="clubbpbl_diff_nl" valid_values="" >
+Prefix for CLUBB text output filenames used in in-and-out experiments.
+When set, output files are named {prefix}_nadv{N}_x_shocm{M}_nstep{step}_macmicsub{macmic_it}.txt.
+When empty (default), the default prefix "clubb_output" is used.
+Default: ''
+</entry>
+
+<entry id="l_clubb_outer_loop" type="logical" category="pblrad"
+       group="clubbpbl_diff_nl" valid_values="" >
+Controls in-and-out experiment mode for CLUBB.
+  .false. = experiment 1: single advance_clubb_core_api loop with large nadv (output written inside clubb_intr.F90)
+  .true.  = experiment 2: many advance_clubb_core_api calls with nadv=1 (output written from clubb_intr.F90)
+Default: .true.
+</entry>
+
 <entry id="clubb_rnevap_effic" type="real" category="pblrad"
        group="clubbpbl_diff_nl" valid_values="" >
 Rain evaporation efficiency factor.
@@ -3538,6 +3554,8 @@ clubb liquid shallow convection factor
 Default: 10.e-6
 </entry>
 
+<!-- >>> SCM_INOUT_CHANGES BEGIN -->
+
 <entry id="clubb_ice_deep" type="real" category="pblrad"
        group="clubbpbl_diff_nl" valid_values="" >
 clubb  ice deep convection factor
@@ -3551,6 +3569,7 @@ Default: 50.e-6
 </entry>
 
 <entry id="clubb_tk1" type="real" category="pblrad"
+<!-- <<< SCM_INOUT_CHANGES END -->
        group="clubbpbl_diff_nl" valid_values="" >
 temperature thresholds determining the fraction of condensate detrained from ZM as ice
 Default: 268.15D0
