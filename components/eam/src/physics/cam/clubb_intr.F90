@@ -2395,7 +2395,7 @@ end subroutine clubb_init_cnst
       ! Initialization/preparation for "standalone"/"in-and-out" test (only in SCM mode)
       ! - Heng XIAO
       ! ---------------------------------------------------------------------------
-      if (single_column.and.l_turb_standalone) then
+      if (l_turb_standalone) then
 
          ! (1) Set the height levels (zt_g, zi_g), 
          ! mean state (thlm_in, rtm_in, um_in, vm_in, rcm_inout, cloud_frac_inout),
@@ -2462,11 +2462,12 @@ end subroutine clubb_init_cnst
       end if
 
       ! Open txt file for output (SCM only)
-      if (single_column.and.masterproc) then
+      if (l_turb_standalone .and. masterproc) then
 
          txt_output_prefix = 'clubb_output'
          if (len_trim(clubb_output_prefix) > 0) txt_output_prefix = trim(clubb_output_prefix)
 
+         ! write out surface fluxes for verification
          txtout_unit = getunit()
          write(outfname, '(A,A, 4(A,I0),A)') trim(txt_output_prefix), '_sfc', &
                                  '_nadv', nadv, '_x_clubb', n_clubb_main_calls, &
@@ -2493,7 +2494,7 @@ end subroutine clubb_init_cnst
          write(iulog,*) 'nadv              = ', nadv
       end if
 
-      l_inner_write = single_column.and.(.not.l_clubb_outer_loop)
+      l_inner_write = l_turb_standalone .and. (.not.l_clubb_outer_loop)
 
       ! ------------------------------------------------------------- !
       ! Time integration for CLUBB only
@@ -2622,7 +2623,7 @@ end subroutine clubb_init_cnst
 
           ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
           ! inner loop output
-          if (l_inner_write.and.masterproc) then
+          if (l_inner_write .and. masterproc) then
              do kk=pver,1,-1
                 ixind = pverp-kk+1
                 write(txtout_unit,clubb_txt_fmt) t*nint(real(dtime, kind=r8)), &
@@ -2644,7 +2645,7 @@ end subroutine clubb_init_cnst
 
       ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
       ! outer loop output
-      if (single_column.and.l_clubb_outer_loop.and.masterproc) then
+      if (l_turb_standalone .and. l_clubb_outer_loop .and. masterproc) then
          do kk=pver,1,-1
             ixind = pverp-kk+1
             write(txtout_unit,clubb_txt_fmt) i_clubb_main*nint(real(dtime, kind=r8)), &
@@ -2662,7 +2663,7 @@ end subroutine clubb_init_cnst
 
       end do  ! end i_clubb_main loop
 
-      if (single_column.and.masterproc) then
+      if (l_turb_standalone .and. masterproc) then
          close(txtout_unit)
          call freeunit(txtout_unit)
       end if

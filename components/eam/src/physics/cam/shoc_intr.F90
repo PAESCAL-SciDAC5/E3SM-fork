@@ -992,7 +992,7 @@ end function shoc_implements_cnst
    ! is run in an SCM "turb standalone" model when the nadv loop inside shoc_main
    ! is used to take multiple substeps.
 
-   l_inner_write = single_column .and. (.not.l_shoc_outer_loop)
+   l_inner_write = l_turb_standalone .and. (.not.l_shoc_outer_loop)
 
    ! ------------------------------------------------- !
    ! Actually call SHOC                                !
@@ -1026,7 +1026,7 @@ end function shoc_implements_cnst
 
       ! Write results to txt file after each shoc_main call if conditions are met.
 
-      if (single_column .and. l_shoc_outer_loop .and. masterproc) then
+      if (l_turb_standalone .and. l_shoc_outer_loop .and. masterproc) then
            do kk = pver, 1, -1
               write(txtout_unit,fmt) i_shoc_main * nint(dtime), &!
                                      kk - 1,                    &! 0 = TOM, pver - 1 = sfc
