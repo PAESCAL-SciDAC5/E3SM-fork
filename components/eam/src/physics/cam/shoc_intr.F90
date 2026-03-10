@@ -953,6 +953,20 @@ end function shoc_implements_cnst
 
          txt_output_prefix = 'shoc_output'
          if (len_trim(shoc_output_prefix) > 0) txt_output_prefix = trim(shoc_output_prefix)
+
+         ! output sfc fluxes for checking
+         txtout_unit = getunit()
+         write(outfname, '(A,A, 4(A,I0),A)') trim(txt_output_prefix), '_sfc', &
+                                 '_nadv', nadv, '_x_shocm', n_shoc_main_calls, &
+                                 '_nstep', get_nstep(), '_macmicsub', macmic_it, &
+                                 '.txt'
+         open(txtout_unit, file=trim(outfname), status='replace')
+
+         write(txtout_unit,*) 'wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc'
+         write(txtout_unit,*) wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc
+         close(txtout_unit)
+         call freeunit(txtout_unit)
+
          write(outfname, '(A,4(A,I0),A)') trim(txt_output_prefix), &
                                           '_nadv', nadv, '_x_shocm',n_shoc_main_calls, &
                                           '_nstep',get_nstep(), '_macmicsub',macmic_it,&
@@ -962,7 +976,7 @@ end function shoc_implements_cnst
 
          txtout_unit = getunit()
          open(txtout_unit, file=trim(outfname), status='replace')
-         write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), u, v, tke, qv, qc, T, P'
+         write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), z, u, v, tke, qt, qc, tl, P'
 
          ! Send info to iulog to double check
 
@@ -978,7 +992,7 @@ end function shoc_implements_cnst
    ! is run in an SCM "turb standalone" model when the nadv loop inside shoc_main
    ! is used to take multiple substeps.
 
-   l_inner_write = l_turb_standalone .and. (.not.l_shoc_outer_loop)
+   l_inner_write = single_column .and. (.not.l_shoc_outer_loop)
 
    ! ------------------------------------------------- !
    ! Actually call SHOC                                !
@@ -1012,17 +1026,18 @@ end function shoc_implements_cnst
 
       ! Write results to txt file after each shoc_main call if conditions are met.
 
-      if (l_turb_standalone .and. l_shoc_outer_loop .and. masterproc) then
+      if (single_column .and. l_shoc_outer_loop .and. masterproc) then
            do kk = pver, 1, -1
               write(txtout_unit,fmt) i_shoc_main * nint(dtime), &!
                                      kk - 1,                    &! 0 = TOM, pver - 1 = sfc
+                                     zt_g(1,kk),                &!
                                      um(1,kk),                  &!
                                      vm(1,kk),                  &!
                                      tke_zt(1,kk),              &!
-                                     rtm(1,kk) - rcm(1,kk),     &! qv
+                                     rtm(1,kk),                 &! qt
                                      rcm(1,kk),                 &! qc
-                                     thlm(1,kk) / inv_exner(1,kk) + latvap/cpair * rcm(1,kk), &! temperature
-                                     state1%pmid(1,kk)                                         ! pressure
+                                     thlm(1,kk),                &! thl
+                                     state1%pmid(1,kk)           ! pressure
            end do
       end if
 

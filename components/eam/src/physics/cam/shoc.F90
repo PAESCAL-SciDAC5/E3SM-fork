@@ -33,7 +33,7 @@ real(rtype), parameter, public :: largeneg = -99999999.99_rtype
 real(rtype), parameter, public :: pi = 3.14159265358979323_rtype
 
 !character(len=*), parameter, public :: fmt = '(i8,i4,20ES22.13)'
-character(len=*), parameter, public :: fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)'
+character(len=*), parameter, public :: fmt = '(I5,1X,I4,F12.5,5(1X,F17.14),1X,F16.12,1X,F17.10)'
 !=========================================================
 ! Physical constants used in SHOC
 !=========================================================
@@ -584,10 +584,11 @@ subroutine shoc_main ( &
       do kk=nlev,1,-1
          write(txtout_unit,fmt) t*nint(dtime),                                           &! time elapsed inside this subroutine 
                                 kk-1,                                                    &! vertical layer index (0 = TOM, nlev - 1 = sfc)
+                               zt_grid(1,kk),                                           &! height of mid-point grid
                                 u_wind(1,kk), v_wind(1,kk), tke(1,kk),                   &! u, v, and tke
-                                    qw(1,kk)-shoc_ql(1,kk),                              &! qv
+                                    qw(1,kk),                                            &! qt
                                shoc_ql(1,kk),                                            &! qc
-                                thetal(1,kk)/inv_exner(1,kk) + lcond/cp * shoc_ql(1,kk), &! temperature
+                                thetal(1,kk),                                            &! thl
                                   pres(1,kk)                                              ! pressure
       end do
     end if

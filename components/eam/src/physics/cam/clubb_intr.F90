@@ -1310,7 +1310,7 @@ end subroutine clubb_init_cnst
    logical :: l_inner_write
    character(len=256) :: txt_output_prefix
    character(len=512) :: outfname
-   character(len=*), parameter :: clubb_txt_fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)'
+   character(len=*), parameter :: clubb_txt_fmt = '(I5,1X,I4,F12.5, 5(1X,F17.14),1X,F16.12,1X,F17.10)'
    ! this one is for getting input for CLUBB in-n-out mode
    real(core_rknd) :: pdel_input(pverp)
    ! <<< CLUBB_INOUT_CHANGES END
@@ -1656,9 +1656,9 @@ end subroutine clubb_init_cnst
    det_s(:)   = 0.0_r8
    det_ice(:) = 0.0_r8
 
-   if (macmic_it > 99) then
-      call endrun('clubb_tend_cam: macmic_it > 99. Revise checkpoint name for cnd_diag_checkpoint.')
-   end if
+   ! if (macmic_it > 99) then
+   !    call endrun('clubb_tend_cam: macmic_it > 99. Revise checkpoint name for cnd_diag_checkpoint.')
+   ! end if
 
 #ifdef CLUBB_SGS
 
@@ -2405,7 +2405,7 @@ end subroutine clubb_init_cnst
          ! directly using SHOC IC file.
          ! All the profile variables are on zt_g levels with the ghost level filled already.
          call read_and_set_input_to_clubb_core( &
-              ncol, zt_g, zi_g, p_in_Pa, exner, thv_ds_zt, pdel_input, &
+              ncol, zt_g, zi_g, p_in_Pa, exner, pdel_input, thv_ds_zt, &
               wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, &
               thlm_in, rtm_in, um_in, vm_in, rcm_inout, cloud_frac_inout )
          ! (2) Calculate derived variables 
@@ -2463,8 +2463,22 @@ end subroutine clubb_init_cnst
 
       ! Open txt file for output (SCM only)
       if (single_column.and.masterproc) then
+
          txt_output_prefix = 'clubb_output'
          if (len_trim(clubb_output_prefix) > 0) txt_output_prefix = trim(clubb_output_prefix)
+
+         txtout_unit = getunit()
+         write(outfname, '(A,A, 4(A,I0),A)') trim(txt_output_prefix), '_sfc', &
+                                 '_nadv', nadv, '_x_clubb', n_clubb_main_calls, &
+                                 '_nstep', get_nstep(), '_macmicsub', macmic_it, &
+                                 '.txt'
+         open(txtout_unit, file=trim(outfname), status='replace')
+
+         write(txtout_unit,*) 'wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc'
+         write(txtout_unit,*) wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc
+         close(txtout_unit)
+         call freeunit(txtout_unit)
+
          write(outfname, '(A,4(A,I0),A)') trim(txt_output_prefix), &
                                           '_nadv', nadv, '_x_clubb', n_clubb_main_calls, &
                                           '_nstep', get_nstep(), '_macmicsub', macmic_it, &
@@ -2472,7 +2486,7 @@ end subroutine clubb_init_cnst
 
          txtout_unit = getunit()
          open(txtout_unit, file=trim(outfname), status='replace')
-         write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), u, v, tke, qv, qc, T, P'
+         write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), z, u, v, tke, qt, qc, tl, P'
 
          write(iulog,*) 'clubb_num_steps    = ', clubb_num_steps
          write(iulog,*) 'n_clubb_main_calls = ', n_clubb_main_calls
@@ -2613,12 +2627,13 @@ end subroutine clubb_init_cnst
                 ixind = pverp-kk+1
                 write(txtout_unit,clubb_txt_fmt) t*nint(real(dtime, kind=r8)), &
                      kk-1, &
+                     real(zt_g(ixind), kind=r8), &
                      real(um_in(ixind), kind=r8), &
                      real(vm_in(ixind), kind=r8), &
                      0.5_r8*(real(up2_in(ixind), kind=r8)+real(vp2_in(ixind), kind=r8)+real(wp2_in(ixind), kind=r8)), &
-                     real(rtm_in(ixind)-rcm_inout(ixind), kind=r8), &
+                     real(rtm_in(ixind), kind=r8), &
                      real(rcm_inout(ixind), kind=r8), &
-                     real(thlm_in(ixind)*exner(ixind) + (latvap/cpair)*rcm_inout(ixind), kind=r8), &
+                     real(thlm_in(ixind), kind=r8), &
                      real(p_in_Pa(ixind), kind=r8)
              end do
           end if
@@ -2634,12 +2649,13 @@ end subroutine clubb_init_cnst
             ixind = pverp-kk+1
             write(txtout_unit,clubb_txt_fmt) i_clubb_main*nint(real(dtime, kind=r8)), &
                  kk-1, &
+                 real(zt_g(ixind), kind=r8), &
                  real(um_in(ixind), kind=r8), &
                  real(vm_in(ixind), kind=r8), &
                  0.5_r8*(real(up2_in(ixind), kind=r8)+real(vp2_in(ixind), kind=r8)+real(wp2_in(ixind), kind=r8)), &
-                 real(rtm_in(ixind)-rcm_inout(ixind), kind=r8), &
+                 real(rtm_in(ixind), kind=r8), &
                  real(rcm_inout(ixind), kind=r8), &
-                 real(thlm_in(ixind)*exner(ixind) + (latvap/cpair)*rcm_inout(ixind), kind=r8), &
+                 real(thlm_in(ixind), kind=r8), &
                  real(p_in_Pa(ixind), kind=r8)
          end do
       end if
