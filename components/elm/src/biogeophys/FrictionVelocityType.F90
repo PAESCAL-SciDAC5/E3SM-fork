@@ -181,12 +181,16 @@ contains
             ptr_patch=this%z0hv_patch, default='inactive')
     end if
 
-    if (use_cn) then
-       this%z0m_patch(begp:endp) = spval
-       call hist_addfld1d (fname='Z0M', units='m', &
-            avgflag='A', long_name='momentum roughness length', &
-            ptr_patch=this%z0m_patch, default='inactive')
-    end if
+!     if (use_cn) then
+!        this%z0m_patch(begp:endp) = spval
+!        call hist_addfld1d (fname='Z0M', units='m', &
+!             avgflag='A', long_name='momentum roughness length', &
+!             ptr_patch=this%z0m_patch, default='inactive')
+!     end if
+     this%z0m_patch(begp:endp) = spval
+     call hist_addfld1d (fname='Z0M', units='m', &
+          avgflag='A', long_name='momentum roughness length', &
+          ptr_patch=this%z0m_patch, default='inactive')
 
     if (use_cn) then
        this%z0mv_patch(begp:endp) = spval

@@ -19,6 +19,7 @@ module LandunitType
   use shr_kind_mod   , only : r8 => shr_kind_r8
   use elm_varcon     , only : ispval, spval
   use shr_infnan_mod , only : nan => shr_infnan_nan, assignment(=)
+  use histFileMod    , only : hist_addfld1d
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -105,6 +106,14 @@ contains
     allocate(this%ht_roof      (begl:endl)); this%ht_roof      (:) = nan
     allocate(this%z_0_town     (begl:endl)); this%z_0_town     (:) = nan
     allocate(this%z_d_town     (begl:endl)); this%z_d_town     (:) = nan
+
+    !-----------------------------------------------------------------------
+    ! initialize history fields for select members of lun_pp
+    !-----------------------------------------------------------------------
+    this%z_0_town(begl:endl) = spval
+     call hist_addfld1d(fname='Z_0_TOWN', units='m',  &
+          avgflag='A', long_name='momentum roughness length of urban landunit', &
+          ptr_lunit=this%z_0_town, set_nourb=spval, l2g_scale_type='unity')
 
   end subroutine lun_pp_init
 

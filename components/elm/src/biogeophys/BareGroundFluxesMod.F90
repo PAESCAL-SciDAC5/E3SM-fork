@@ -196,7 +196,7 @@ contains
       !---------------------------------------------------
       ! Filter patches where frac_veg_nosno IS ZERO
       !---------------------------------------------------
-      
+
       beta = 1._r8 ! previously set as a constant for all columns in CanopyTemperature()
 
       fn = 0
@@ -265,6 +265,7 @@ contains
          loopmax = itmin
       end if
 
+      loopmax = 100
       ITERATION: do iter = 1, loopmax
 
          call FrictionVelocity(begp, endp, fn, filterp, &
@@ -288,6 +289,8 @@ contains
                     wind_speed_adj(p))
                ur(p) = max(1.0_r8, wind_speed_adj(p) + ugust(t))
             end if
+
+            ! print *, "Iteration: ", iter, ", patch=", p, ", ustar=", ustar(p), ", loopmax=", loopmax
 
             tstar = temp1(p)*dth(p)
             qstar = temp2(p)*dqh(p)

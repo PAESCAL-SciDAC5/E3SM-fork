@@ -1,0 +1,3524 @@
+<?xml version="1.0"?>
+
+<?xml-stylesheet type="text/xsl" href="history_fields.xsl"?>
+
+<!--
+  List of history file field names, long-names and units for all the fields output
+  by CLM. This was created by reading in the file: /p/lustre2/dong9/E3SM-fork/components/elm/src/main/histFileMod.F90
+  SVN version information:
+  $URL: https://svn-ccsm-models.cgd.ucar.edu/clm2/trunk_tags/clm4_0_40/models/lnd/clm/src/main/findHistFields.pl $
+  $Id: findHistFields.pl 34757 2012-02-15 18:38:05Z erik $
+-->
+
+<history_fields>
+
+<field name='C13CWDC_TO_LITR2C' units='gC13/m^2/s'
+ long_name='decomp of coarse woody debris C to litter 2 C'
+/>
+
+<field name='C13CWDC_TO_LITR2C_vr' units='gC13/m^3/s'
+ long_name='decomp of coarse woody debris C to litter 2 C'
+/>
+
+<field name='C13CWDC_TO_LITR3C' units='gC13/m^2/s'
+ long_name='decomp of coarse woody debris C to litter 3 C'
+/>
+
+<field name='C13CWDC_TO_LITR3C_vr' units='gC13/m^3/s'
+ long_name='decomp of coarse woody debris C to litter 3 C'
+/>
+
+<field name='C13LITR1C_TO_SOIL1C' units='gC13/m^2/s'
+ long_name='decomp of litter 1 C to soil 1 C'
+/>
+
+<field name='C13LITR1C_TO_SOIL1C_vr' units='gC13/m^3/s'
+ long_name='decomp of litter 1 C to soil 1 C'
+/>
+
+<field name='C13LITR1_HR_S1' units='gC13/m^2/s'
+ long_name='Het. Resp. from litter 1'
+/>
+
+<field name='C13LITR1_HR_S1_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from litter 1'
+/>
+
+<field name='C13LITR2C_TO_SOIL1C' units='gC13/m^2/s'
+ long_name='decomp of litter 2 C to soil 1 C'
+/>
+
+<field name='C13LITR2C_TO_SOIL1C_vr' units='gC13/m^3/s'
+ long_name='decomp of litter 2 C to soil 1 C'
+/>
+
+<field name='C13LITR2C_TO_SOIL2C' units='gC13/m^2/s'
+ long_name='decomp of litter 2 C to soil 2 C'
+/>
+
+<field name='C13LITR2C_TO_SOIL2C_vr' units='gC13/m^3/s'
+ long_name='decomp of litter 2 C to soil 2 C'
+/>
+
+<field name='C13LITR2_HR_S1' units='gC13/m^2/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C13LITR2_HR_S1_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C13LITR2_HR_S2' units='gC13/m^2/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C13LITR2_HR_S2_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C13LITR3C_TO_SOIL2C' units='gC13/m^2/s'
+ long_name='decomp of litter 3 C to soil 2 C'
+/>
+
+<field name='C13LITR3C_TO_SOIL2C_vr' units='gC13/m^3/s'
+ long_name='decomp of litter 3 C to soil 2 C'
+/>
+
+<field name='C13LITR3C_TO_SOIL3C' units='gC13/m^2/s'
+ long_name='decomp of litter 3 C to soil 3 C'
+/>
+
+<field name='C13LITR3C_TO_SOIL3C_vr' units='gC13/m^3/s'
+ long_name='decomp of litter 3 C to soil 3 C'
+/>
+
+<field name='C13LITR3_HR_S2' units='gC13/m^2/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C13LITR3_HR_S2_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C13LITR3_HR_S3' units='gC13/m^2/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C13LITR3_HR_S3_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C13SOIL1C_TO_SOIL2C' units='gC13/m^2/s'
+ long_name='decomp of soil 1 C to soil 2 C'
+/>
+
+<field name='C13SOIL1C_TO_SOIL2C_vr' units='gC13/m^3/s'
+ long_name='decomp of soil 1 C to soil 2 C'
+/>
+
+<field name='C13SOIL1C_TO_SOIL3C' units='gC13/m^2/s'
+ long_name='decomp of soil 1 C to soil 3 C'
+/>
+
+<field name='C13SOIL1C_TO_SOIL3C_vr' units='gC13/m^3/s'
+ long_name='decomp of soil 1 C to soil 3 C'
+/>
+
+<field name='C13SOIL1_HR_S2' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C13SOIL1_HR_S2_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C13SOIL1_HR_S3' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C13SOIL1_HR_S3_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C13SOIL2C_TO_SOIL1C' units='gC13/m^2/s'
+ long_name='decomp of soil 2 C to soil 1 C'
+/>
+
+<field name='C13SOIL2C_TO_SOIL1C_vr' units='gC13/m^3/s'
+ long_name='decomp of soil 2 C to soil 1 C'
+/>
+
+<field name='C13SOIL2C_TO_SOIL3C' units='gC13/m^2/s'
+ long_name='decomp of soil 2 C to soil 3 C'
+/>
+
+<field name='C13SOIL2C_TO_SOIL3C_vr' units='gC13/m^3/s'
+ long_name='decomp of soil 2 C to soil 3 C'
+/>
+
+<field name='C13SOIL2_HR_S1' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C13SOIL2_HR_S1_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C13SOIL2_HR_S3' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C13SOIL2_HR_S3_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C13SOIL3C_TO_SOIL1C' units='gC13/m^2/s'
+ long_name='decomp of soil 3 C to soil 1 C'
+/>
+
+<field name='C13SOIL3C_TO_SOIL1C_vr' units='gC13/m^3/s'
+ long_name='decomp of soil 3 C to soil 1 C'
+/>
+
+<field name='C13SOIL3C_TO_SOIL4C' units='gC13/m^2/s'
+ long_name='decomp of soil 3 C to soil 4 C'
+/>
+
+<field name='C13SOIL3C_TO_SOIL4C_vr' units='gC13/m^3/s'
+ long_name='decomp of soil 3 C to soil 4 C'
+/>
+
+<field name='C13SOIL3_HR_S1' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C13SOIL3_HR_S1_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C13SOIL3_HR_S4' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C13SOIL3_HR_S4_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C13SOIL4_HR_atm' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 4'
+/>
+
+<field name='C13SOIL4_HR_atm_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 4'
+/>
+
+<field name='C13_CWDC' units='gC13/m^2'
+ long_name='C13 coarse woody debris C'
+/>
+
+<field name='C13_CWDC_vr' units='gC13m^3'
+ long_name='C13 coarse woody debris C (vertically resolved)'
+/>
+
+<field name='C13_LITR1C' units='gC13/m^2'
+ long_name='C13 litter 1 C'
+/>
+
+<field name='C13_LITR1C_vr' units='gC13m^3'
+ long_name='C13 litter 1 C (vertically resolved)'
+/>
+
+<field name='C13_LITR2C' units='gC13/m^2'
+ long_name='C13 litter 2 C'
+/>
+
+<field name='C13_LITR2C_vr' units='gC13m^3'
+ long_name='C13 litter 2 C (vertically resolved)'
+/>
+
+<field name='C13_LITR3C' units='gC13/m^2'
+ long_name='C13 litter 3 C'
+/>
+
+<field name='C13_LITR3C_vr' units='gC13m^3'
+ long_name='C13 litter 3 C (vertically resolved)'
+/>
+
+<field name='C13_M_CWDC_TO_FIRE' units='gC13/m^2'
+ long_name='C13'
+/>
+
+<field name='C13_M_CWDC_TO_FIRE_vr' units='gC13/m^3'
+ long_name='C13'
+/>
+
+<field name='C13_M_LITR1C_TO_FIRE' units='gC13/m^2'
+ long_name='C13'
+/>
+
+<field name='C13_M_LITR1C_TO_FIRE_vr' units='gC13/m^3'
+ long_name='C13'
+/>
+
+<field name='C13_M_LITR2C_TO_FIRE' units='gC13/m^2'
+ long_name='C13'
+/>
+
+<field name='C13_M_LITR2C_TO_FIRE_vr' units='gC13/m^3'
+ long_name='C13'
+/>
+
+<field name='C13_M_LITR3C_TO_FIRE' units='gC13/m^2'
+ long_name='C13'
+/>
+
+<field name='C13_M_LITR3C_TO_FIRE_vr' units='gC13/m^3'
+ long_name='C13'
+/>
+
+<field name='C13_SOIL1C' units='gC13/m^2'
+ long_name='C13 soil 1 C'
+/>
+
+<field name='C13_SOIL1C_vr' units='gC13m^3'
+ long_name='C13 soil 1 C (vertically resolved)'
+/>
+
+<field name='C13_SOIL2C' units='gC13/m^2'
+ long_name='C13 soil 2 C'
+/>
+
+<field name='C13_SOIL2C_vr' units='gC13m^3'
+ long_name='C13 soil 2 C (vertically resolved)'
+/>
+
+<field name='C13_SOIL3C' units='gC13/m^2'
+ long_name='C13 soil 3 C'
+/>
+
+<field name='C13_SOIL3C_vr' units='gC13m^3'
+ long_name='C13 soil 3 C (vertically resolved)'
+/>
+
+<field name='C13_SOIL4C' units='gC13/m^2'
+ long_name='C13 soil 4 C'
+/>
+
+<field name='C13_SOIL4C_vr' units='gC13m^3'
+ long_name='C13 soil 4 C (vertically resolved)'
+/>
+
+<field name='C13_atmosphereC' units='gC13/m^2'
+ long_name='C13 atmosphere C'
+/>
+
+<field name='C13_atmosphereC_vr' units='gC13m^3'
+ long_name='C13 atmosphere C (vertically resolved)'
+/>
+
+<field name='C14CWDC_TO_LITR2C' units='gC14/m^2/s'
+ long_name='decomp of coarse woody debris C to litter 2 C'
+/>
+
+<field name='C14CWDC_TO_LITR2C_vr' units='gC14/m^3/s'
+ long_name='decomp of coarse woody debris C to litter 2 C'
+/>
+
+<field name='C14CWDC_TO_LITR3C' units='gC14/m^2/s'
+ long_name='decomp of coarse woody debris C to litter 3 C'
+/>
+
+<field name='C14CWDC_TO_LITR3C_vr' units='gC14/m^3/s'
+ long_name='decomp of coarse woody debris C to litter 3 C'
+/>
+
+<field name='C14LITR1C_TO_SOIL1C' units='gC14/m^2/s'
+ long_name='decomp of litter 1 C to soil 1 C'
+/>
+
+<field name='C14LITR1C_TO_SOIL1C_vr' units='gC14/m^3/s'
+ long_name='decomp of litter 1 C to soil 1 C'
+/>
+
+<field name='C14LITR1_HR_S1' units='gC14/m^2/s'
+ long_name='Het. Resp. from litter 1'
+/>
+
+<field name='C14LITR1_HR_S1_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from litter 1'
+/>
+
+<field name='C14LITR2C_TO_SOIL1C' units='gC14/m^2/s'
+ long_name='decomp of litter 2 C to soil 1 C'
+/>
+
+<field name='C14LITR2C_TO_SOIL1C_vr' units='gC14/m^3/s'
+ long_name='decomp of litter 2 C to soil 1 C'
+/>
+
+<field name='C14LITR2C_TO_SOIL2C' units='gC14/m^2/s'
+ long_name='decomp of litter 2 C to soil 2 C'
+/>
+
+<field name='C14LITR2C_TO_SOIL2C_vr' units='gC14/m^3/s'
+ long_name='decomp of litter 2 C to soil 2 C'
+/>
+
+<field name='C14LITR2_HR_S1' units='gC14/m^2/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C14LITR2_HR_S1_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C14LITR2_HR_S2' units='gC14/m^2/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C14LITR2_HR_S2_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C14LITR3C_TO_SOIL2C' units='gC14/m^2/s'
+ long_name='decomp of litter 3 C to soil 2 C'
+/>
+
+<field name='C14LITR3C_TO_SOIL2C_vr' units='gC14/m^3/s'
+ long_name='decomp of litter 3 C to soil 2 C'
+/>
+
+<field name='C14LITR3C_TO_SOIL3C' units='gC14/m^2/s'
+ long_name='decomp of litter 3 C to soil 3 C'
+/>
+
+<field name='C14LITR3C_TO_SOIL3C_vr' units='gC14/m^3/s'
+ long_name='decomp of litter 3 C to soil 3 C'
+/>
+
+<field name='C14LITR3_HR_S2' units='gC14/m^2/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C14LITR3_HR_S2_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C14LITR3_HR_S3' units='gC14/m^2/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C14LITR3_HR_S3_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C14SOIL1C_TO_SOIL2C' units='gC14/m^2/s'
+ long_name='decomp of soil 1 C to soil 2 C'
+/>
+
+<field name='C14SOIL1C_TO_SOIL2C_vr' units='gC14/m^3/s'
+ long_name='decomp of soil 1 C to soil 2 C'
+/>
+
+<field name='C14SOIL1C_TO_SOIL3C' units='gC14/m^2/s'
+ long_name='decomp of soil 1 C to soil 3 C'
+/>
+
+<field name='C14SOIL1C_TO_SOIL3C_vr' units='gC14/m^3/s'
+ long_name='decomp of soil 1 C to soil 3 C'
+/>
+
+<field name='C14SOIL1_HR_S2' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C14SOIL1_HR_S2_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C14SOIL1_HR_S3' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C14SOIL1_HR_S3_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C14SOIL2C_TO_SOIL1C' units='gC14/m^2/s'
+ long_name='decomp of soil 2 C to soil 1 C'
+/>
+
+<field name='C14SOIL2C_TO_SOIL1C_vr' units='gC14/m^3/s'
+ long_name='decomp of soil 2 C to soil 1 C'
+/>
+
+<field name='C14SOIL2C_TO_SOIL3C' units='gC14/m^2/s'
+ long_name='decomp of soil 2 C to soil 3 C'
+/>
+
+<field name='C14SOIL2C_TO_SOIL3C_vr' units='gC14/m^3/s'
+ long_name='decomp of soil 2 C to soil 3 C'
+/>
+
+<field name='C14SOIL2_HR_S1' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C14SOIL2_HR_S1_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C14SOIL2_HR_S3' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C14SOIL2_HR_S3_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C14SOIL3C_TO_SOIL1C' units='gC14/m^2/s'
+ long_name='decomp of soil 3 C to soil 1 C'
+/>
+
+<field name='C14SOIL3C_TO_SOIL1C_vr' units='gC14/m^3/s'
+ long_name='decomp of soil 3 C to soil 1 C'
+/>
+
+<field name='C14SOIL3C_TO_SOIL4C' units='gC14/m^2/s'
+ long_name='decomp of soil 3 C to soil 4 C'
+/>
+
+<field name='C14SOIL3C_TO_SOIL4C_vr' units='gC14/m^3/s'
+ long_name='decomp of soil 3 C to soil 4 C'
+/>
+
+<field name='C14SOIL3_HR_S1' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C14SOIL3_HR_S1_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C14SOIL3_HR_S4' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C14SOIL3_HR_S4_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C14SOIL4_HR_atm' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 4'
+/>
+
+<field name='C14SOIL4_HR_atm_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 4'
+/>
+
+<field name='C14_CWDC' units='gC14/m^2'
+ long_name='C14 coarse woody debris C'
+/>
+
+<field name='C14_CWDC_1m' units='gC14/m^2'
+ long_name='C14 coarse woody debris C to 1 meter'
+/>
+
+<field name='C14_CWDC_activelayer' units='gC14/m^2'
+ long_name='C14 coarse woody debris C in active layer'
+/>
+
+<field name='C14_CWDC_vr' units='gC14m^3'
+ long_name='C14 coarse woody debris C (vertically resolved)'
+/>
+
+<field name='C14_LITR1C' units='gC14/m^2'
+ long_name='C14 litter 1 C'
+/>
+
+<field name='C14_LITR1C_1m' units='gC14/m^2'
+ long_name='C14 litter 1 C to 1 meter'
+/>
+
+<field name='C14_LITR1C_activelayer' units='gC14/m^2'
+ long_name='C14 litter 1 C in active layer'
+/>
+
+<field name='C14_LITR1C_vr' units='gC14m^3'
+ long_name='C14 litter 1 C (vertically resolved)'
+/>
+
+<field name='C14_LITR2C' units='gC14/m^2'
+ long_name='C14 litter 2 C'
+/>
+
+<field name='C14_LITR2C_1m' units='gC14/m^2'
+ long_name='C14 litter 2 C to 1 meter'
+/>
+
+<field name='C14_LITR2C_activelayer' units='gC14/m^2'
+ long_name='C14 litter 2 C in active layer'
+/>
+
+<field name='C14_LITR2C_vr' units='gC14m^3'
+ long_name='C14 litter 2 C (vertically resolved)'
+/>
+
+<field name='C14_LITR3C' units='gC14/m^2'
+ long_name='C14 litter 3 C'
+/>
+
+<field name='C14_LITR3C_1m' units='gC14/m^2'
+ long_name='C14 litter 3 C to 1 meter'
+/>
+
+<field name='C14_LITR3C_activelayer' units='gC14/m^2'
+ long_name='C14 litter 3 C in active layer'
+/>
+
+<field name='C14_LITR3C_vr' units='gC14m^3'
+ long_name='C14 litter 3 C (vertically resolved)'
+/>
+
+<field name='C14_M_CWDC_TO_FIRE' units='gC14/m^2'
+ long_name='C14'
+/>
+
+<field name='C14_M_CWDC_TO_FIRE_vr' units='gC14/m^3'
+ long_name='C14'
+/>
+
+<field name='C14_M_LITR1C_TO_FIRE' units='gC14/m^2'
+ long_name='C14'
+/>
+
+<field name='C14_M_LITR1C_TO_FIRE_vr' units='gC14/m^3'
+ long_name='C14'
+/>
+
+<field name='C14_M_LITR2C_TO_FIRE' units='gC14/m^2'
+ long_name='C14'
+/>
+
+<field name='C14_M_LITR2C_TO_FIRE_vr' units='gC14/m^3'
+ long_name='C14'
+/>
+
+<field name='C14_M_LITR3C_TO_FIRE' units='gC14/m^2'
+ long_name='C14'
+/>
+
+<field name='C14_M_LITR3C_TO_FIRE_vr' units='gC14/m^3'
+ long_name='C14'
+/>
+
+<field name='C14_SOIL1C' units='gC14/m^2'
+ long_name='C14 soil 1 C'
+/>
+
+<field name='C14_SOIL1C_1m' units='gC14/m^2'
+ long_name='C14 soil 1 C to 1 meter'
+/>
+
+<field name='C14_SOIL1C_activelayer' units='gC14/m^2'
+ long_name='C14 soil 1 C in active layer'
+/>
+
+<field name='C14_SOIL1C_vr' units='gC14m^3'
+ long_name='C14 soil 1 C (vertically resolved)'
+/>
+
+<field name='C14_SOIL2C' units='gC14/m^2'
+ long_name='C14 soil 2 C'
+/>
+
+<field name='C14_SOIL2C_1m' units='gC14/m^2'
+ long_name='C14 soil 2 C to 1 meter'
+/>
+
+<field name='C14_SOIL2C_activelayer' units='gC14/m^2'
+ long_name='C14 soil 2 C in active layer'
+/>
+
+<field name='C14_SOIL2C_vr' units='gC14m^3'
+ long_name='C14 soil 2 C (vertically resolved)'
+/>
+
+<field name='C14_SOIL3C' units='gC14/m^2'
+ long_name='C14 soil 3 C'
+/>
+
+<field name='C14_SOIL3C_1m' units='gC14/m^2'
+ long_name='C14 soil 3 C to 1 meter'
+/>
+
+<field name='C14_SOIL3C_activelayer' units='gC14/m^2'
+ long_name='C14 soil 3 C in active layer'
+/>
+
+<field name='C14_SOIL3C_vr' units='gC14m^3'
+ long_name='C14 soil 3 C (vertically resolved)'
+/>
+
+<field name='C14_SOIL4C' units='gC14/m^2'
+ long_name='C14 soil 4 C'
+/>
+
+<field name='C14_SOIL4C_1m' units='gC14/m^2'
+ long_name='C14 soil 4 C to 1 meter'
+/>
+
+<field name='C14_SOIL4C_activelayer' units='gC14/m^2'
+ long_name='C14 soil 4 C in active layer'
+/>
+
+<field name='C14_SOIL4C_vr' units='gC14m^3'
+ long_name='C14 soil 4 C (vertically resolved)'
+/>
+
+<field name='C14_atmosphereC' units='gC14/m^2'
+ long_name='C14 atmosphere C'
+/>
+
+<field name='C14_atmosphereC_1m' units='gC14/m^2'
+ long_name='C14 atmosphere C to 1 meter'
+/>
+
+<field name='C14_atmosphereC_activelayer' units='gC14/m^2'
+ long_name='C14 atmosphere C in active layer'
+/>
+
+<field name='C14_atmosphereC_vr' units='gC14m^3'
+ long_name='C14 atmosphere C (vertically resolved)'
+/>
+
+<field name='CWDC' units='gC/m^2'
+ long_name='CWD C'
+/>
+
+<field name='CWDC_1m' units='gC/m^2'
+ long_name='CWD C to 1 meter'
+/>
+
+<field name='CWDC_30cm' units='gC/m^2'
+ long_name='CWD C to 30 cm'
+/>
+
+<field name='CWDC_TO_LITR2C' units='gC/m^2/s'
+ long_name='decomp of coarse woody debris C to litter 2 C'
+/>
+
+<field name='CWDC_TO_LITR2C_vr' units='gC/m^3/s'
+ long_name='decomp of coarse woody debris C to litter 2 C'
+/>
+
+<field name='CWDC_TO_LITR3C' units='gC/m^2/s'
+ long_name='decomp of coarse woody debris C to litter 3 C'
+/>
+
+<field name='CWDC_TO_LITR3C_vr' units='gC/m^3/s'
+ long_name='decomp of coarse woody debris C to litter 3 C'
+/>
+
+<field name='CWDC_activelayer' units='gC/m^2'
+ long_name='CWD C in active layer'
+/>
+
+<field name='CWDC_vr' units='gC/m^3'
+ long_name='CWD C (vertically resolved)'
+/>
+
+<field name='CWDN' units='gN/m^2'
+ long_name='CWD C'
+/>
+
+<field name='CWDN_1m' units='gN/m^2'
+ long_name='CWD N to 1 meter'
+/>
+
+<field name='CWDN_30cm' units='gN/m^2'
+ long_name='CWD N to 30 cm'
+/>
+
+<field name='CWDN_activelayer' units='gN/m^2'
+ long_name='CWD N in active layer'
+/>
+
+<field name='CWDN_vr' units='gN/m^3'
+ long_name='CWD N (vertically resolved)'
+/>
+
+<field name='K_CWD' units='1/s'
+ long_name='coarse woody debris potential loss coefficient'
+/>
+
+<field name='K_LITR1' units='1/s'
+ long_name='litter 1 potential loss coefficient'
+/>
+
+<field name='K_LITR2' units='1/s'
+ long_name='litter 2 potential loss coefficient'
+/>
+
+<field name='K_LITR3' units='1/s'
+ long_name='litter 3 potential loss coefficient'
+/>
+
+<field name='K_SOIL1' units='1/s'
+ long_name='soil 1 potential loss coefficient'
+/>
+
+<field name='K_SOIL2' units='1/s'
+ long_name='soil 2 potential loss coefficient'
+/>
+
+<field name='K_SOIL3' units='1/s'
+ long_name='soil 3 potential loss coefficient'
+/>
+
+<field name='K_SOIL4' units='1/s'
+ long_name='soil 4 potential loss coefficient'
+/>
+
+<field name='K_atmosphere' units='1/s'
+ long_name='atmosphere potential loss coefficient'
+/>
+
+<field name='LITR1C' units='gC/m^2'
+ long_name='LITR1 C'
+/>
+
+<field name='LITR1C_1m' units='gC/m^2'
+ long_name='LITR1 C to 1 meter'
+/>
+
+<field name='LITR1C_30cm' units='gC/m^2'
+ long_name='LITR1 C to 30 cm'
+/>
+
+<field name='LITR1C_TO_SOIL1C' units='gC/m^2/s'
+ long_name='decomp of litter 1 C to soil 1 C'
+/>
+
+<field name='LITR1C_TO_SOIL1C_vr' units='gC/m^3/s'
+ long_name='decomp of litter 1 C to soil 1 C'
+/>
+
+<field name='LITR1C_activelayer' units='gC/m^2'
+ long_name='LITR1 C in active layer'
+/>
+
+<field name='LITR1C_vr' units='gC/m^3'
+ long_name='LITR1 C (vertically resolved)'
+/>
+
+<field name='LITR1N' units='gN/m^2'
+ long_name='LITR1 C'
+/>
+
+<field name='LITR1N_1m' units='gN/m^2'
+ long_name='LITR1 N to 1 meter'
+/>
+
+<field name='LITR1N_30cm' units='gN/m^2'
+ long_name='LITR1 N to 30 cm'
+/>
+
+<field name='LITR1N_TO_SOIL1N' units='gN/m^2/s'
+ long_name='decomp of litter 1 N to soil 1 N'
+/>
+
+<field name='LITR1N_TO_SOIL1N_vr' units='gN/m^3/s'
+ long_name='decomp of litter 1 N to soil 1 N'
+/>
+
+<field name='LITR1N_activelayer' units='gN/m^2'
+ long_name='LITR1 N in active layer'
+/>
+
+<field name='LITR1N_vr' units='gN/m^3'
+ long_name='LITR1 N (vertically resolved)'
+/>
+
+<field name='LITR1_HR_S1' units='gC/m^2/s'
+ long_name='Het. Resp. from litter 1'
+/>
+
+<field name='LITR1_HR_S1_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from litter 1'
+/>
+
+<field name='LITR2C' units='gC/m^2'
+ long_name='LITR2 C'
+/>
+
+<field name='LITR2C_1m' units='gC/m^2'
+ long_name='LITR2 C to 1 meter'
+/>
+
+<field name='LITR2C_30cm' units='gC/m^2'
+ long_name='LITR2 C to 30 cm'
+/>
+
+<field name='LITR2C_TO_SOIL1C' units='gC/m^2/s'
+ long_name='decomp of litter 2 C to soil 1 C'
+/>
+
+<field name='LITR2C_TO_SOIL1C_vr' units='gC/m^3/s'
+ long_name='decomp of litter 2 C to soil 1 C'
+/>
+
+<field name='LITR2C_TO_SOIL2C' units='gC/m^2/s'
+ long_name='decomp of litter 2 C to soil 2 C'
+/>
+
+<field name='LITR2C_TO_SOIL2C_vr' units='gC/m^3/s'
+ long_name='decomp of litter 2 C to soil 2 C'
+/>
+
+<field name='LITR2C_activelayer' units='gC/m^2'
+ long_name='LITR2 C in active layer'
+/>
+
+<field name='LITR2C_vr' units='gC/m^3'
+ long_name='LITR2 C (vertically resolved)'
+/>
+
+<field name='LITR2N' units='gN/m^2'
+ long_name='LITR2 C'
+/>
+
+<field name='LITR2N_1m' units='gN/m^2'
+ long_name='LITR2 N to 1 meter'
+/>
+
+<field name='LITR2N_30cm' units='gN/m^2'
+ long_name='LITR2 N to 30 cm'
+/>
+
+<field name='LITR2N_TO_SOIL1N' units='gN/m^2/s'
+ long_name='decomp of litter 2 N to soil 1 N'
+/>
+
+<field name='LITR2N_TO_SOIL1N_vr' units='gN/m^3/s'
+ long_name='decomp of litter 2 N to soil 1 N'
+/>
+
+<field name='LITR2N_TO_SOIL2N' units='gN/m^2/s'
+ long_name='decomp of litter 2 N to soil 2 N'
+/>
+
+<field name='LITR2N_TO_SOIL2N_vr' units='gN/m^3/s'
+ long_name='decomp of litter 2 N to soil 2 N'
+/>
+
+<field name='LITR2N_activelayer' units='gN/m^2'
+ long_name='LITR2 N in active layer'
+/>
+
+<field name='LITR2N_vr' units='gN/m^3'
+ long_name='LITR2 N (vertically resolved)'
+/>
+
+<field name='LITR2_HR_S1' units='gC/m^2/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='LITR2_HR_S1_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='LITR2_HR_S2' units='gC/m^2/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='LITR2_HR_S2_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='LITR3C' units='gC/m^2'
+ long_name='LITR3 C'
+/>
+
+<field name='LITR3C_1m' units='gC/m^2'
+ long_name='LITR3 C to 1 meter'
+/>
+
+<field name='LITR3C_30cm' units='gC/m^2'
+ long_name='LITR3 C to 30 cm'
+/>
+
+<field name='LITR3C_TO_SOIL2C' units='gC/m^2/s'
+ long_name='decomp of litter 3 C to soil 2 C'
+/>
+
+<field name='LITR3C_TO_SOIL2C_vr' units='gC/m^3/s'
+ long_name='decomp of litter 3 C to soil 2 C'
+/>
+
+<field name='LITR3C_TO_SOIL3C' units='gC/m^2/s'
+ long_name='decomp of litter 3 C to soil 3 C'
+/>
+
+<field name='LITR3C_TO_SOIL3C_vr' units='gC/m^3/s'
+ long_name='decomp of litter 3 C to soil 3 C'
+/>
+
+<field name='LITR3C_activelayer' units='gC/m^2'
+ long_name='LITR3 C in active layer'
+/>
+
+<field name='LITR3C_vr' units='gC/m^3'
+ long_name='LITR3 C (vertically resolved)'
+/>
+
+<field name='LITR3N' units='gN/m^2'
+ long_name='LITR3 C'
+/>
+
+<field name='LITR3N_1m' units='gN/m^2'
+ long_name='LITR3 N to 1 meter'
+/>
+
+<field name='LITR3N_30cm' units='gN/m^2'
+ long_name='LITR3 N to 30 cm'
+/>
+
+<field name='LITR3N_TO_SOIL2N' units='gN/m^2/s'
+ long_name='decomp of litter 3 N to soil 2 N'
+/>
+
+<field name='LITR3N_TO_SOIL2N_vr' units='gN/m^3/s'
+ long_name='decomp of litter 3 N to soil 2 N'
+/>
+
+<field name='LITR3N_TO_SOIL3N' units='gN/m^2/s'
+ long_name='decomp of litter 3 N to soil 3 N'
+/>
+
+<field name='LITR3N_TO_SOIL3N_vr' units='gN/m^3/s'
+ long_name='decomp of litter 3 N to soil 3 N'
+/>
+
+<field name='LITR3N_activelayer' units='gN/m^2'
+ long_name='LITR3 N in active layer'
+/>
+
+<field name='LITR3N_vr' units='gN/m^3'
+ long_name='LITR3 N (vertically resolved)'
+/>
+
+<field name='LITR3_HR_S2' units='gC/m^2/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='LITR3_HR_S2_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='LITR3_HR_S3' units='gC/m^2/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='LITR3_HR_S3_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='M_CWDC_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_CWDC_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_CWDN_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_CWDN_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR1C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR1C_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR1C_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR1C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR1N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR1N_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR1N_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR1N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR2C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR2C_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR2C_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR2C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR2N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR2N_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR2N_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR2N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR3C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR3C_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR3C_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR3C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR3N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR3N_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR3N_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR3N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL1C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL1C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL1N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL1N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL2C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL2C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL2N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL2N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL3C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL3C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL3N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL3N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL4C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL4C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL4N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL4N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_atmosphereC_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_atmosphereC_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_atmosphereN_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_atmosphereN_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='SMINN_TO_DENIT_L1S1' units='gN/m^2'
+ long_name='denitrification for decomp. of litter 1to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_L1S1_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of litter 1to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_L2S1' units='gN/m^2'
+ long_name='denitrification for decomp. of litter 2to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_L2S1_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of litter 2to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_L2S2' units='gN/m^2'
+ long_name='denitrification for decomp. of litter 2to SOIL2'
+/>
+
+<field name='SMINN_TO_DENIT_L2S2_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of litter 2to SOIL2'
+/>
+
+<field name='SMINN_TO_DENIT_L3S2' units='gN/m^2'
+ long_name='denitrification for decomp. of litter 3to SOIL2'
+/>
+
+<field name='SMINN_TO_DENIT_L3S2_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of litter 3to SOIL2'
+/>
+
+<field name='SMINN_TO_DENIT_L3S3' units='gN/m^2'
+ long_name='denitrification for decomp. of litter 3to SOIL3'
+/>
+
+<field name='SMINN_TO_DENIT_L3S3_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of litter 3to SOIL3'
+/>
+
+<field name='SMINN_TO_DENIT_S1S2' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 1to SOIL2'
+/>
+
+<field name='SMINN_TO_DENIT_S1S2_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 1to SOIL2'
+/>
+
+<field name='SMINN_TO_DENIT_S1S3' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 1to SOIL3'
+/>
+
+<field name='SMINN_TO_DENIT_S1S3_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 1to SOIL3'
+/>
+
+<field name='SMINN_TO_DENIT_S2S1' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 2to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_S2S1_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 2to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_S2S3' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 2to SOIL3'
+/>
+
+<field name='SMINN_TO_DENIT_S2S3_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 2to SOIL3'
+/>
+
+<field name='SMINN_TO_DENIT_S3S1' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 3to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_S3S1_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 3to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_S3S4' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 3to SOIL4'
+/>
+
+<field name='SMINN_TO_DENIT_S3S4_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 3to SOIL4'
+/>
+
+<field name='SMINN_TO_DENIT_S4' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 4to atmosphere'
+/>
+
+<field name='SMINN_TO_DENIT_S4_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 4to atmosphere'
+/>
+
+<field name='SMINN_TO_SOIL1N_L1' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of LITR1'
+/>
+
+<field name='SMINN_TO_SOIL1N_L1_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of LITR1'
+/>
+
+<field name='SMINN_TO_SOIL1N_L2' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of LITR2'
+/>
+
+<field name='SMINN_TO_SOIL1N_L2_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of LITR2'
+/>
+
+<field name='SMINN_TO_SOIL1N_S2' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL2'
+/>
+
+<field name='SMINN_TO_SOIL1N_S2_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL2'
+/>
+
+<field name='SMINN_TO_SOIL1N_S3' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL3'
+/>
+
+<field name='SMINN_TO_SOIL1N_S3_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL3'
+/>
+
+<field name='SMINN_TO_SOIL2N_L2' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of LITR2'
+/>
+
+<field name='SMINN_TO_SOIL2N_L2_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of LITR2'
+/>
+
+<field name='SMINN_TO_SOIL2N_L3' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of LITR3'
+/>
+
+<field name='SMINN_TO_SOIL2N_L3_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of LITR3'
+/>
+
+<field name='SMINN_TO_SOIL2N_S1' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL1'
+/>
+
+<field name='SMINN_TO_SOIL2N_S1_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL1'
+/>
+
+<field name='SMINN_TO_SOIL3N_L3' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of LITR3'
+/>
+
+<field name='SMINN_TO_SOIL3N_L3_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of LITR3'
+/>
+
+<field name='SMINN_TO_SOIL3N_S1' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL1'
+/>
+
+<field name='SMINN_TO_SOIL3N_S1_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL1'
+/>
+
+<field name='SMINN_TO_SOIL3N_S2' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL2'
+/>
+
+<field name='SMINN_TO_SOIL3N_S2_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL2'
+/>
+
+<field name='SMINN_TO_SOIL4N_S3' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL3'
+/>
+
+<field name='SMINN_TO_SOIL4N_S3_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL3'
+/>
+
+<field name='SOIL1C' units='gC/m^2'
+ long_name='SOIL1 C'
+/>
+
+<field name='SOIL1C_1m' units='gC/m^2'
+ long_name='SOIL1 C to 1 meter'
+/>
+
+<field name='SOIL1C_30cm' units='gC/m^2'
+ long_name='SOIL1 C to 30 cm'
+/>
+
+<field name='SOIL1C_TO_SOIL2C' units='gC/m^2/s'
+ long_name='decomp of soil 1 C to soil 2 C'
+/>
+
+<field name='SOIL1C_TO_SOIL2C_vr' units='gC/m^3/s'
+ long_name='decomp of soil 1 C to soil 2 C'
+/>
+
+<field name='SOIL1C_TO_SOIL3C' units='gC/m^2/s'
+ long_name='decomp of soil 1 C to soil 3 C'
+/>
+
+<field name='SOIL1C_TO_SOIL3C_vr' units='gC/m^3/s'
+ long_name='decomp of soil 1 C to soil 3 C'
+/>
+
+<field name='SOIL1C_activelayer' units='gC/m^2'
+ long_name='SOIL1 C in active layer'
+/>
+
+<field name='SOIL1C_vr' units='gC/m^3'
+ long_name='SOIL1 C (vertically resolved)'
+/>
+
+<field name='SOIL1N' units='gN/m^2'
+ long_name='SOIL1 C'
+/>
+
+<field name='SOIL1N_1m' units='gN/m^2'
+ long_name='SOIL1 N to 1 meter'
+/>
+
+<field name='SOIL1N_30cm' units='gN/m^2'
+ long_name='SOIL1 N to 30 cm'
+/>
+
+<field name='SOIL1N_TO_SOIL2N' units='gN/m^2/s'
+ long_name='decomp of soil 1 N to soil 2 N'
+/>
+
+<field name='SOIL1N_TO_SOIL2N_vr' units='gN/m^3/s'
+ long_name='decomp of soil 1 N to soil 2 N'
+/>
+
+<field name='SOIL1N_TO_SOIL3N' units='gN/m^2/s'
+ long_name='decomp of soil 1 N to soil 3 N'
+/>
+
+<field name='SOIL1N_TO_SOIL3N_vr' units='gN/m^3/s'
+ long_name='decomp of soil 1 N to soil 3 N'
+/>
+
+<field name='SOIL1N_activelayer' units='gN/m^2'
+ long_name='SOIL1 N in active layer'
+/>
+
+<field name='SOIL1N_vr' units='gN/m^3'
+ long_name='SOIL1 N (vertically resolved)'
+/>
+
+<field name='SOIL1_HR_S2' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='SOIL1_HR_S2_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='SOIL1_HR_S3' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='SOIL1_HR_S3_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='SOIL2C' units='gC/m^2'
+ long_name='SOIL2 C'
+/>
+
+<field name='SOIL2C_1m' units='gC/m^2'
+ long_name='SOIL2 C to 1 meter'
+/>
+
+<field name='SOIL2C_30cm' units='gC/m^2'
+ long_name='SOIL2 C to 30 cm'
+/>
+
+<field name='SOIL2C_TO_SOIL1C' units='gC/m^2/s'
+ long_name='decomp of soil 2 C to soil 1 C'
+/>
+
+<field name='SOIL2C_TO_SOIL1C_vr' units='gC/m^3/s'
+ long_name='decomp of soil 2 C to soil 1 C'
+/>
+
+<field name='SOIL2C_TO_SOIL3C' units='gC/m^2/s'
+ long_name='decomp of soil 2 C to soil 3 C'
+/>
+
+<field name='SOIL2C_TO_SOIL3C_vr' units='gC/m^3/s'
+ long_name='decomp of soil 2 C to soil 3 C'
+/>
+
+<field name='SOIL2C_activelayer' units='gC/m^2'
+ long_name='SOIL2 C in active layer'
+/>
+
+<field name='SOIL2C_vr' units='gC/m^3'
+ long_name='SOIL2 C (vertically resolved)'
+/>
+
+<field name='SOIL2N' units='gN/m^2'
+ long_name='SOIL2 C'
+/>
+
+<field name='SOIL2N_1m' units='gN/m^2'
+ long_name='SOIL2 N to 1 meter'
+/>
+
+<field name='SOIL2N_30cm' units='gN/m^2'
+ long_name='SOIL2 N to 30 cm'
+/>
+
+<field name='SOIL2N_TO_SOIL1N' units='gN/m^2/s'
+ long_name='decomp of soil 2 N to soil 1 N'
+/>
+
+<field name='SOIL2N_TO_SOIL1N_vr' units='gN/m^3/s'
+ long_name='decomp of soil 2 N to soil 1 N'
+/>
+
+<field name='SOIL2N_TO_SOIL3N' units='gN/m^2/s'
+ long_name='decomp of soil 2 N to soil 3 N'
+/>
+
+<field name='SOIL2N_TO_SOIL3N_vr' units='gN/m^3/s'
+ long_name='decomp of soil 2 N to soil 3 N'
+/>
+
+<field name='SOIL2N_activelayer' units='gN/m^2'
+ long_name='SOIL2 N in active layer'
+/>
+
+<field name='SOIL2N_vr' units='gN/m^3'
+ long_name='SOIL2 N (vertically resolved)'
+/>
+
+<field name='SOIL2_HR_S1' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='SOIL2_HR_S1_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='SOIL2_HR_S3' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='SOIL2_HR_S3_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='SOIL3C' units='gC/m^2'
+ long_name='SOIL3 C'
+/>
+
+<field name='SOIL3C_1m' units='gC/m^2'
+ long_name='SOIL3 C to 1 meter'
+/>
+
+<field name='SOIL3C_30cm' units='gC/m^2'
+ long_name='SOIL3 C to 30 cm'
+/>
+
+<field name='SOIL3C_TO_SOIL1C' units='gC/m^2/s'
+ long_name='decomp of soil 3 C to soil 1 C'
+/>
+
+<field name='SOIL3C_TO_SOIL1C_vr' units='gC/m^3/s'
+ long_name='decomp of soil 3 C to soil 1 C'
+/>
+
+<field name='SOIL3C_TO_SOIL4C' units='gC/m^2/s'
+ long_name='decomp of soil 3 C to soil 4 C'
+/>
+
+<field name='SOIL3C_TO_SOIL4C_vr' units='gC/m^3/s'
+ long_name='decomp of soil 3 C to soil 4 C'
+/>
+
+<field name='SOIL3C_activelayer' units='gC/m^2'
+ long_name='SOIL3 C in active layer'
+/>
+
+<field name='SOIL3C_vr' units='gC/m^3'
+ long_name='SOIL3 C (vertically resolved)'
+/>
+
+<field name='SOIL3N' units='gN/m^2'
+ long_name='SOIL3 C'
+/>
+
+<field name='SOIL3N_1m' units='gN/m^2'
+ long_name='SOIL3 N to 1 meter'
+/>
+
+<field name='SOIL3N_30cm' units='gN/m^2'
+ long_name='SOIL3 N to 30 cm'
+/>
+
+<field name='SOIL3N_TO_SOIL1N' units='gN/m^2/s'
+ long_name='decomp of soil 3 N to soil 1 N'
+/>
+
+<field name='SOIL3N_TO_SOIL1N_vr' units='gN/m^3/s'
+ long_name='decomp of soil 3 N to soil 1 N'
+/>
+
+<field name='SOIL3N_TO_SOIL4N' units='gN/m^2/s'
+ long_name='decomp of soil 3 N to soil 4 N'
+/>
+
+<field name='SOIL3N_TO_SOIL4N_vr' units='gN/m^3/s'
+ long_name='decomp of soil 3 N to soil 4 N'
+/>
+
+<field name='SOIL3N_activelayer' units='gN/m^2'
+ long_name='SOIL3 N in active layer'
+/>
+
+<field name='SOIL3N_vr' units='gN/m^3'
+ long_name='SOIL3 N (vertically resolved)'
+/>
+
+<field name='SOIL3_HR_S1' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='SOIL3_HR_S1_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='SOIL3_HR_S4' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='SOIL3_HR_S4_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='SOIL4C' units='gC/m^2'
+ long_name='SOIL4 C'
+/>
+
+<field name='SOIL4C_1m' units='gC/m^2'
+ long_name='SOIL4 C to 1 meter'
+/>
+
+<field name='SOIL4C_30cm' units='gC/m^2'
+ long_name='SOIL4 C to 30 cm'
+/>
+
+<field name='SOIL4C_activelayer' units='gC/m^2'
+ long_name='SOIL4 C in active layer'
+/>
+
+<field name='SOIL4C_vr' units='gC/m^3'
+ long_name='SOIL4 C (vertically resolved)'
+/>
+
+<field name='SOIL4N' units='gN/m^2'
+ long_name='SOIL4 C'
+/>
+
+<field name='SOIL4N_1m' units='gN/m^2'
+ long_name='SOIL4 N to 1 meter'
+/>
+
+<field name='SOIL4N_30cm' units='gN/m^2'
+ long_name='SOIL4 N to 30 cm'
+/>
+
+<field name='SOIL4N_TO_SMINN' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL4'
+/>
+
+<field name='SOIL4N_TO_SMINN_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL4'
+/>
+
+<field name='SOIL4N_activelayer' units='gN/m^2'
+ long_name='SOIL4 N in active layer'
+/>
+
+<field name='SOIL4N_vr' units='gN/m^3'
+ long_name='SOIL4 N (vertically resolved)'
+/>
+
+<field name='SOIL4_HR_atm' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 4'
+/>
+
+<field name='SOIL4_HR_atm_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 4'
+/>
+
+<field name='atmosphereC' units='gC/m^2'
+ long_name='atmosphere C'
+/>
+
+<field name='atmosphereC_1m' units='gC/m^2'
+ long_name='atmosphere C to 1 meter'
+/>
+
+<field name='atmosphereC_30cm' units='gC/m^2'
+ long_name='atmosphere C to 30 cm'
+/>
+
+<field name='atmosphereC_activelayer' units='gC/m^2'
+ long_name='atmosphere C in active layer'
+/>
+
+<field name='atmosphereC_vr' units='gC/m^3'
+ long_name='atmosphere C (vertically resolved)'
+/>
+
+<field name='atmosphereN' units='gN/m^2'
+ long_name='atmosphere C'
+/>
+
+<field name='atmosphereN_1m' units='gN/m^2'
+ long_name='atmosphere N to 1 meter'
+/>
+
+<field name='atmosphereN_30cm' units='gN/m^2'
+ long_name='atmosphere N to 30 cm'
+/>
+
+<field name='atmosphereN_activelayer' units='gN/m^2'
+ long_name='atmosphere N in active layer'
+/>
+
+<field name='atmosphereN_vr' units='gN/m^3'
+ long_name='atmosphere N (vertically resolved)'
+/>
+<?xml version="1.0"?>
+
+<?xml-stylesheet type="text/xsl" href="history_fields.xsl"?>
+
+<!--
+  List of history file field names, long-names and units for all the fields output
+  by CLM. This was created by reading in the file: /p/lustre2/dong9/E3SM-fork/components/elm/src/main/../biogeochem/FireMod.F90
+  SVN version information:
+  $URL: https://svn-ccsm-models.cgd.ucar.edu/clm2/trunk_tags/clm4_0_40/models/lnd/clm/src/main/findHistFields.pl $
+  $Id: findHistFields.pl 34757 2012-02-15 18:38:05Z erik $
+-->
+
+<history_fields>
+
+<field name='C13CWDC_TO_LITR2C' units='gC13/m^2/s'
+ long_name='decomp of coarse woody debris C to litter 2 C'
+/>
+
+<field name='C13CWDC_TO_LITR2C_vr' units='gC13/m^3/s'
+ long_name='decomp of coarse woody debris C to litter 2 C'
+/>
+
+<field name='C13CWDC_TO_LITR3C' units='gC13/m^2/s'
+ long_name='decomp of coarse woody debris C to litter 3 C'
+/>
+
+<field name='C13CWDC_TO_LITR3C_vr' units='gC13/m^3/s'
+ long_name='decomp of coarse woody debris C to litter 3 C'
+/>
+
+<field name='C13LITR1C_TO_SOIL1C' units='gC13/m^2/s'
+ long_name='decomp of litter 1 C to soil 1 C'
+/>
+
+<field name='C13LITR1C_TO_SOIL1C_vr' units='gC13/m^3/s'
+ long_name='decomp of litter 1 C to soil 1 C'
+/>
+
+<field name='C13LITR1_HR_S1' units='gC13/m^2/s'
+ long_name='Het. Resp. from litter 1'
+/>
+
+<field name='C13LITR1_HR_S1_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from litter 1'
+/>
+
+<field name='C13LITR2C_TO_SOIL1C' units='gC13/m^2/s'
+ long_name='decomp of litter 2 C to soil 1 C'
+/>
+
+<field name='C13LITR2C_TO_SOIL1C_vr' units='gC13/m^3/s'
+ long_name='decomp of litter 2 C to soil 1 C'
+/>
+
+<field name='C13LITR2C_TO_SOIL2C' units='gC13/m^2/s'
+ long_name='decomp of litter 2 C to soil 2 C'
+/>
+
+<field name='C13LITR2C_TO_SOIL2C_vr' units='gC13/m^3/s'
+ long_name='decomp of litter 2 C to soil 2 C'
+/>
+
+<field name='C13LITR2_HR_S1' units='gC13/m^2/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C13LITR2_HR_S1_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C13LITR2_HR_S2' units='gC13/m^2/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C13LITR2_HR_S2_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C13LITR3C_TO_SOIL2C' units='gC13/m^2/s'
+ long_name='decomp of litter 3 C to soil 2 C'
+/>
+
+<field name='C13LITR3C_TO_SOIL2C_vr' units='gC13/m^3/s'
+ long_name='decomp of litter 3 C to soil 2 C'
+/>
+
+<field name='C13LITR3C_TO_SOIL3C' units='gC13/m^2/s'
+ long_name='decomp of litter 3 C to soil 3 C'
+/>
+
+<field name='C13LITR3C_TO_SOIL3C_vr' units='gC13/m^3/s'
+ long_name='decomp of litter 3 C to soil 3 C'
+/>
+
+<field name='C13LITR3_HR_S2' units='gC13/m^2/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C13LITR3_HR_S2_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C13LITR3_HR_S3' units='gC13/m^2/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C13LITR3_HR_S3_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C13SOIL1C_TO_SOIL2C' units='gC13/m^2/s'
+ long_name='decomp of soil 1 C to soil 2 C'
+/>
+
+<field name='C13SOIL1C_TO_SOIL2C_vr' units='gC13/m^3/s'
+ long_name='decomp of soil 1 C to soil 2 C'
+/>
+
+<field name='C13SOIL1C_TO_SOIL3C' units='gC13/m^2/s'
+ long_name='decomp of soil 1 C to soil 3 C'
+/>
+
+<field name='C13SOIL1C_TO_SOIL3C_vr' units='gC13/m^3/s'
+ long_name='decomp of soil 1 C to soil 3 C'
+/>
+
+<field name='C13SOIL1_HR_S2' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C13SOIL1_HR_S2_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C13SOIL1_HR_S3' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C13SOIL1_HR_S3_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C13SOIL2C_TO_SOIL1C' units='gC13/m^2/s'
+ long_name='decomp of soil 2 C to soil 1 C'
+/>
+
+<field name='C13SOIL2C_TO_SOIL1C_vr' units='gC13/m^3/s'
+ long_name='decomp of soil 2 C to soil 1 C'
+/>
+
+<field name='C13SOIL2C_TO_SOIL3C' units='gC13/m^2/s'
+ long_name='decomp of soil 2 C to soil 3 C'
+/>
+
+<field name='C13SOIL2C_TO_SOIL3C_vr' units='gC13/m^3/s'
+ long_name='decomp of soil 2 C to soil 3 C'
+/>
+
+<field name='C13SOIL2_HR_S1' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C13SOIL2_HR_S1_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C13SOIL2_HR_S3' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C13SOIL2_HR_S3_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C13SOIL3C_TO_SOIL1C' units='gC13/m^2/s'
+ long_name='decomp of soil 3 C to soil 1 C'
+/>
+
+<field name='C13SOIL3C_TO_SOIL1C_vr' units='gC13/m^3/s'
+ long_name='decomp of soil 3 C to soil 1 C'
+/>
+
+<field name='C13SOIL3C_TO_SOIL4C' units='gC13/m^2/s'
+ long_name='decomp of soil 3 C to soil 4 C'
+/>
+
+<field name='C13SOIL3C_TO_SOIL4C_vr' units='gC13/m^3/s'
+ long_name='decomp of soil 3 C to soil 4 C'
+/>
+
+<field name='C13SOIL3_HR_S1' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C13SOIL3_HR_S1_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C13SOIL3_HR_S4' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C13SOIL3_HR_S4_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C13SOIL4_HR_atm' units='gC13/m^2/s'
+ long_name='Het. Resp. from soil 4'
+/>
+
+<field name='C13SOIL4_HR_atm_vr' units='gC13/m^3/s'
+ long_name='Het. Resp. from soil 4'
+/>
+
+<field name='C13_CWDC' units='gC13/m^2'
+ long_name='C13 coarse woody debris C'
+/>
+
+<field name='C13_CWDC_vr' units='gC13m^3'
+ long_name='C13 coarse woody debris C (vertically resolved)'
+/>
+
+<field name='C13_LITR1C' units='gC13/m^2'
+ long_name='C13 litter 1 C'
+/>
+
+<field name='C13_LITR1C_vr' units='gC13m^3'
+ long_name='C13 litter 1 C (vertically resolved)'
+/>
+
+<field name='C13_LITR2C' units='gC13/m^2'
+ long_name='C13 litter 2 C'
+/>
+
+<field name='C13_LITR2C_vr' units='gC13m^3'
+ long_name='C13 litter 2 C (vertically resolved)'
+/>
+
+<field name='C13_LITR3C' units='gC13/m^2'
+ long_name='C13 litter 3 C'
+/>
+
+<field name='C13_LITR3C_vr' units='gC13m^3'
+ long_name='C13 litter 3 C (vertically resolved)'
+/>
+
+<field name='C13_M_CWDC_TO_FIRE' units='gC13/m^2'
+ long_name='C13'
+/>
+
+<field name='C13_M_CWDC_TO_FIRE_vr' units='gC13/m^3'
+ long_name='C13'
+/>
+
+<field name='C13_M_LITR1C_TO_FIRE' units='gC13/m^2'
+ long_name='C13'
+/>
+
+<field name='C13_M_LITR1C_TO_FIRE_vr' units='gC13/m^3'
+ long_name='C13'
+/>
+
+<field name='C13_M_LITR2C_TO_FIRE' units='gC13/m^2'
+ long_name='C13'
+/>
+
+<field name='C13_M_LITR2C_TO_FIRE_vr' units='gC13/m^3'
+ long_name='C13'
+/>
+
+<field name='C13_M_LITR3C_TO_FIRE' units='gC13/m^2'
+ long_name='C13'
+/>
+
+<field name='C13_M_LITR3C_TO_FIRE_vr' units='gC13/m^3'
+ long_name='C13'
+/>
+
+<field name='C13_SOIL1C' units='gC13/m^2'
+ long_name='C13 soil 1 C'
+/>
+
+<field name='C13_SOIL1C_vr' units='gC13m^3'
+ long_name='C13 soil 1 C (vertically resolved)'
+/>
+
+<field name='C13_SOIL2C' units='gC13/m^2'
+ long_name='C13 soil 2 C'
+/>
+
+<field name='C13_SOIL2C_vr' units='gC13m^3'
+ long_name='C13 soil 2 C (vertically resolved)'
+/>
+
+<field name='C13_SOIL3C' units='gC13/m^2'
+ long_name='C13 soil 3 C'
+/>
+
+<field name='C13_SOIL3C_vr' units='gC13m^3'
+ long_name='C13 soil 3 C (vertically resolved)'
+/>
+
+<field name='C13_SOIL4C' units='gC13/m^2'
+ long_name='C13 soil 4 C'
+/>
+
+<field name='C13_SOIL4C_vr' units='gC13m^3'
+ long_name='C13 soil 4 C (vertically resolved)'
+/>
+
+<field name='C13_atmosphereC' units='gC13/m^2'
+ long_name='C13 atmosphere C'
+/>
+
+<field name='C13_atmosphereC_vr' units='gC13m^3'
+ long_name='C13 atmosphere C (vertically resolved)'
+/>
+
+<field name='C14CWDC_TO_LITR2C' units='gC14/m^2/s'
+ long_name='decomp of coarse woody debris C to litter 2 C'
+/>
+
+<field name='C14CWDC_TO_LITR2C_vr' units='gC14/m^3/s'
+ long_name='decomp of coarse woody debris C to litter 2 C'
+/>
+
+<field name='C14CWDC_TO_LITR3C' units='gC14/m^2/s'
+ long_name='decomp of coarse woody debris C to litter 3 C'
+/>
+
+<field name='C14CWDC_TO_LITR3C_vr' units='gC14/m^3/s'
+ long_name='decomp of coarse woody debris C to litter 3 C'
+/>
+
+<field name='C14LITR1C_TO_SOIL1C' units='gC14/m^2/s'
+ long_name='decomp of litter 1 C to soil 1 C'
+/>
+
+<field name='C14LITR1C_TO_SOIL1C_vr' units='gC14/m^3/s'
+ long_name='decomp of litter 1 C to soil 1 C'
+/>
+
+<field name='C14LITR1_HR_S1' units='gC14/m^2/s'
+ long_name='Het. Resp. from litter 1'
+/>
+
+<field name='C14LITR1_HR_S1_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from litter 1'
+/>
+
+<field name='C14LITR2C_TO_SOIL1C' units='gC14/m^2/s'
+ long_name='decomp of litter 2 C to soil 1 C'
+/>
+
+<field name='C14LITR2C_TO_SOIL1C_vr' units='gC14/m^3/s'
+ long_name='decomp of litter 2 C to soil 1 C'
+/>
+
+<field name='C14LITR2C_TO_SOIL2C' units='gC14/m^2/s'
+ long_name='decomp of litter 2 C to soil 2 C'
+/>
+
+<field name='C14LITR2C_TO_SOIL2C_vr' units='gC14/m^3/s'
+ long_name='decomp of litter 2 C to soil 2 C'
+/>
+
+<field name='C14LITR2_HR_S1' units='gC14/m^2/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C14LITR2_HR_S1_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C14LITR2_HR_S2' units='gC14/m^2/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C14LITR2_HR_S2_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='C14LITR3C_TO_SOIL2C' units='gC14/m^2/s'
+ long_name='decomp of litter 3 C to soil 2 C'
+/>
+
+<field name='C14LITR3C_TO_SOIL2C_vr' units='gC14/m^3/s'
+ long_name='decomp of litter 3 C to soil 2 C'
+/>
+
+<field name='C14LITR3C_TO_SOIL3C' units='gC14/m^2/s'
+ long_name='decomp of litter 3 C to soil 3 C'
+/>
+
+<field name='C14LITR3C_TO_SOIL3C_vr' units='gC14/m^3/s'
+ long_name='decomp of litter 3 C to soil 3 C'
+/>
+
+<field name='C14LITR3_HR_S2' units='gC14/m^2/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C14LITR3_HR_S2_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C14LITR3_HR_S3' units='gC14/m^2/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C14LITR3_HR_S3_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='C14SOIL1C_TO_SOIL2C' units='gC14/m^2/s'
+ long_name='decomp of soil 1 C to soil 2 C'
+/>
+
+<field name='C14SOIL1C_TO_SOIL2C_vr' units='gC14/m^3/s'
+ long_name='decomp of soil 1 C to soil 2 C'
+/>
+
+<field name='C14SOIL1C_TO_SOIL3C' units='gC14/m^2/s'
+ long_name='decomp of soil 1 C to soil 3 C'
+/>
+
+<field name='C14SOIL1C_TO_SOIL3C_vr' units='gC14/m^3/s'
+ long_name='decomp of soil 1 C to soil 3 C'
+/>
+
+<field name='C14SOIL1_HR_S2' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C14SOIL1_HR_S2_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C14SOIL1_HR_S3' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C14SOIL1_HR_S3_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='C14SOIL2C_TO_SOIL1C' units='gC14/m^2/s'
+ long_name='decomp of soil 2 C to soil 1 C'
+/>
+
+<field name='C14SOIL2C_TO_SOIL1C_vr' units='gC14/m^3/s'
+ long_name='decomp of soil 2 C to soil 1 C'
+/>
+
+<field name='C14SOIL2C_TO_SOIL3C' units='gC14/m^2/s'
+ long_name='decomp of soil 2 C to soil 3 C'
+/>
+
+<field name='C14SOIL2C_TO_SOIL3C_vr' units='gC14/m^3/s'
+ long_name='decomp of soil 2 C to soil 3 C'
+/>
+
+<field name='C14SOIL2_HR_S1' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C14SOIL2_HR_S1_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C14SOIL2_HR_S3' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C14SOIL2_HR_S3_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='C14SOIL3C_TO_SOIL1C' units='gC14/m^2/s'
+ long_name='decomp of soil 3 C to soil 1 C'
+/>
+
+<field name='C14SOIL3C_TO_SOIL1C_vr' units='gC14/m^3/s'
+ long_name='decomp of soil 3 C to soil 1 C'
+/>
+
+<field name='C14SOIL3C_TO_SOIL4C' units='gC14/m^2/s'
+ long_name='decomp of soil 3 C to soil 4 C'
+/>
+
+<field name='C14SOIL3C_TO_SOIL4C_vr' units='gC14/m^3/s'
+ long_name='decomp of soil 3 C to soil 4 C'
+/>
+
+<field name='C14SOIL3_HR_S1' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C14SOIL3_HR_S1_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C14SOIL3_HR_S4' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C14SOIL3_HR_S4_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='C14SOIL4_HR_atm' units='gC14/m^2/s'
+ long_name='Het. Resp. from soil 4'
+/>
+
+<field name='C14SOIL4_HR_atm_vr' units='gC14/m^3/s'
+ long_name='Het. Resp. from soil 4'
+/>
+
+<field name='C14_CWDC' units='gC14/m^2'
+ long_name='C14 coarse woody debris C'
+/>
+
+<field name='C14_CWDC_1m' units='gC14/m^2'
+ long_name='C14 coarse woody debris C to 1 meter'
+/>
+
+<field name='C14_CWDC_activelayer' units='gC14/m^2'
+ long_name='C14 coarse woody debris C in active layer'
+/>
+
+<field name='C14_CWDC_vr' units='gC14m^3'
+ long_name='C14 coarse woody debris C (vertically resolved)'
+/>
+
+<field name='C14_LITR1C' units='gC14/m^2'
+ long_name='C14 litter 1 C'
+/>
+
+<field name='C14_LITR1C_1m' units='gC14/m^2'
+ long_name='C14 litter 1 C to 1 meter'
+/>
+
+<field name='C14_LITR1C_activelayer' units='gC14/m^2'
+ long_name='C14 litter 1 C in active layer'
+/>
+
+<field name='C14_LITR1C_vr' units='gC14m^3'
+ long_name='C14 litter 1 C (vertically resolved)'
+/>
+
+<field name='C14_LITR2C' units='gC14/m^2'
+ long_name='C14 litter 2 C'
+/>
+
+<field name='C14_LITR2C_1m' units='gC14/m^2'
+ long_name='C14 litter 2 C to 1 meter'
+/>
+
+<field name='C14_LITR2C_activelayer' units='gC14/m^2'
+ long_name='C14 litter 2 C in active layer'
+/>
+
+<field name='C14_LITR2C_vr' units='gC14m^3'
+ long_name='C14 litter 2 C (vertically resolved)'
+/>
+
+<field name='C14_LITR3C' units='gC14/m^2'
+ long_name='C14 litter 3 C'
+/>
+
+<field name='C14_LITR3C_1m' units='gC14/m^2'
+ long_name='C14 litter 3 C to 1 meter'
+/>
+
+<field name='C14_LITR3C_activelayer' units='gC14/m^2'
+ long_name='C14 litter 3 C in active layer'
+/>
+
+<field name='C14_LITR3C_vr' units='gC14m^3'
+ long_name='C14 litter 3 C (vertically resolved)'
+/>
+
+<field name='C14_M_CWDC_TO_FIRE' units='gC14/m^2'
+ long_name='C14'
+/>
+
+<field name='C14_M_CWDC_TO_FIRE_vr' units='gC14/m^3'
+ long_name='C14'
+/>
+
+<field name='C14_M_LITR1C_TO_FIRE' units='gC14/m^2'
+ long_name='C14'
+/>
+
+<field name='C14_M_LITR1C_TO_FIRE_vr' units='gC14/m^3'
+ long_name='C14'
+/>
+
+<field name='C14_M_LITR2C_TO_FIRE' units='gC14/m^2'
+ long_name='C14'
+/>
+
+<field name='C14_M_LITR2C_TO_FIRE_vr' units='gC14/m^3'
+ long_name='C14'
+/>
+
+<field name='C14_M_LITR3C_TO_FIRE' units='gC14/m^2'
+ long_name='C14'
+/>
+
+<field name='C14_M_LITR3C_TO_FIRE_vr' units='gC14/m^3'
+ long_name='C14'
+/>
+
+<field name='C14_SOIL1C' units='gC14/m^2'
+ long_name='C14 soil 1 C'
+/>
+
+<field name='C14_SOIL1C_1m' units='gC14/m^2'
+ long_name='C14 soil 1 C to 1 meter'
+/>
+
+<field name='C14_SOIL1C_activelayer' units='gC14/m^2'
+ long_name='C14 soil 1 C in active layer'
+/>
+
+<field name='C14_SOIL1C_vr' units='gC14m^3'
+ long_name='C14 soil 1 C (vertically resolved)'
+/>
+
+<field name='C14_SOIL2C' units='gC14/m^2'
+ long_name='C14 soil 2 C'
+/>
+
+<field name='C14_SOIL2C_1m' units='gC14/m^2'
+ long_name='C14 soil 2 C to 1 meter'
+/>
+
+<field name='C14_SOIL2C_activelayer' units='gC14/m^2'
+ long_name='C14 soil 2 C in active layer'
+/>
+
+<field name='C14_SOIL2C_vr' units='gC14m^3'
+ long_name='C14 soil 2 C (vertically resolved)'
+/>
+
+<field name='C14_SOIL3C' units='gC14/m^2'
+ long_name='C14 soil 3 C'
+/>
+
+<field name='C14_SOIL3C_1m' units='gC14/m^2'
+ long_name='C14 soil 3 C to 1 meter'
+/>
+
+<field name='C14_SOIL3C_activelayer' units='gC14/m^2'
+ long_name='C14 soil 3 C in active layer'
+/>
+
+<field name='C14_SOIL3C_vr' units='gC14m^3'
+ long_name='C14 soil 3 C (vertically resolved)'
+/>
+
+<field name='C14_SOIL4C' units='gC14/m^2'
+ long_name='C14 soil 4 C'
+/>
+
+<field name='C14_SOIL4C_1m' units='gC14/m^2'
+ long_name='C14 soil 4 C to 1 meter'
+/>
+
+<field name='C14_SOIL4C_activelayer' units='gC14/m^2'
+ long_name='C14 soil 4 C in active layer'
+/>
+
+<field name='C14_SOIL4C_vr' units='gC14m^3'
+ long_name='C14 soil 4 C (vertically resolved)'
+/>
+
+<field name='C14_atmosphereC' units='gC14/m^2'
+ long_name='C14 atmosphere C'
+/>
+
+<field name='C14_atmosphereC_1m' units='gC14/m^2'
+ long_name='C14 atmosphere C to 1 meter'
+/>
+
+<field name='C14_atmosphereC_activelayer' units='gC14/m^2'
+ long_name='C14 atmosphere C in active layer'
+/>
+
+<field name='C14_atmosphereC_vr' units='gC14m^3'
+ long_name='C14 atmosphere C (vertically resolved)'
+/>
+
+<field name='CWDC' units='gC/m^2'
+ long_name='CWD C'
+/>
+
+<field name='CWDC_1m' units='gC/m^2'
+ long_name='CWD C to 1 meter'
+/>
+
+<field name='CWDC_30cm' units='gC/m^2'
+ long_name='CWD C to 30 cm'
+/>
+
+<field name='CWDC_TO_LITR2C' units='gC/m^2/s'
+ long_name='decomp of coarse woody debris C to litter 2 C'
+/>
+
+<field name='CWDC_TO_LITR2C_vr' units='gC/m^3/s'
+ long_name='decomp of coarse woody debris C to litter 2 C'
+/>
+
+<field name='CWDC_TO_LITR3C' units='gC/m^2/s'
+ long_name='decomp of coarse woody debris C to litter 3 C'
+/>
+
+<field name='CWDC_TO_LITR3C_vr' units='gC/m^3/s'
+ long_name='decomp of coarse woody debris C to litter 3 C'
+/>
+
+<field name='CWDC_activelayer' units='gC/m^2'
+ long_name='CWD C in active layer'
+/>
+
+<field name='CWDC_vr' units='gC/m^3'
+ long_name='CWD C (vertically resolved)'
+/>
+
+<field name='CWDN' units='gN/m^2'
+ long_name='CWD C'
+/>
+
+<field name='CWDN_1m' units='gN/m^2'
+ long_name='CWD N to 1 meter'
+/>
+
+<field name='CWDN_30cm' units='gN/m^2'
+ long_name='CWD N to 30 cm'
+/>
+
+<field name='CWDN_activelayer' units='gN/m^2'
+ long_name='CWD N in active layer'
+/>
+
+<field name='CWDN_vr' units='gN/m^3'
+ long_name='CWD N (vertically resolved)'
+/>
+
+<field name='K_CWD' units='1/s'
+ long_name='coarse woody debris potential loss coefficient'
+/>
+
+<field name='K_LITR1' units='1/s'
+ long_name='litter 1 potential loss coefficient'
+/>
+
+<field name='K_LITR2' units='1/s'
+ long_name='litter 2 potential loss coefficient'
+/>
+
+<field name='K_LITR3' units='1/s'
+ long_name='litter 3 potential loss coefficient'
+/>
+
+<field name='K_SOIL1' units='1/s'
+ long_name='soil 1 potential loss coefficient'
+/>
+
+<field name='K_SOIL2' units='1/s'
+ long_name='soil 2 potential loss coefficient'
+/>
+
+<field name='K_SOIL3' units='1/s'
+ long_name='soil 3 potential loss coefficient'
+/>
+
+<field name='K_SOIL4' units='1/s'
+ long_name='soil 4 potential loss coefficient'
+/>
+
+<field name='K_atmosphere' units='1/s'
+ long_name='atmosphere potential loss coefficient'
+/>
+
+<field name='LITR1C' units='gC/m^2'
+ long_name='LITR1 C'
+/>
+
+<field name='LITR1C_1m' units='gC/m^2'
+ long_name='LITR1 C to 1 meter'
+/>
+
+<field name='LITR1C_30cm' units='gC/m^2'
+ long_name='LITR1 C to 30 cm'
+/>
+
+<field name='LITR1C_TO_SOIL1C' units='gC/m^2/s'
+ long_name='decomp of litter 1 C to soil 1 C'
+/>
+
+<field name='LITR1C_TO_SOIL1C_vr' units='gC/m^3/s'
+ long_name='decomp of litter 1 C to soil 1 C'
+/>
+
+<field name='LITR1C_activelayer' units='gC/m^2'
+ long_name='LITR1 C in active layer'
+/>
+
+<field name='LITR1C_vr' units='gC/m^3'
+ long_name='LITR1 C (vertically resolved)'
+/>
+
+<field name='LITR1N' units='gN/m^2'
+ long_name='LITR1 C'
+/>
+
+<field name='LITR1N_1m' units='gN/m^2'
+ long_name='LITR1 N to 1 meter'
+/>
+
+<field name='LITR1N_30cm' units='gN/m^2'
+ long_name='LITR1 N to 30 cm'
+/>
+
+<field name='LITR1N_TO_SOIL1N' units='gN/m^2/s'
+ long_name='decomp of litter 1 N to soil 1 N'
+/>
+
+<field name='LITR1N_TO_SOIL1N_vr' units='gN/m^3/s'
+ long_name='decomp of litter 1 N to soil 1 N'
+/>
+
+<field name='LITR1N_activelayer' units='gN/m^2'
+ long_name='LITR1 N in active layer'
+/>
+
+<field name='LITR1N_vr' units='gN/m^3'
+ long_name='LITR1 N (vertically resolved)'
+/>
+
+<field name='LITR1_HR_S1' units='gC/m^2/s'
+ long_name='Het. Resp. from litter 1'
+/>
+
+<field name='LITR1_HR_S1_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from litter 1'
+/>
+
+<field name='LITR2C' units='gC/m^2'
+ long_name='LITR2 C'
+/>
+
+<field name='LITR2C_1m' units='gC/m^2'
+ long_name='LITR2 C to 1 meter'
+/>
+
+<field name='LITR2C_30cm' units='gC/m^2'
+ long_name='LITR2 C to 30 cm'
+/>
+
+<field name='LITR2C_TO_SOIL1C' units='gC/m^2/s'
+ long_name='decomp of litter 2 C to soil 1 C'
+/>
+
+<field name='LITR2C_TO_SOIL1C_vr' units='gC/m^3/s'
+ long_name='decomp of litter 2 C to soil 1 C'
+/>
+
+<field name='LITR2C_TO_SOIL2C' units='gC/m^2/s'
+ long_name='decomp of litter 2 C to soil 2 C'
+/>
+
+<field name='LITR2C_TO_SOIL2C_vr' units='gC/m^3/s'
+ long_name='decomp of litter 2 C to soil 2 C'
+/>
+
+<field name='LITR2C_activelayer' units='gC/m^2'
+ long_name='LITR2 C in active layer'
+/>
+
+<field name='LITR2C_vr' units='gC/m^3'
+ long_name='LITR2 C (vertically resolved)'
+/>
+
+<field name='LITR2N' units='gN/m^2'
+ long_name='LITR2 C'
+/>
+
+<field name='LITR2N_1m' units='gN/m^2'
+ long_name='LITR2 N to 1 meter'
+/>
+
+<field name='LITR2N_30cm' units='gN/m^2'
+ long_name='LITR2 N to 30 cm'
+/>
+
+<field name='LITR2N_TO_SOIL1N' units='gN/m^2/s'
+ long_name='decomp of litter 2 N to soil 1 N'
+/>
+
+<field name='LITR2N_TO_SOIL1N_vr' units='gN/m^3/s'
+ long_name='decomp of litter 2 N to soil 1 N'
+/>
+
+<field name='LITR2N_TO_SOIL2N' units='gN/m^2/s'
+ long_name='decomp of litter 2 N to soil 2 N'
+/>
+
+<field name='LITR2N_TO_SOIL2N_vr' units='gN/m^3/s'
+ long_name='decomp of litter 2 N to soil 2 N'
+/>
+
+<field name='LITR2N_activelayer' units='gN/m^2'
+ long_name='LITR2 N in active layer'
+/>
+
+<field name='LITR2N_vr' units='gN/m^3'
+ long_name='LITR2 N (vertically resolved)'
+/>
+
+<field name='LITR2_HR_S1' units='gC/m^2/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='LITR2_HR_S1_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='LITR2_HR_S2' units='gC/m^2/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='LITR2_HR_S2_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from litter 2'
+/>
+
+<field name='LITR3C' units='gC/m^2'
+ long_name='LITR3 C'
+/>
+
+<field name='LITR3C_1m' units='gC/m^2'
+ long_name='LITR3 C to 1 meter'
+/>
+
+<field name='LITR3C_30cm' units='gC/m^2'
+ long_name='LITR3 C to 30 cm'
+/>
+
+<field name='LITR3C_TO_SOIL2C' units='gC/m^2/s'
+ long_name='decomp of litter 3 C to soil 2 C'
+/>
+
+<field name='LITR3C_TO_SOIL2C_vr' units='gC/m^3/s'
+ long_name='decomp of litter 3 C to soil 2 C'
+/>
+
+<field name='LITR3C_TO_SOIL3C' units='gC/m^2/s'
+ long_name='decomp of litter 3 C to soil 3 C'
+/>
+
+<field name='LITR3C_TO_SOIL3C_vr' units='gC/m^3/s'
+ long_name='decomp of litter 3 C to soil 3 C'
+/>
+
+<field name='LITR3C_activelayer' units='gC/m^2'
+ long_name='LITR3 C in active layer'
+/>
+
+<field name='LITR3C_vr' units='gC/m^3'
+ long_name='LITR3 C (vertically resolved)'
+/>
+
+<field name='LITR3N' units='gN/m^2'
+ long_name='LITR3 C'
+/>
+
+<field name='LITR3N_1m' units='gN/m^2'
+ long_name='LITR3 N to 1 meter'
+/>
+
+<field name='LITR3N_30cm' units='gN/m^2'
+ long_name='LITR3 N to 30 cm'
+/>
+
+<field name='LITR3N_TO_SOIL2N' units='gN/m^2/s'
+ long_name='decomp of litter 3 N to soil 2 N'
+/>
+
+<field name='LITR3N_TO_SOIL2N_vr' units='gN/m^3/s'
+ long_name='decomp of litter 3 N to soil 2 N'
+/>
+
+<field name='LITR3N_TO_SOIL3N' units='gN/m^2/s'
+ long_name='decomp of litter 3 N to soil 3 N'
+/>
+
+<field name='LITR3N_TO_SOIL3N_vr' units='gN/m^3/s'
+ long_name='decomp of litter 3 N to soil 3 N'
+/>
+
+<field name='LITR3N_activelayer' units='gN/m^2'
+ long_name='LITR3 N in active layer'
+/>
+
+<field name='LITR3N_vr' units='gN/m^3'
+ long_name='LITR3 N (vertically resolved)'
+/>
+
+<field name='LITR3_HR_S2' units='gC/m^2/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='LITR3_HR_S2_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='LITR3_HR_S3' units='gC/m^2/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='LITR3_HR_S3_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from litter 3'
+/>
+
+<field name='M_CWDC_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_CWDC_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_CWDN_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_CWDN_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR1C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR1C_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR1C_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR1C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR1N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR1N_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR1N_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR1N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR2C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR2C_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR2C_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR2C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR2N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR2N_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR2N_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR2N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR3C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR3C_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR3C_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR3C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR3N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR3N_TO_FIRE' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_LITR3N_TO_FIRE_vr' units='gC/m^3'
+ long_name=''
+/>
+
+<field name='M_LITR3N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL1C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL1C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL1N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL1N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL2C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL2C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL2N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL2N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL3C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL3C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL3N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL3N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL4C_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL4C_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL4N_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_SOIL4N_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_atmosphereC_TNDNCY_VERT_TRANSPORT' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_atmosphereC_TO_LEACHING' units='gC/m^2'
+ long_name=''
+/>
+
+<field name='M_atmosphereN_TNDNCY_VERT_TRANSPORT' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='M_atmosphereN_TO_LEACHING' units='gN/m^2'
+ long_name=''
+/>
+
+<field name='SMINN_TO_DENIT_L1S1' units='gN/m^2'
+ long_name='denitrification for decomp. of litter 1to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_L1S1_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of litter 1to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_L2S1' units='gN/m^2'
+ long_name='denitrification for decomp. of litter 2to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_L2S1_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of litter 2to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_L2S2' units='gN/m^2'
+ long_name='denitrification for decomp. of litter 2to SOIL2'
+/>
+
+<field name='SMINN_TO_DENIT_L2S2_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of litter 2to SOIL2'
+/>
+
+<field name='SMINN_TO_DENIT_L3S2' units='gN/m^2'
+ long_name='denitrification for decomp. of litter 3to SOIL2'
+/>
+
+<field name='SMINN_TO_DENIT_L3S2_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of litter 3to SOIL2'
+/>
+
+<field name='SMINN_TO_DENIT_L3S3' units='gN/m^2'
+ long_name='denitrification for decomp. of litter 3to SOIL3'
+/>
+
+<field name='SMINN_TO_DENIT_L3S3_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of litter 3to SOIL3'
+/>
+
+<field name='SMINN_TO_DENIT_S1S2' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 1to SOIL2'
+/>
+
+<field name='SMINN_TO_DENIT_S1S2_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 1to SOIL2'
+/>
+
+<field name='SMINN_TO_DENIT_S1S3' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 1to SOIL3'
+/>
+
+<field name='SMINN_TO_DENIT_S1S3_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 1to SOIL3'
+/>
+
+<field name='SMINN_TO_DENIT_S2S1' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 2to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_S2S1_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 2to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_S2S3' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 2to SOIL3'
+/>
+
+<field name='SMINN_TO_DENIT_S2S3_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 2to SOIL3'
+/>
+
+<field name='SMINN_TO_DENIT_S3S1' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 3to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_S3S1_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 3to SOIL1'
+/>
+
+<field name='SMINN_TO_DENIT_S3S4' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 3to SOIL4'
+/>
+
+<field name='SMINN_TO_DENIT_S3S4_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 3to SOIL4'
+/>
+
+<field name='SMINN_TO_DENIT_S4' units='gN/m^2'
+ long_name='denitrification for decomp. of soil 4to atmosphere'
+/>
+
+<field name='SMINN_TO_DENIT_S4_vr' units='gN/m^3'
+ long_name='denitrification for decomp. of soil 4to atmosphere'
+/>
+
+<field name='SMINN_TO_SOIL1N_L1' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of LITR1'
+/>
+
+<field name='SMINN_TO_SOIL1N_L1_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of LITR1'
+/>
+
+<field name='SMINN_TO_SOIL1N_L2' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of LITR2'
+/>
+
+<field name='SMINN_TO_SOIL1N_L2_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of LITR2'
+/>
+
+<field name='SMINN_TO_SOIL1N_S2' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL2'
+/>
+
+<field name='SMINN_TO_SOIL1N_S2_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL2'
+/>
+
+<field name='SMINN_TO_SOIL1N_S3' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL3'
+/>
+
+<field name='SMINN_TO_SOIL1N_S3_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL3'
+/>
+
+<field name='SMINN_TO_SOIL2N_L2' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of LITR2'
+/>
+
+<field name='SMINN_TO_SOIL2N_L2_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of LITR2'
+/>
+
+<field name='SMINN_TO_SOIL2N_L3' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of LITR3'
+/>
+
+<field name='SMINN_TO_SOIL2N_L3_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of LITR3'
+/>
+
+<field name='SMINN_TO_SOIL2N_S1' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL1'
+/>
+
+<field name='SMINN_TO_SOIL2N_S1_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL1'
+/>
+
+<field name='SMINN_TO_SOIL3N_L3' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of LITR3'
+/>
+
+<field name='SMINN_TO_SOIL3N_L3_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of LITR3'
+/>
+
+<field name='SMINN_TO_SOIL3N_S1' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL1'
+/>
+
+<field name='SMINN_TO_SOIL3N_S1_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL1'
+/>
+
+<field name='SMINN_TO_SOIL3N_S2' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL2'
+/>
+
+<field name='SMINN_TO_SOIL3N_S2_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL2'
+/>
+
+<field name='SMINN_TO_SOIL4N_S3' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL3'
+/>
+
+<field name='SMINN_TO_SOIL4N_S3_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL3'
+/>
+
+<field name='SOIL1C' units='gC/m^2'
+ long_name='SOIL1 C'
+/>
+
+<field name='SOIL1C_1m' units='gC/m^2'
+ long_name='SOIL1 C to 1 meter'
+/>
+
+<field name='SOIL1C_30cm' units='gC/m^2'
+ long_name='SOIL1 C to 30 cm'
+/>
+
+<field name='SOIL1C_TO_SOIL2C' units='gC/m^2/s'
+ long_name='decomp of soil 1 C to soil 2 C'
+/>
+
+<field name='SOIL1C_TO_SOIL2C_vr' units='gC/m^3/s'
+ long_name='decomp of soil 1 C to soil 2 C'
+/>
+
+<field name='SOIL1C_TO_SOIL3C' units='gC/m^2/s'
+ long_name='decomp of soil 1 C to soil 3 C'
+/>
+
+<field name='SOIL1C_TO_SOIL3C_vr' units='gC/m^3/s'
+ long_name='decomp of soil 1 C to soil 3 C'
+/>
+
+<field name='SOIL1C_activelayer' units='gC/m^2'
+ long_name='SOIL1 C in active layer'
+/>
+
+<field name='SOIL1C_vr' units='gC/m^3'
+ long_name='SOIL1 C (vertically resolved)'
+/>
+
+<field name='SOIL1N' units='gN/m^2'
+ long_name='SOIL1 C'
+/>
+
+<field name='SOIL1N_1m' units='gN/m^2'
+ long_name='SOIL1 N to 1 meter'
+/>
+
+<field name='SOIL1N_30cm' units='gN/m^2'
+ long_name='SOIL1 N to 30 cm'
+/>
+
+<field name='SOIL1N_TO_SOIL2N' units='gN/m^2/s'
+ long_name='decomp of soil 1 N to soil 2 N'
+/>
+
+<field name='SOIL1N_TO_SOIL2N_vr' units='gN/m^3/s'
+ long_name='decomp of soil 1 N to soil 2 N'
+/>
+
+<field name='SOIL1N_TO_SOIL3N' units='gN/m^2/s'
+ long_name='decomp of soil 1 N to soil 3 N'
+/>
+
+<field name='SOIL1N_TO_SOIL3N_vr' units='gN/m^3/s'
+ long_name='decomp of soil 1 N to soil 3 N'
+/>
+
+<field name='SOIL1N_activelayer' units='gN/m^2'
+ long_name='SOIL1 N in active layer'
+/>
+
+<field name='SOIL1N_vr' units='gN/m^3'
+ long_name='SOIL1 N (vertically resolved)'
+/>
+
+<field name='SOIL1_HR_S2' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='SOIL1_HR_S2_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='SOIL1_HR_S3' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='SOIL1_HR_S3_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 1'
+/>
+
+<field name='SOIL2C' units='gC/m^2'
+ long_name='SOIL2 C'
+/>
+
+<field name='SOIL2C_1m' units='gC/m^2'
+ long_name='SOIL2 C to 1 meter'
+/>
+
+<field name='SOIL2C_30cm' units='gC/m^2'
+ long_name='SOIL2 C to 30 cm'
+/>
+
+<field name='SOIL2C_TO_SOIL1C' units='gC/m^2/s'
+ long_name='decomp of soil 2 C to soil 1 C'
+/>
+
+<field name='SOIL2C_TO_SOIL1C_vr' units='gC/m^3/s'
+ long_name='decomp of soil 2 C to soil 1 C'
+/>
+
+<field name='SOIL2C_TO_SOIL3C' units='gC/m^2/s'
+ long_name='decomp of soil 2 C to soil 3 C'
+/>
+
+<field name='SOIL2C_TO_SOIL3C_vr' units='gC/m^3/s'
+ long_name='decomp of soil 2 C to soil 3 C'
+/>
+
+<field name='SOIL2C_activelayer' units='gC/m^2'
+ long_name='SOIL2 C in active layer'
+/>
+
+<field name='SOIL2C_vr' units='gC/m^3'
+ long_name='SOIL2 C (vertically resolved)'
+/>
+
+<field name='SOIL2N' units='gN/m^2'
+ long_name='SOIL2 C'
+/>
+
+<field name='SOIL2N_1m' units='gN/m^2'
+ long_name='SOIL2 N to 1 meter'
+/>
+
+<field name='SOIL2N_30cm' units='gN/m^2'
+ long_name='SOIL2 N to 30 cm'
+/>
+
+<field name='SOIL2N_TO_SOIL1N' units='gN/m^2/s'
+ long_name='decomp of soil 2 N to soil 1 N'
+/>
+
+<field name='SOIL2N_TO_SOIL1N_vr' units='gN/m^3/s'
+ long_name='decomp of soil 2 N to soil 1 N'
+/>
+
+<field name='SOIL2N_TO_SOIL3N' units='gN/m^2/s'
+ long_name='decomp of soil 2 N to soil 3 N'
+/>
+
+<field name='SOIL2N_TO_SOIL3N_vr' units='gN/m^3/s'
+ long_name='decomp of soil 2 N to soil 3 N'
+/>
+
+<field name='SOIL2N_activelayer' units='gN/m^2'
+ long_name='SOIL2 N in active layer'
+/>
+
+<field name='SOIL2N_vr' units='gN/m^3'
+ long_name='SOIL2 N (vertically resolved)'
+/>
+
+<field name='SOIL2_HR_S1' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='SOIL2_HR_S1_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='SOIL2_HR_S3' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='SOIL2_HR_S3_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 2'
+/>
+
+<field name='SOIL3C' units='gC/m^2'
+ long_name='SOIL3 C'
+/>
+
+<field name='SOIL3C_1m' units='gC/m^2'
+ long_name='SOIL3 C to 1 meter'
+/>
+
+<field name='SOIL3C_30cm' units='gC/m^2'
+ long_name='SOIL3 C to 30 cm'
+/>
+
+<field name='SOIL3C_TO_SOIL1C' units='gC/m^2/s'
+ long_name='decomp of soil 3 C to soil 1 C'
+/>
+
+<field name='SOIL3C_TO_SOIL1C_vr' units='gC/m^3/s'
+ long_name='decomp of soil 3 C to soil 1 C'
+/>
+
+<field name='SOIL3C_TO_SOIL4C' units='gC/m^2/s'
+ long_name='decomp of soil 3 C to soil 4 C'
+/>
+
+<field name='SOIL3C_TO_SOIL4C_vr' units='gC/m^3/s'
+ long_name='decomp of soil 3 C to soil 4 C'
+/>
+
+<field name='SOIL3C_activelayer' units='gC/m^2'
+ long_name='SOIL3 C in active layer'
+/>
+
+<field name='SOIL3C_vr' units='gC/m^3'
+ long_name='SOIL3 C (vertically resolved)'
+/>
+
+<field name='SOIL3N' units='gN/m^2'
+ long_name='SOIL3 C'
+/>
+
+<field name='SOIL3N_1m' units='gN/m^2'
+ long_name='SOIL3 N to 1 meter'
+/>
+
+<field name='SOIL3N_30cm' units='gN/m^2'
+ long_name='SOIL3 N to 30 cm'
+/>
+
+<field name='SOIL3N_TO_SOIL1N' units='gN/m^2/s'
+ long_name='decomp of soil 3 N to soil 1 N'
+/>
+
+<field name='SOIL3N_TO_SOIL1N_vr' units='gN/m^3/s'
+ long_name='decomp of soil 3 N to soil 1 N'
+/>
+
+<field name='SOIL3N_TO_SOIL4N' units='gN/m^2/s'
+ long_name='decomp of soil 3 N to soil 4 N'
+/>
+
+<field name='SOIL3N_TO_SOIL4N_vr' units='gN/m^3/s'
+ long_name='decomp of soil 3 N to soil 4 N'
+/>
+
+<field name='SOIL3N_activelayer' units='gN/m^2'
+ long_name='SOIL3 N in active layer'
+/>
+
+<field name='SOIL3N_vr' units='gN/m^3'
+ long_name='SOIL3 N (vertically resolved)'
+/>
+
+<field name='SOIL3_HR_S1' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='SOIL3_HR_S1_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='SOIL3_HR_S4' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='SOIL3_HR_S4_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 3'
+/>
+
+<field name='SOIL4C' units='gC/m^2'
+ long_name='SOIL4 C'
+/>
+
+<field name='SOIL4C_1m' units='gC/m^2'
+ long_name='SOIL4 C to 1 meter'
+/>
+
+<field name='SOIL4C_30cm' units='gC/m^2'
+ long_name='SOIL4 C to 30 cm'
+/>
+
+<field name='SOIL4C_activelayer' units='gC/m^2'
+ long_name='SOIL4 C in active layer'
+/>
+
+<field name='SOIL4C_vr' units='gC/m^3'
+ long_name='SOIL4 C (vertically resolved)'
+/>
+
+<field name='SOIL4N' units='gN/m^2'
+ long_name='SOIL4 C'
+/>
+
+<field name='SOIL4N_1m' units='gN/m^2'
+ long_name='SOIL4 N to 1 meter'
+/>
+
+<field name='SOIL4N_30cm' units='gN/m^2'
+ long_name='SOIL4 N to 30 cm'
+/>
+
+<field name='SOIL4N_TO_SMINN' units='gN/m^2/s'
+ long_name='mineral N flux for decomp. of SOIL4'
+/>
+
+<field name='SOIL4N_TO_SMINN_vr' units='gN/m^3/s'
+ long_name='mineral N flux for decomp. of SOIL4'
+/>
+
+<field name='SOIL4N_activelayer' units='gN/m^2'
+ long_name='SOIL4 N in active layer'
+/>
+
+<field name='SOIL4N_vr' units='gN/m^3'
+ long_name='SOIL4 N (vertically resolved)'
+/>
+
+<field name='SOIL4_HR_atm' units='gC/m^2/s'
+ long_name='Het. Resp. from soil 4'
+/>
+
+<field name='SOIL4_HR_atm_vr' units='gC/m^3/s'
+ long_name='Het. Resp. from soil 4'
+/>
+
+<field name='atmosphereC' units='gC/m^2'
+ long_name='atmosphere C'
+/>
+
+<field name='atmosphereC_1m' units='gC/m^2'
+ long_name='atmosphere C to 1 meter'
+/>
+
+<field name='atmosphereC_30cm' units='gC/m^2'
+ long_name='atmosphere C to 30 cm'
+/>
+
+<field name='atmosphereC_activelayer' units='gC/m^2'
+ long_name='atmosphere C in active layer'
+/>
+
+<field name='atmosphereC_vr' units='gC/m^3'
+ long_name='atmosphere C (vertically resolved)'
+/>
+
+<field name='atmosphereN' units='gN/m^2'
+ long_name='atmosphere C'
+/>
+
+<field name='atmosphereN_1m' units='gN/m^2'
+ long_name='atmosphere N to 1 meter'
+/>
+
+<field name='atmosphereN_30cm' units='gN/m^2'
+ long_name='atmosphere N to 30 cm'
+/>
+
+<field name='atmosphereN_activelayer' units='gN/m^2'
+ long_name='atmosphere N in active layer'
+/>
+
+<field name='atmosphereN_vr' units='gN/m^3'
+ long_name='atmosphere N (vertically resolved)'
+/>
+
+</history_fields>

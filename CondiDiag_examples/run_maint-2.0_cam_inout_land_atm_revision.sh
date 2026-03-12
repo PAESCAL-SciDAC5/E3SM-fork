@@ -10,6 +10,9 @@
 # TO DO:
 # - custom pelayout
 
+# NOTE: ON DANE, RUNNING THIS SCRIPT NOW REQUIRES LOADING PYTHON 3.9.12 FIRST, I.E.
+#       ml python/3.9.12
+
 main() {
 
 # For debugging, uncomment line below
@@ -18,14 +21,15 @@ main() {
 # --- Configuration flags ----
 
 # Machine and project
-readonly MACHINE="pm-cpu"
-readonly PROJECT="m4359"
+# readonly MACHINE="pm-cpu"
+readonly MACHINE="dane"
+readonly PROJECT="paescal"
 
 # Simulation
 readonly COMPSET="F2010"
 readonly RESOLUTION="ne30pg2_oECv3"
 # BEFORE RUNNING : CHANGE the following CASE_NAME to desired value
-readonly CASE_NAME="EAMv2_newscheme_eps05_zetamax1000_tol3e-3_final_sfc_inout_"$RESOLUTION
+readonly CASE_NAME="EAMv2_test_baregroundfluxes_sfc_inout_"$RESOLUTION
 # readonly CASE_NAME="EAMv2_oldscheme_noregularization_withuniquenessfix_final_sfc_inout_"$RESOLUTION
 # readonly CASE_NAME="EAMv2_fullconvergence_unregularizedscheme_withuniquenessfix_zetamax20_10years_instantaneousoutput_sfc_inout_"$RESOLUTION
 # readonly CASE_NAME="EAMv2_regularizeduniquescheme_testMPASseaicestream_E1850C5ELM_sfc_inout_"$RESOLUTION
@@ -54,8 +58,11 @@ readonly START_DATE="2009-09-01"
 
 # Set paths
 readonly CHECKOUT="ocean_atm_flux_revision"
-readonly CODE_ROOT="/global/cfs/projectdirs/"${PROJECT}/${USER}"/sfc_cpl/code/${CHECKOUT}"
-readonly CASE_ROOT="${SCRATCH}/sfc_cpl/cases/${CASE_NAME}"
+# readonly CODE_ROOT="/global/cfs/projectdirs/"${PROJECT}/${USER}"/sfc_cpl/code/${CHECKOUT}"
+# readonly CASE_ROOT="${SCRATCH}/sfc_cpl/cases/${CASE_NAME}"
+readonly CODE_ROOT="/p/lustre2/"${USER}"/E3SM-fork"
+readonly SCRATCH="/p/lustre2/dong9/e3sm_scratch/dane"
+readonly CASE_ROOT="${SCRATCH}/cases/${CASE_NAME}"
 
 # Sub-directories
 readonly CASE_BUILD_DIR=${CASE_ROOT}/build
@@ -66,7 +73,7 @@ readonly CASE_ARCHIVE_DIR=${CASE_ROOT}/archive
 #               'M_1x10_ndays', 'M2_1x10_ndays', 'M80_1x10_ndays', 'L_1x10_ndays'
 #  or 'production' for full simulation
 # readonly run='XS_1x1_nmonths'
-readonly run='production'
+readonly run='XS_2x5_ndays'
 if [ "${run}" != "production" ]; then
 
   # Short test simulations
@@ -79,6 +86,7 @@ if [ "${run}" != "production" ]; then
   readonly CASE_SCRIPTS_DIR=${CASE_ROOT}/tests/${run}/case_scripts
   readonly CASE_RUN_DIR=${CASE_ROOT}/tests/${run}/run
   readonly PELAYOUT=${layout}
+#  readonly PELAYOUT="custom-1"
   readonly WALLTIME="2:00:00"
   readonly STOP_OPTION=${units}
   readonly STOP_N=${length}
@@ -180,6 +188,10 @@ then
     elif [ "${MACHINE}" == "pm-cpu" ]; then
         ncore=128
         hthrd=1  # including pm-cpu
+    elif [ "${MACHINE}" == "dane" ]; then
+        # ncore=224
+        ncore=1
+        hthrd=1
     fi
 
     # Extract number of nodes
@@ -199,14 +211,14 @@ then
 
        echo Using custom 1 nodes layout with pm-cpu
 
-      ./xmlchange CPL_NTASKS=128
-      ./xmlchange ATM_NTASKS=128
-      ./xmlchange OCN_NTASKS=128
+      ./xmlchange CPL_NTASKS=1
+      ./xmlchange ATM_NTASKS=1
+      ./xmlchange OCN_NTASKS=1
       ./xmlchange OCN_ROOTPE=0
 
-      ./xmlchange LND_NTASKS=128
-      ./xmlchange ROF_NTASKS=128
-      ./xmlchange ICE_NTASKS=128
+      ./xmlchange LND_NTASKS=1
+      ./xmlchange ROF_NTASKS=1
+      ./xmlchange ICE_NTASKS=1
       ./xmlchange LND_ROOTPE=0
       ./xmlchange ROF_ROOTPE=0
 
@@ -325,6 +337,14 @@ hist_tape_with_all_output = 2
 ! Additional variables in tape 2
 
 fincl2 = 'PRECC','PRECL'
+
+EOF
+
+
+cat << EOF >> user_nl_elm
+
+hist_empty_htapes = .true.
+hist_fincl2 = 'TG', 'TV', 'FSA', 'Z0M', 'Z_0_TOWN'
 
 EOF
 
@@ -467,6 +487,8 @@ case_setup() {
 
     # Custom user_nl
     user_nl
+
+    # set -exv; . /usr/WS1/climdat/python_venv/3.9.2/screamML/bin/activate
 
     # Finally, run CIME case.setup
     ./case.setup --reset
