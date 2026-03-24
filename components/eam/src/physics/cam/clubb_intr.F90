@@ -2461,8 +2461,14 @@ end subroutine clubb_init_cnst
             zi_g, zt_g, err_code)     
       end if
 
+      if ((.not. l_turb_standalone) .and. single_column) then
+         call read_and_set_sfc_input_to_clubb_core( &
+              ncol, wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc)
+      end if
+
       ! Open txt file for output (SCM only)
-      if (l_turb_standalone .and. masterproc) then
+      ! if (l_turb_standalone .and. masterproc) then
+      if (single_column .and. masterproc) then
 
          txt_output_prefix = 'clubb_output'
          if (len_trim(clubb_output_prefix) > 0) txt_output_prefix = trim(clubb_output_prefix)
@@ -2494,7 +2500,7 @@ end subroutine clubb_init_cnst
          write(iulog,*) 'nadv              = ', nadv
       end if
 
-      l_inner_write = l_turb_standalone .and. (.not.l_clubb_outer_loop)
+      l_inner_write = single_column .and. (.not.l_clubb_outer_loop)
 
       ! ------------------------------------------------------------- !
       ! Time integration for CLUBB only
@@ -2645,7 +2651,7 @@ end subroutine clubb_init_cnst
 
       ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
       ! outer loop output
-      if (l_turb_standalone .and. l_clubb_outer_loop .and. masterproc) then
+      if (single_column .and. l_clubb_outer_loop .and. masterproc) then
          do kk=pver,1,-1
             ixind = pverp-kk+1
             write(txtout_unit,clubb_txt_fmt) i_clubb_main*nint(real(dtime, kind=r8)), &
@@ -2663,7 +2669,7 @@ end subroutine clubb_init_cnst
 
       end do  ! end i_clubb_main loop
 
-      if (l_turb_standalone .and. masterproc) then
+      if (single_column .and. masterproc) then
          close(txtout_unit)
          call freeunit(txtout_unit)
       end if
@@ -4440,6 +4446,72 @@ end function diag_ustar
 #endif
 
    ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
+
+   subroutine read_and_set_sfc_input_to_clubb_core( &
+             ncol, wpthlp_sfc_input, wprtp_sfc_input, upwp_sfc_input, vpwp_sfc_input)
+
+    integer, intent(in) :: ncol
+
+    real(core_rknd), intent(inout) :: wpthlp_sfc_input
+    real(core_rknd), intent(inout) :: wprtp_sfc_input
+    real(core_rknd), intent(inout) :: upwp_sfc_input
+    real(core_rknd), intent(inout) :: vpwp_sfc_input
+
+    character(len=72) :: junk   ! a string to hold comment lines in input text file
+    real(r8) :: wprtp_sfc_read
+    real(r8) :: wpthlp_sfc_read
+    real(r8) :: upwp_sfc_read
+    real(r8) :: vpwp_sfc_read
+    real(r8) :: pverread
+    real(r8) :: pverpread
+    real(r8) :: dz_zi_read
+    real(r8) :: zsurf
+
+    integer :: ierr
+    integer :: unitn
+
+    if (ncol < 1) return
+
+    if (.not.masterproc) then
+       call endrun('In SCM mode but calculating CLUBB on multiple MPI processes?')
+    end if
+
+    if (masterproc) then
+
+      !----------------------------------------------------------------
+      ! Surface variables
+      !----------------------------------------------------------------
+      write(iulog,*) 'Read in column surface vars initial conditions (CLUBB/SHOC format).'
+
+      unitn = getunit()
+      open( unitn, file='ShocInOut_IC_surface_vars.txt', status='old' )
+      read( unitn, *, iostat=ierr ) junk
+      if( ierr /= 0 ) then
+         call endrun('Error reading ShocInOut_IC_surface_vars.txt.')
+      end if
+      read( unitn, *, iostat=ierr ) junk
+
+      read(unitn, *)  pverread
+
+      read(unitn,*) dz_zi_read      ! dz_zi is computed from zi_g, zt_g
+      read(unitn,*) zsurf           ! zsurf, assume zero for now and don't use
+
+      read(unitn,*) wprtp_sfc_read  ! kg/kg m/s
+      read(unitn,*) wpthlp_sfc_read ! K-m/s
+      read(unitn,*) upwp_sfc_read
+      read(unitn,*) vpwp_sfc_read
+
+      wprtp_sfc_input = real(wprtp_sfc_read, kind=core_rknd)
+      wpthlp_sfc_input = real(wpthlp_sfc_read, kind=core_rknd)
+      upwp_sfc_input = real(upwp_sfc_read, kind=core_rknd)
+      vpwp_sfc_input = real(vpwp_sfc_read, kind=core_rknd)
+
+      close( unitn )
+      call freeunit( unitn )
+    end if
+
+   end subroutine read_and_set_sfc_input_to_clubb_core
+
    subroutine read_and_set_input_to_clubb_core( &
              ncol, zt_g_input, zi_g_input, p_in_Pa_input, exner_input, pdel_input, thv_input, &
              wpthlp_sfc_input, wprtp_sfc_input, upwp_sfc_input, vpwp_sfc_input, &
