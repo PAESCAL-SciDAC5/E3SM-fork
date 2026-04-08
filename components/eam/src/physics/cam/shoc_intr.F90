@@ -83,8 +83,11 @@ module shoc_intr
       shoc_ice_deep = 25.e-6, &
       shoc_ice_sh = 50.e-6
 
-  integer, parameter :: fmt_int_len = 3    !  length of I/O text file integer format string, e.g., I3.  Should not ever exceed this length.
-  integer, parameter :: fmt_real_len = 9   !  length of I/O text file real format string, e.g., ES23.16.  Should not ever exceed this length.
+  integer, parameter :: fmt_int_len = 3    !  length of I/O text file integer format string, e.g., I3.  Should not need to be changed.
+  integer, parameter :: fmt_real_len = 9   !  length of I/O text file real format string, e.g., ES23.16.  Should not need to be changed.
+
+  ! Zero-padded k indices in ASCII files (e.g., 00, 01, ...) require width = digits(nz-1).  I3 supports nz up to 999.
+  ! If nz >= 1000, change fmt_int from 'I3' to 'I4'.  fmt_int_len does not need to change.
 
   character(len=fmt_int_len), parameter, public :: fmt_int = 'I3'
   character(len=fmt_real_len), parameter, public :: fmt_real = 'ES23.16'
@@ -1584,255 +1587,24 @@ end function shoc_implements_cnst
        read( unitn, * ) junk
        read( unitn, * ) junk    ! skip 3 global header lines
 
-       !  u (m/s)
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, um_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              um_input(:ncol,kk) = um_read
-              write(iulog,*) 'kk, zt_g_read, um_read, nstep:  ', kk, zt_g_read, um_read, get_nstep()
-          end if
-
-       end do
-
-       !  v (m/s)
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, vm_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              vm_input(:ncol,kk) = vm_read
-              write(iulog,*) 'kk, zt_g_read, vm_read, nstep:  ', kk, zt_g_read, vm_read, get_nstep()
-          end if
-
-       end do
-
-
-       !  wm_zt (m/s)
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, wm_zt_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              wm_zt_input(:ncol,kk) = wm_zt_read
-              write(iulog,*) 'kk, zt_g_read, wm_zt_read, nstep:  ', kk, zt_g_read, wm_zt_read, get_nstep()
-          end if
-
-       end do
-
-
-       !  tke (m2/s2) = tke_zt
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, tke_zt_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              tke_zt_input(:ncol,kk) = tke_zt_read
-              write(iulog,*) 'kk, zt_g_read, tke_zt_read, nstep:  ', kk, zt_g_read, tke_zt_read, get_nstep()
-          end if
-
-       end do
-
-
-       !  thv (K)
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, thv_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              thv_input(:ncol,kk) = thv_read
-              write(iulog,*) 'kk, zt_g_read, thv_read, nstep:  ', kk, zt_g_read, thv_read, get_nstep()
-          end if
-
-       end do
-
-
-       !  thl (K) = thlm
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, thlm_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              thlm_input(:ncol,kk) = thlm_read
-              write(iulog,*) 'kk, zt_g_read, thlm_read, nstep:  ', kk, zt_g_read, thlm_read, get_nstep()
-          end if
-
-       end do
-
-
-       !  qt (kg/kg) = rtm
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, rtm_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              rtm_input(:ncol,kk) = rtm_read
-              write(iulog,*) 'kk, zt_g_read, rtm_read, nstep:  ', kk, zt_g_read, rtm_read, get_nstep()
-          end if
-
-       end do
-
-
-       ! qc (kg/kg) = rcm
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, rcm_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              rcm_input(:ncol,kk) = rcm_read
-              write(iulog,*) 'kk, zt_g_read, rcm_read, nstep:  ', kk, zt_g_read, rcm_read, get_nstep()
-          end if
-
-       end do
-
-
-       !  pmid (Pa) = pres
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, pres_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              pres_input(:ncol,kk) = pres_read
-              write(iulog,*) 'kk, zt_g_read, pres_read, nstep:  ', kk, zt_g_read, pres_read, get_nstep()
-          end if
-
-       end do
-
-
-       !  pdel (Pa)
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, pdel_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              pdel_input(:ncol,kk) = pdel_read
-              write(iulog,*) 'kk, zt_g_read, pdel_read, nstep:  ', kk, zt_g_read, pdel_read, get_nstep()
-          end if
-
-       end do
-
-
-       !  inv_exner (-)
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, inv_exner_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              inv_exner_input(:ncol,kk) = inv_exner_read
-              write(iulog,*) 'kk, zt_g_read, inv_exner_read, nstep:  ', kk, zt_g_read, inv_exner_read, get_nstep()
-          end if
-
-       end do
-
-
-       !  tk (m2/s)
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, tk_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              tk_input(:ncol,kk) = tk_read
-              write(iulog,*) 'kk, zt_g_read, tk_read, nstep:  ', kk, zt_g_read, tk_read, get_nstep()
-          end if
-
-       end do
-
-
-       !  tkh (m2/s)
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, tkh_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              tkh_input(:ncol,kk) = tkh_read
-              write(iulog,*) 'kk, zt_g_read, tkh_read, nstep:  ', kk, zt_g_read, tkh_read, get_nstep()
-          end if
-
-       end do
-
-       !  cloud_frac (-)
-
-       read( unitn, * ) junk   ! skip block header
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn,fmt_read_line) kt_cxx_read, zt_g_read, cloud_frac_read ! first column is level index, but in zero-based indexing as in C++
-
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              cloud_frac_input(:ncol,kk) = cloud_frac_read
-              write(iulog,*) 'kk, zt_g_read, cloud_frac_read, nstep:  ', kk, zt_g_read, cloud_frac_read, get_nstep()
-          end if
-
-       end do
-
+       ! for each variable block in zt file read entry and, for first field, value of zt_g itself.
+
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, um_input, 'u (m/s)', .true.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, vm_input, 'v (m/s)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, wm_zt_input, 'wm_zt (m/s)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, tke_zt_input, 'tke (m2/s2)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, thv_input, 'thv (K)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, thlm_input, 'thl (K)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, rtm_input, 'qt (kg/kg)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, rcm_input, 'qc (kg/kg)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, pres_input, 'pmid (Pa)', .false.)
+          !  pdel = presi(kk+1) - presi(kk), interface pressures computed from hydrostatic balance
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, pdel_input, 'pdel (Pa)', .false.)
+          !  inv_exner  = (p0/pmid)^(Rd/cpair), generated from hydrostatic balance mid-level pressures
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, inv_exner_input, 'inv_exner (-)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, tk_input, 'tk (m2/s)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, tkh_input, 'tkh (m2/s)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, cloud_frac_input, 'cloud_frac (-)', .false.)                      
 
        close( unitn )
        call freeunit( unitn )
@@ -1840,5 +1612,50 @@ end function shoc_implements_cnst
     end if ! masterproc
 
   end subroutine read_and_set_input_to_shoc_main
+
+  subroutine read_zt_block(unitn, fmt_read_line, ncol, pverread, &
+  zt_g_input, field_input, field_name, is_first_block)
+  !
+  ! Reads one per-field block from ShocInOut_IC_zt_grid.txt.
+  ! Skips a header line, loops over levels, validates the level index,
+  ! assigns field_input, and either sets zt_g_input (first block) or
+  ! validates consistency (subsequent blocks).
+  !
+  use ppgrid, only: pver, pcols
+  use cam_abortutils, only: endrun
+
+  integer, intent(in) :: unitn, ncol, pverread
+  character(len=*), intent(in) :: fmt_read_line
+  real(r8), intent(inout) :: zt_g_input(pcols,pver)
+  real(r8), intent(out) :: field_input(pcols,pver)
+  character(len=*), intent(in) :: field_name
+  logical, intent(in) :: is_first_block
+
+  character(len=72) :: junk
+  integer :: k_read, kk, kt_cxx_read
+  real(r8) :: zt_g_read, field_read
+
+  read(unitn, *) junk ! skip block header
+  do k_read = 1, pverread
+    kk = pver - k_read + 1
+    read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, field_read
+    if ( (kt_cxx_read+1) .ne. k_read ) then
+      call endrun('read_zt_block ' // field_name  // ':  Mismatch between level count and k -- missing value?')
+    else if (kk .ge. 1) then
+      if (is_first_block) then
+        zt_g_input(:ncol, kk) = zt_g_read
+      else
+        if ( abs(zt_g_read - zt_g_input(1,kk)) > 1.0e-10_r8 ) &
+          call endrun('read_zt_block ' // field_name // ': zt_g mismatch between blocks -- file corrupted?')
+      end if
+      field_input(:ncol, kk) = field_read
+    end if
+  end do
+
+  end subroutine read_zt_block
+
+
+
+  
 
 end module shoc_intr
