@@ -701,11 +701,16 @@ end function shoc_implements_cnst
    ! For SHOC substep output
    integer :: turb_nadv_out_nstep     ! # of substeps to write out
 
-   integer :: txtout_unit
+   integer, save :: txtout_unit
    character(len=512) :: outfname
    integer :: i_shoc_main
 
    integer :: kk
+
+   integer :: hdtime_int
+   integer :: modeltime
+   integer :: endtime
+   
 
    ! --------------- !
    ! Pointers        !
@@ -802,8 +807,10 @@ end function shoc_implements_cnst
 
    !  If requested SHOC timestep is < 0 then set the SHOC time step
    !    equal to hdtime (the macrophysics/microphysics timestep).
+   !  Modified so that if negative but < -1, the negative value indicates the stopping time for text output
 
    if (dtime < 0._r8) then
+     endtime = -1 * nint(dtime)
      dtime = hdtime
    endif
 
@@ -987,6 +994,39 @@ end function shoc_implements_cnst
 
       end if  ! masterproc
 
+
+   else
+
+        ! BJG Not doing "standalone"/"in-and-out" mode, but still want same format text output each timestep.
+
+      if (masterproc) then
+
+        ! Determine name of txt output file
+
+         txt_output_prefix = 'shoc_output'
+         hdtime_int = nint(hdtime)
+          if (len_trim(shoc_output_prefix) > 0) txt_output_prefix = trim(shoc_output_prefix)
+          write(outfname, '(A,2(A,I0),A)') trim(txt_output_prefix), &
+                                           '_hdtime', hdtime_int, &
+                                           '_macmicsub',macmic_it,&
+                                           '.txt'
+          ! Open txt file and write a header at initial timestep
+
+          if (get_nstep().eq.0) then
+
+             txtout_unit = getunit()
+             open(txtout_unit, file=trim(outfname), status='replace')
+             write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), u, v, tke, qv, qc, T, P'
+
+          ! Send info to iulog to double check
+
+             write(iulog,*) 'hdtime              = ', hdtime
+
+          end if ! get_nstep = 0
+
+       end if  ! masterproc
+
+
    end if ! l_turb_standalone
 
    ! Write statement inside shoc_main will only be executed when the simulation
@@ -1044,7 +1084,28 @@ end function shoc_implements_cnst
   end do  ! end i_shoc_main loop
   !============================
 
+       ! Write results to txt file after each shoc_main call in other cases
+
+  if (.not.(l_turb_standalone) .and. masterproc) then
+       modeltime = get_nstep() * nint(hdtime)
+       do kk = pver, 1, -1
+          write(txtout_unit,fmt) modeltime, &!
+                                 kk - 1,                    &! 0 = TOM, pver - 1 = sfc
+                                 um(1,kk),                  &!
+                                 vm(1,kk),                  &!
+                                 tke_zt(1,kk),              &!
+                                 rtm(1,kk) - rcm(1,kk),     &! qv
+                                 rcm(1,kk),                 &! qc
+                                 thlm(1,kk) / inv_exner(1,kk) + latvap/cpair * rcm(1,kk), &! temperature
+                                 state1%pmid(1,kk)                                         ! pressure
+       end do
+  end if
+ 
+
   if (l_turb_standalone.and.masterproc) then
+     close(txtout_unit)
+     call freeunit(txtout_unit)
+  else if(masterproc.and.(.not.(l_turb_standalone)).and.(modeltime.ge.endtime)) then  
      close(txtout_unit)
      call freeunit(txtout_unit)
   end if
