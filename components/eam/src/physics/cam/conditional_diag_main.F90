@@ -26,7 +26,7 @@ module conditional_diag_main
 
   ! start time step for increment calculation
 
-  integer,parameter :: NS0INC = 3 ! start time step for increment calculation
+  integer,parameter :: NS0INC = 1 ! start time step for increment calculation
   integer,parameter :: NS0SMP = 4 ! start time step for conditional sampling
 contains
 
@@ -564,6 +564,9 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         !-----------------------------------------------------------
         ! physical quantities that need to be calculated on the fly 
         !-----------------------------------------------------------
+        case ('RTM_VL')
+          call rtm_vapor_and_liquid( state, pcols, pver, &! in
+                                     arrayout(:,:)       )! out
 
         case ('QSATW')
           call qsat_water( state%t(:ncol,:), state%pmid(:ncol,:), &! in

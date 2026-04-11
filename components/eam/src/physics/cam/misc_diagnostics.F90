@@ -8,6 +8,29 @@ public
 contains
 
 !------------------------------------------------
+! Mixing ratio of water vapor and cloud liquid, as defined in rtm for CLUBB 
+!
+subroutine rtm_vapor_and_liquid( state, pcols, pver, rtm_vl )
+
+  use physics_types,  only: physics_state
+  use constituents,   only: cnst_get_ind
+
+  type(physics_state),intent(in),target:: state
+  integer,            intent(in)       :: pcols,pver
+  real(r8),           intent(out)      :: rtm_vl(pcols,pver)
+
+  integer :: ncol, ixcldliq
+
+  !-----------------------
+  ncol = state%ncol
+  call cnst_get_ind( 'CLDLIQ', ixcldliq )
+
+  rtm_vl(:ncol,:) = state%q(:ncol,:,1) + &
+                    state%q(:ncol,:,ixcldliq)
+
+end subroutine rtm_vapor_and_liquid
+
+!------------------------------------------------
 ! saturation specific humidity wrt ice.
 ! The calculation in this subroutine follows 
 ! what is used in the model for 
