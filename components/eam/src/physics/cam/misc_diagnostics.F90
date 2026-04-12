@@ -7,28 +7,87 @@ public
 
 contains
 
-!------------------------------------------------
-! Mixing ratio of water vapor and cloud liquid, as defined in rtm for CLUBB 
+!------------------------------------------------------------------------------
+! Mixing ratio of water vapor and cloud liquid, like rtm defined for CLUBB
 !
-subroutine rtm_vapor_and_liquid( state, pcols, pver, rtm_vl )
+subroutine rtm_in_clubb_calculated_from_state( state, pcols, pver, rtm )
 
   use physics_types,  only: physics_state
   use constituents,   only: cnst_get_ind
 
   type(physics_state),intent(in),target:: state
   integer,            intent(in)       :: pcols,pver
-  real(r8),           intent(out)      :: rtm_vl(pcols,pver)
+  real(r8),           intent(out)      :: rtm(pcols,pver)
 
-  integer :: ncol, ixcldliq
+  integer :: ncol, ixcldliq, ixq
 
   !-----------------------
   ncol = state%ncol
+  call cnst_get_ind( 'Q',      ixq)
   call cnst_get_ind( 'CLDLIQ', ixcldliq )
 
-  rtm_vl(:ncol,:) = state%q(:ncol,:,1) + &
-                    state%q(:ncol,:,ixcldliq)
+  rtm(:ncol,:) = state%q(:ncol,:,ixq)     + &
+                 state%q(:ncol,:,ixcldliq)
 
-end subroutine rtm_vapor_and_liquid
+end subroutine rtm_in_clubb_calculated_from_state
+
+!------------------------------------------------------------------------------
+! Liquid water potential temperature as defined in CLUBB.
+! Code for the calculations was copied from clubb_intr.F90
+! Note that the original code was written to operate on state1,
+! which is preserved here.
+!
+subroutine thlm_in_CLUBB_calculated_from_state( state1, pcols, pver, thlm )
+
+  use physics_types,  only: physics_state
+  use constituents,   only: cnst_get_ind
+  use physconst,      only: latvap,cpair,rair
+
+ !use clubb_intr,     only: p0_clubb   ! This "use" causes circular dependency
+  real(r8) :: p0_clubb = 100000._r8    ! Simple, not optimal: copy value from clubb_intr
+
+  type(physics_state),intent(in),target:: state1
+  integer,            intent(in)       :: pcols,pver
+  real(r8),           intent(out)      :: thlm(pcols,pver)
+
+  real(r8) :: exner_clubb(pcols,pver)
+  integer  :: i,k
+  integer  :: ncol, ixcldliq
+
+  !-----------------------
+  ncol = state1%ncol
+  call cnst_get_ind( 'CLDLIQ', ixcldliq )
+
+  ! Calculate exner_clubb
+
+   do k=1,pver
+     do i=1,ncol
+       exner_clubb(i,k) = (real(p0_clubb, kind = r8 )/state1%pmid(i,k))**(rair/cpair)
+     enddo
+   enddo
+
+  ! Calculate thlm
+
+   do k=1,pver   ! loop over levels
+     do i=1,ncol ! loop over columns
+
+#define NEWTHETAL
+#ifndef NEWTHETAL
+       thlm(i,k)    = state1%t(i,k)*exner_clubb(i,k)-(latvap/cpair)*state1%q(i,k,ixcldliq)
+#else
+!NCAR
+!       thlm(i,k) = ( state1%t(i,k) &
+!                     - (latvap/cpairv(i,k,lchnk))*state1%q(i,k,ixcldliq) ) &
+!                   * inv_exner_clubb(i,k)
+
+       thlm(i,k) = ( state1%t(i,k) &
+                     - (latvap/cpair)*state1%q(i,k,ixcldliq) ) &
+                   * exner_clubb(i,k)
+#endif
+     enddo
+   enddo
+
+end subroutine thlm_in_clubb_calculated_from_state
 
 !------------------------------------------------
 ! saturation specific humidity wrt ice.

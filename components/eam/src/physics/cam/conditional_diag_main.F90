@@ -561,12 +561,25 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
             idx = pbuf_get_index('LAMBDAC')  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
+        ! CLUBB variables saved in pbuf
+
+        case('RTMp')
+            idx = pbuf_get_index('RTM')  ; call pbuf_get_field( pbuf, idx, ptr2d )
+            arrayout(:,:) = ptr2d
+
+        case('THLMp')
+            idx = pbuf_get_index('THLM')  ; call pbuf_get_field( pbuf, idx, ptr2d )
+            arrayout(:,:) = ptr2d
+
         !-----------------------------------------------------------
         ! physical quantities that need to be calculated on the fly 
         !-----------------------------------------------------------
-        case ('RTM_VL')
-          call rtm_vapor_and_liquid( state, pcols, pver, &! in
-                                     arrayout(:,:)       )! out
+        case ('RTMs')
+          call rtm_in_clubb_calculated_from_state( state, pcols, pver, &! in
+                                                   arrayout(:,:)       )! out
+        case ('THLMs')
+          call thlm_in_clubb_calculated_from_state( state, pcols, pver, &! in
+                                                    arrayout(:,:)       )! out
 
         case ('QSATW')
           call qsat_water( state%t(:ncol,:), state%pmid(:ncol,:), &! in
