@@ -27,7 +27,7 @@ module conditional_diag_main
   ! start time step for increment calculation
 
   integer,parameter :: NS0INC = 1 ! start time step for increment calculation
-  integer,parameter :: NS0SMP = 4 ! start time step for conditional sampling
+  integer,parameter :: NS0SMP = 1 ! start time step for conditional sampling
 contains
 
 !======================================================
