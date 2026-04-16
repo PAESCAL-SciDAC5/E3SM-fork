@@ -83,6 +83,19 @@ module shoc_intr
       shoc_ice_deep = 25.e-6, &
       shoc_ice_sh = 50.e-6
 
+  integer, parameter :: fmt_int_len = 3    !  length of I/O text file integer format string, e.g., I3.  Should not need to be changed.
+  integer, parameter :: fmt_real_len = 9   !  length of I/O text file real format string, e.g., ES23.16.  Should not need to be changed.
+
+  ! Zero-padded k indices in ASCII files (e.g., 00, 01, ...) require width = digits(nz-1).  I3 supports nz up to 999.
+  ! If nz >= 1000, change fmt_int from 'I3' to 'I4'.  fmt_int_len does not need to change.
+
+  character(len=fmt_int_len), parameter, public :: fmt_int = 'I3'
+  character(len=fmt_real_len), parameter, public :: fmt_real = 'ES23.16'
+
+  integer, parameter :: fmt_read_int_pad_len = fmt_int_len + 2  !  add length for 2 parentheses
+  integer, parameter :: fmt_read_real_pad_len = fmt_real_len + 2  !  add length for 2 parentheses
+  integer, parameter :: fmt_read_line_pad_len = fmt_int_len + 2 * fmt_real_len + 2 + 2  !  integer + 2 reals + 2 parentheses + 2 commas
+
   logical      :: lq(pcnst)
 
   logical            :: history_budget
@@ -140,6 +153,8 @@ module shoc_intr
 
   ! Prefix for SHOC text output filenames (set via namelist shoc_output_prefix)
   character(len=256) :: shoc_output_prefix = ''
+
+
 
   contains
 
@@ -1467,6 +1482,23 @@ end function shoc_implements_cnst
     integer :: unitn
    !integer :: nstep
 
+    character(len=fmt_read_int_pad_len) :: fmt_read_int_pad  !  padded format statement for reading integer from input text file
+    character(len=fmt_read_real_pad_len) :: fmt_read_real_pad  !  padded format statement for reading real from input text file
+    character(len=fmt_read_line_pad_len) :: fmt_read_line_pad   ! padded format statement for each line of z_i input text file
+  ! and block of z_t input text file
+
+    character(:), allocatable :: fmt_read_int
+    character(:), allocatable :: fmt_read_real
+    character(:), allocatable :: fmt_read_line
+
+    write(fmt_read_int_pad,'(a,a,a)')"(",trim(fmt_int),")"
+    write(fmt_read_real_pad,'(a,a,a)')"(",trim(fmt_real),")"
+    write(fmt_read_line_pad,'(a,a,a,a,a,a,a)')"(",trim(fmt_int),",",trim(fmt_real),",",trim(fmt_real),")"
+
+    fmt_read_int = trim(fmt_read_int_pad)
+    fmt_read_real = trim(fmt_read_real_pad)
+    fmt_read_line = trim(fmt_read_line_pad)
+
     if (.not.masterproc) then
        call endrun('In SCM mode but calculating SHOC on multiple MPI processes?')
     else
@@ -1483,25 +1515,25 @@ end function shoc_implements_cnst
        end if
        read( unitn, *, iostat=ierr ) junk
 
-       read(unitn, *)  pverread
+       read(unitn, fmt_read_int)  pverread
        write(iulog,*) 'pverread is:  ', pverread
        pverpread = pverread + 1
 
-       read(unitn,*) dz_zi_read      !  dz_zi is computed in subroutine shoc_main/shoc_grid from zi_g, zt_g
+       read(unitn, fmt_read_real) dz_zi_read      !  dz_zi is computed in subroutine shoc_main/shoc_grid from zi_g, zt_g
                                      !  So this is not directly used.
-       read(unitn,*) zsurf           !  zsurf, assume zero for now and don't use
+       read(unitn, fmt_read_real) zsurf           !  zsurf, assume zero for now and don't use
        write(iulog,*) 'zsurf is:  ', zsurf
 
-       read(unitn,*) wprtp_sfc_read  ! kg/kg m/s
+       read(unitn, fmt_read_real) wprtp_sfc_read  ! kg/kg m/s
        write(iulog,*) 'wprtp_sfc is:  ',wprtp_sfc_read
 
-       read(unitn,*) wpthlp_sfc_read  ! In SHOC this needs to be in kinematic units (K-m/s); for this input file format, it is
+       read(unitn, fmt_read_real) wpthlp_sfc_read  ! In SHOC this needs to be in kinematic units (K-m/s); for this input file format, it is
        write(iulog,*) 'wpthlp_sfc is:  ',wpthlp_sfc_read
 
-       read(unitn,*) upwp_sfc_read
+       read(unitn, fmt_read_real) upwp_sfc_read
        write(iulog,*) 'upwp_sfc is:  ',upwp_sfc_read
 
-       read(unitn,*) vpwp_sfc_read
+       read(unitn, fmt_read_real) vpwp_sfc_read
        write(iulog,*) 'vpwp_sfc is:  ',vpwp_sfc_read
 
        wprtp_sfc_input(:ncol) = wprtp_sfc_read
@@ -1530,7 +1562,7 @@ end function shoc_implements_cnst
 
        do k_read=1,pverpread
         kk = pverp-k_read+1       ! Note that for SHOC k=1 is model top, but input file starts at model surface
-        read(unitn,*) ki_cxx_read, zi_g_read, presi_read   ! first column is interface index, but zero-based as in C++
+        read(unitn,fmt_read_line) ki_cxx_read, zi_g_read, presi_read   ! first column is interface index, but zero-based as in C++
         if( (ki_cxx_read+1) .ne. k_read ) then
           call endrun('Mismatch between interface count and k -- missing value?')
         else if(kk.ge.1) then
@@ -1553,39 +1585,26 @@ end function shoc_implements_cnst
           call endrun('Error reading ShocInOut_IC_zt_grid.txt.')
        end if
        read( unitn, * ) junk
-       read( unitn, * ) junk
+       read( unitn, * ) junk    ! skip 3 global header lines
 
-       do k_read=1,pverread
-          kk = pver-k_read+1
-          read(unitn,*) kt_cxx_read, zt_g_read, um_read, vm_read, wm_zt_read, tke_zt_read, thv_read, &
-               thlm_read, rtm_read, rcm_read, pres_read, pdel_read, inv_exner_read, tk_read, tkh_read, &
-               cloud_frac_read     ! first column is level index, but in zero-based indexing as in C++
+       ! for each variable block in zt file read entry and, for first field, value of zt_g itself.
 
-          if( (kt_cxx_read+1) .ne. k_read ) then
-             call endrun('Mismatch between level count and k -- missing value?')
-          else if(kk.ge.1) then
-              zt_g_input(:ncol,kk) = zt_g_read
-              um_input(:ncol,kk) = um_read
-              vm_input(:ncol,kk) = vm_read
-              wm_zt_input(:ncol,kk) = wm_zt_read
-              tke_zt_input(:ncol,kk) = tke_zt_read
-              thv_input(:ncol,kk) = thv_read
-              thlm_input(:ncol,kk) = thlm_read
-              rtm_input(:ncol,kk) = rtm_read
-              rcm_input(:ncol,kk) = rcm_read
-              pres_input(:ncol,kk) = pres_read
-              pdel_input(:ncol,kk) = pdel_read   !  Assumed to be consistent with presi(kk+1) - presi(kk)
-              inv_exner_input(:ncol,kk) = inv_exner_read  ! Assumed to be consistent with pres(kk) and interface constants
-              tk_input(:ncol,kk) = tk_read
-              !  looks like tk, tkh are effectively intent(out), so initial values not actually used.
-              tkh_input(:ncol,kk) = tkh_read
-              cloud_frac_input(:ncol,kk) = cloud_frac_read
-              write(iulog,*) kk, zt_g_read, um_read, vm_read, wm_zt_read, tke_zt_read, &
-                   thv_read, thlm_read, rtm_read, rcm_read, pres_read, pdel_read, &
-                   inv_exner_read, tk_read, tkh_read, cloud_frac_read
-           end if
-
-       end do
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, um_input, 'u (m/s)', .true.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, vm_input, 'v (m/s)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, wm_zt_input, 'wm_zt (m/s)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, tke_zt_input, 'tke (m2/s2)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, thv_input, 'thv (K)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, thlm_input, 'thl (K)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, rtm_input, 'qt (kg/kg)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, rcm_input, 'qc (kg/kg)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, pres_input, 'pmid (Pa)', .false.)
+          !  pdel = presi(kk+1) - presi(kk), interface pressures computed from hydrostatic balance
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, pdel_input, 'pdel (Pa)', .false.)
+          !  inv_exner  = (p0/pmid)^(Rd/cpair), generated from hydrostatic balance mid-level pressures
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, inv_exner_input, 'inv_exner (-)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, tk_input, 'tk (m2/s)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, tkh_input, 'tkh (m2/s)', .false.)
+       call read_zt_block(unitn, fmt_read_line, ncol, pverread, zt_g_input, cloud_frac_input, 'cloud_frac (-)', .false.)                      
 
        close( unitn )
        call freeunit( unitn )
@@ -1593,5 +1612,50 @@ end function shoc_implements_cnst
     end if ! masterproc
 
   end subroutine read_and_set_input_to_shoc_main
+
+  subroutine read_zt_block(unitn, fmt_read_line, ncol, pverread, &
+  zt_g_input, field_input, field_name, is_first_block)
+  !
+  ! Reads one per-field block from ShocInOut_IC_zt_grid.txt.
+  ! Skips a header line, loops over levels, validates the level index,
+  ! assigns field_input, and either sets zt_g_input (first block) or
+  ! validates consistency (subsequent blocks).
+  !
+  use ppgrid, only: pver, pcols
+  use cam_abortutils, only: endrun
+
+  integer, intent(in) :: unitn, ncol, pverread
+  character(len=*), intent(in) :: fmt_read_line
+  real(r8), intent(inout) :: zt_g_input(pcols,pver)
+  real(r8), intent(out) :: field_input(pcols,pver)
+  character(len=*), intent(in) :: field_name
+  logical, intent(in) :: is_first_block
+
+  character(len=72) :: junk
+  integer :: k_read, kk, kt_cxx_read
+  real(r8) :: zt_g_read, field_read
+
+  read(unitn, *) junk ! skip block header
+  do k_read = 1, pverread
+    kk = pver - k_read + 1
+    read(unitn, fmt_read_line) kt_cxx_read, zt_g_read, field_read
+    if ( (kt_cxx_read+1) .ne. k_read ) then
+      call endrun('read_zt_block ' // field_name  // ':  Mismatch between level count and k -- missing value?')
+    else if (kk .ge. 1) then
+      if (is_first_block) then
+        zt_g_input(:ncol, kk) = zt_g_read
+      else
+        if ( abs(zt_g_read - zt_g_input(1,kk)) > 1.0e-10_r8 ) &
+          call endrun('read_zt_block ' // field_name // ': zt_g mismatch between blocks -- file corrupted?')
+      end if
+      field_input(:ncol, kk) = field_read
+    end if
+  end do
+
+  end subroutine read_zt_block
+
+
+
+  
 
 end module shoc_intr
