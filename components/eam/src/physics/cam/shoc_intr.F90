@@ -1035,6 +1035,14 @@ end function shoc_implements_cnst
 
    l_inner_write = l_turb_standalone .and. (.not.l_shoc_outer_loop)
 
+   wpthlp_sfc(:ncol) = 0.0_r8  ! BJG test to hardwire surface thl flux to zero
+   wprtp_sfc(:ncol) = 0.0_r8  ! BJG test to hardwire surface moisture flux to zero
+   upwp_sfc(:ncol) = -0.068547301186844697_r8  ! BJG test to hardwire surface u flux to input text file value
+   vpwp_sfc(:ncol) = 0.053858593789663699_r8  ! BJG test to hardwire surface v flux to input text file value
+
+   wm_zt(:ncol,:) = 0.0_r8  ! BJG -- hardwiring wm_zt = 0.0 to be consistent with no_omega test.
+
+   
    ! ------------------------------------------------- !
    ! Actually call SHOC                                !
    ! ------------------------------------------------- !
