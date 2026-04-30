@@ -100,8 +100,10 @@ subroutine advance_iop_forcing(scm_dt, ps_in, &             ! In
 
   if (have_v .and. have_u .and. .not. dp_crm) then
     do k=1,plev
-      u_update(k) = uobs(k)
-      v_update(k) = vobs(k)
+! BJG      u_update(k) = uobs(k)
+! BJG      v_update(k) = vobs(k)
+      u_update(k) = u_in(k)  ! do not overwrite u,v based on Heng Xiao comment.
+      v_update(k) = v_in(k)
     enddo
   else
     do k=1,plev

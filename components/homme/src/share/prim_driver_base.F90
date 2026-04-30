@@ -1993,7 +1993,14 @@ contains
           elem(1)%state%dp3d(:,:,k,np1)
       enddo
     enddo
-    
+
+    ! Copy horizontal wind components, assuming no horizontal advection
+    ! of momentum.  From Hui Wan's commit, applied 17 Apr 2026
+
+    do k=1,nlev
+      elem(1)%state%v(:,:,:,k,np1) = elem(1)%state%v(:,:,:,k,n0)
+    enddo
+   
   end subroutine set_prescribed_scm
     
 end module prim_driver_base
