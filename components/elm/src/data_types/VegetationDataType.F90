@@ -1218,6 +1218,11 @@ module VegetationDataType
             ptr_patch=this%gdd1020, default='inactive')
     end if
 
+     this%thm(begp:endp) = spval
+     call hist_addfld1d (fname='THM', units='K', &
+          avgflag='A', long_name='intermediate temperature variable', &
+          ptr_patch=this%thm)
+
     if (use_cn ) then
        this%emv(begp:endp) = spval
        call hist_addfld1d (fname='EMV', units='proportion', &

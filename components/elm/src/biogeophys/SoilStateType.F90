@@ -285,6 +285,11 @@ contains
          avgflag='A', long_name='hydraulic conductivity (vegetated landunits only)', &
          ptr_col=this%hk_l_col, set_spec=spval, l2g_scale_type='veg', default='inactive')
 
+    this%soilbeta_col(begc:endc) = spval
+    call hist_addfld1d (fname='SoilBeta',  units='1',  &
+         avgflag='A', long_name='soil wetness relative to field capacity', &
+         ptr_col=this%soilbeta_col, set_urb=spval)
+
     this%soilalpha_col(begc:endc) = spval
     call hist_addfld1d (fname='SoilAlpha',  units='1',  &
          avgflag='A', long_name='factor limiting ground evap', &

@@ -13,29 +13,32 @@ main() {
 # --- Configuration flags ----
 
 # Machine and project
-readonly MACHINE=pm-cpu
-# NOTE: The command below will return your default project on SLURM-based systems. 
-# If you are not using SLURM or need a different project, remove the command and set it directly
-readonly PROJECT="$(sacctmgr show user $USER format=DefaultAccount | tail -n1 | tr -d ' ')"
+readonly MACHINE="dane"
+readonly PROJECT="paescal"
 
 # Simulation
-readonly COMPSET="WCYCL1850"
-readonly RESOLUTION="ne30pg2_r05_IcoswISC30E3r5"
+readonly COMPSET="F2010"
+# readonly RESOLUTION="ne30pg2_r05_IcoswISC30E3r5"
+readonly RESOLUTION="ne30pg2_oECv3"
 # BEFORE RUNNING : CHANGE the following CASE_NAME to desired value
-readonly CASE_NAME="your_casename"
+readonly CASE_NAME="EAMv3_test_canopyfluxes_1year_testfracvegnosno_sfc_inout_"$RESOLUTION
+# readonly COMPSET="GMPAS-JRA1p4"
+# readonly RESOLUTION="TL319_WC14to60E2r3"
+# BEFORE RUNNING : CHANGE the following CASE_NAME to desired value
+# readonly CASE_NAME="MPASv3_1yeardata_reducedtimestep2_sfc_inout_"$RESOLUTION
 # If this is part of a simulation campaign, ask your group lead about using a case_group label
 # readonly CASE_GROUP=""
 
 # Code and compilation
 # BEFORE RUNNING: CHANGE CHECKOUT to date string like 20240301
-readonly CHECKOUT="latest"
-readonly BRANCH="master"
+readonly CHECKOUT="20260409"
+readonly BRANCH="maint-3.0"
 readonly CHERRY=( )
 readonly DEBUG_COMPILE=false
 
 # Run options
 readonly MODEL_START_TYPE="initial"  # 'initial', 'continue', 'branch', 'hybrid'
-readonly START_DATE="0001-01-01"
+readonly START_DATE="2010-01-01"
 
 # Additional options for 'branch' and 'hybrid'
 readonly GET_REFCASE=TRUE
@@ -44,8 +47,9 @@ readonly GET_REFCASE=TRUE
 #readonly RUN_REFDATE=""   # same as MODEL_START_DATE for 'branch', can be different for 'hybrid'
 
 # Set paths
-readonly CASE_ROOT="${PSCRATCH}/E3SMv3/${CASE_NAME}"
-readonly CODE_ROOT="${HOME}/E3SMv3/code/${CHECKOUT}"
+readonly SCRATCH="/p/lustre2/dong9/e3sm_scratch/dane"
+readonly CASE_ROOT="${SCRATCH}/cases/${CASE_NAME}"
+readonly CODE_ROOT="/p/lustre2/"${USER}"/E3SM-maint-3.0"
 
 # Sub-directories
 readonly CASE_BUILD_DIR=${CASE_ROOT}/build
@@ -56,7 +60,7 @@ readonly CASE_ARCHIVE_DIR=${CASE_ROOT}/archive
 #               'M_1x10_ndays', 'M2_1x10_ndays', 'M80_1x10_ndays', 'L_1x10_ndays'
 #               * can replace XS, M, etc. with custom-XY with XY being the node count
 #  or 'production' for full simulation
-readonly run='XS_2x5_ndays'
+readonly run='production'
 if [ "${run}" != "production" ]; then
   echo "setting up Short test simulations: ${run}"
   # Short test simulations
@@ -82,13 +86,13 @@ else
   # Production simulation
   readonly CASE_SCRIPTS_DIR=${CASE_ROOT}/case_scripts
   readonly CASE_RUN_DIR=${CASE_ROOT}/run
-  readonly PELAYOUT="L"
-  readonly WALLTIME="34:00:00"
-  readonly STOP_OPTION="nyears"
-  readonly STOP_N="50"
-  readonly REST_OPTION="nyears"
-  readonly REST_N="5"
-  readonly RESUBMIT="9"
+  readonly PELAYOUT="custom-4"
+  readonly WALLTIME="8:00:00"
+  readonly STOP_OPTION="nmonths"
+  readonly STOP_N="15"
+  readonly REST_OPTION="nmonths"
+  readonly REST_N="4"
+  readonly RESUBMIT="0"
   readonly DO_SHORT_TERM_ARCHIVING=false
 fi
 
@@ -100,7 +104,7 @@ readonly HIST_N="5"
 readonly OLD_EXECUTABLE=""
 
 # --- Toggle flags for what to do ----
-do_fetch_code=true
+do_fetch_code=false
 do_create_newcase=true
 do_case_setup=true
 do_case_build=true
@@ -151,9 +155,9 @@ cat << EOF >> user_nl_eam
 
  empty_htapes = .true.
 
- avgflag_pertape = 'A','A','A','A','I','I'
- nhtfrq = 0,-24,-6,-3,-1,0
- mfilt  = 1,30,120,240,720,1
+ avgflag_pertape = 'A','A'
+ nhtfrq = 0,-24
+ mfilt  = 1,30
 
  fincl1 = 'AODALL','AODBC','AODDUST','AODPOM','AODSO4','AODSOA','AODSS','AODVIS',
           'CLDLOW','CLDMED','CLDHGH','CLDTOT',
@@ -192,10 +196,6 @@ cat << EOF >> user_nl_eam
 
  fincl2 = 'PS', 'FLUT','PRECT','U200','V200','U850','V850',
           'TCO','SCO','TREFHTMN','TREFHTMX','TREFHT','QREFHT'
- fincl3 = 'PS', 'PSL','PRECT','TUQ','TVQ','UBOT','VBOT','TREFHT','FLUT','OMEGA500','TBOT','U850','V850','U200','V200','T200','T500','Z700'
- fincl4 = 'PRECT'
- fincl5 = 'O3_SRF'
- fincl6 = 'CO_2DMSD','NO2_2DMSD','NO_2DMSD','O3_2DMSD','O3_2DMSD_trop'
 
  ! -- chemUCI settings ------------------
  history_chemdyg_summary = .true.
@@ -205,11 +205,12 @@ cat << EOF >> user_nl_eam
 
  ! -- MAM5 settings ------------------
  is_output_interactive_volc = .true.
+
+ ncdata = '/p/vast1/e3sm/ccsm3data/inputdata/atm/cam/inic/homme/eami_mam4_Linoz_ne30np4_L80_c20231010.nc'
 EOF
 
 cat << EOF >> user_nl_elm
-finidat = ''
-hist_dov2xy = .true.,.true.
+hist_dov2xy = .true.,.false.,.false.
 hist_fexcl1 = 'AGWDNPP','ALTMAX_LASTYEAR','AVAIL_RETRANSP','AVAILC','BAF_CROP',
               'BAF_PEATF','BIOCHEM_PMIN_TO_PLANT','CH4_SURF_AERE_SAT','CH4_SURF_AERE_UNSAT','CH4_SURF_DIFF_SAT',
               'CH4_SURF_DIFF_UNSAT','CH4_SURF_EBUL_SAT','CH4_SURF_EBUL_UNSAT','CMASS_BALANCE_ERROR','cn_scalar',
@@ -245,16 +246,28 @@ hist_fexcl1 = 'AGWDNPP','ALTMAX_LASTYEAR','AVAIL_RETRANSP','AVAILC','BAF_CROP',
               'TCS_MONTH_BEGIN','TCS_MONTH_END','TOTCOLCH4','water_scalar','WF',
               'wlim_m','WOODC_LOSS','WTGQ'
  hist_fincl1 = 'SNOWDP','COL_FIRE_CLOSS','NPOOL','PPOOL','TOTPRODC'
- hist_fincl2 = 'H2OSNO', 'FSNO', 'QRUNOFF', 'QSNOMELT', 'FSNO_EFF', 'SNORDSL', 'SNOW', 'FSDS', 'FSR', 'FLDS', 'FIRE', 'FIRA'
- hist_mfilt = 1,365
- hist_nhtfrq = 0,-24
- hist_avgflag_pertape = 'A','A'
+ hist_fincl2 = 'H2OSNO', 'FSNO', 'QRUNOFF', 'QSNOMELT', 'FSNO_EFF', 'SNORDSL', 'SNOW', 'FSDS', 'FSR', 'FLDS', 'FIRE', 'FIRA',
+               'UBOT', 'VBOT', 'RHOBOT', 'UGUST', 'THM', 'TG', 'QBOT', 'QG', 'THBOT', 'FORC_HGT_U', 'Z0MG', 'Z0HG', 'Z0QG', 'THV', 'ZII'
+ hist_fincl3 = 'DISPLA', 'ELAI', 'ESAI', 'Z0MG', 'Z0MV', 'DLEAF', 'HTOP', 'PBOT', 'TV', 'FDRY', 'LAISUN', 'LAISHA', 'RSSUN', 'RSSHA', 
+               'RH', 'FWET', 'QVEGT', 'H2OCAN', 'FRAC_VEG_NOSNO', 'SNOW_DEPTH', 'SoilBeta', 'TSOI', 'FH2OSFC', 'SABV', 'EMV', 'EMG', 'FLDS', 'QFLX_EVAP_VEG'
+ hist_mfilt = 1,30,30
+ hist_nhtfrq = 0,-24,-24
+ hist_avgflag_pertape = 'A','I','I'
  check_finidat_year_consistency = .false.
  check_dynpft_consistency = .false.
  create_crop_landunit = .false.
+ use_cn = .true.
 EOF
 
 }
+
+#  hist_fincl2 = 'H2OSNO', 'FSNO', 'QRUNOFF', 'QSNOMELT', 'FSNO_EFF', 'SNORDSL', 'SNOW', 'FSDS', 'FSR', 'FLDS', 'FIRE', 'FIRA',
+#                'UBOT', 'VBOT', 'RHOBOT', 'UGUST', 'THM', 'TG', 'QBOT', 'QG', 'THBOT', 'FORC_HGT_U', 'Z0MG', 'Z0HG', 'Z0QG', 'THV', 'ZII'
+#  hist_fincl2 = 'DISPLA', 'ELAI', 'ESAI', 'Z0MG', 'Z0MV', 'DLEAF', 'HTOP', 'PBOT', 'TV', 'FDRY', 'LAISUN', 'LAISHA', 'RSSUN', 'RSSHA', 
+#                'RH', 'FWET', 'QVEGT', 'H2OCAN', 'FRAC_VEG_NOSNO', 'SNOW_DEPTH', 'SoilBeta', 'TSOI', 'FH2OSFC', 'SABV', 'EMV', 'EMG', 'FLDS', 'QFLX_EVAP_VEG'
+#  fsurdat = '/p/vast1/e3sm/ccsm3data/inputdata/lnd/clm2/surfdata_map/surfdata_0.5x0.5_simyr1850_c200609_with_TOP.nc'
+#  finidat = '/p/lustre2/dong9/e3sm_inputdata/v3.LR.amip_0101.elm.r.2010-01-01-00000.nc'
+#  check_finidat_pct_consistency = .false.
 
 patch_mpas_streams() {
 
@@ -424,6 +437,8 @@ then
         ncore=40
     elif [ "${MACHINE}" == "anvil" ]; then
         ncore=36
+    elif [ "${MACHINE}" == "dane" ]; then
+        ncore=112
     else
         echo 'ERROR: MACHINE = '${MACHINE}' is not supported for custom PE layout.' 
         exit 400

@@ -146,6 +146,21 @@ module TopounitDataType
          avgflag='A', long_name='atmospheric air potential temperature', &
          ptr_topo=this%thbot,t2g_scale_type='unity')
 
+    this%ubot(begt:endt) = spval
+    call hist_addfld1d (fname='UBOT', units='m/s',  &
+         avgflag='A', long_name='atmospheric wind velocity, x direction', &
+         ptr_topo=this%ubot,t2g_scale_type='unity')
+
+    this%vbot(begt:endt) = spval
+    call hist_addfld1d (fname='VBOT', units='m/s',  &
+         avgflag='A', long_name='atmospheric wind velocity, y direction', &
+         ptr_topo=this%vbot,t2g_scale_type='unity')
+
+    this%rhobot(begt:endt) = spval
+    call hist_addfld1d (fname='RHOBOT', units='kg/m3',  &
+         avgflag='A', long_name='atmospheric air density', &
+         ptr_topo=this%rhobot,t2g_scale_type='unity')
+
     this%pbot(begt:endt) = spval
     call hist_addfld1d (fname='PBOT', units='Pa',  &
          avgflag='A', long_name='atmospheric pressure', &
@@ -165,6 +180,11 @@ module TopounitDataType
     call hist_addfld1d (fname='WIND', units='m/s',  &
          avgflag='A', long_name='atmospheric wind velocity magnitude', &
          ptr_topo=this%windbot,t2g_scale_type='unity')
+
+    this%ugust(begt:endt) = spval
+    call hist_addfld1d (fname='UGUST', units='m/s',  &
+         avgflag='A', long_name='atmospheric wind gustiness', &
+         ptr_topo=this%ugust,t2g_scale_type='unity')
 
     this%zbot(begt:endt) = spval
     call hist_addfld1d (fname='ZBOT', units='m',  &

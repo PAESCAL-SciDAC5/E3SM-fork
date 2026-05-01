@@ -34,8 +34,9 @@ module CanopyStateType
   ! !PUBLIC TYPES:
   type, public :: CanopyState_type
 
-     integer  , pointer :: frac_veg_nosno_patch     (:)   ! patch fraction of vegetation not covered by snow (0 OR 1) [-]
+     real(r8)  , pointer :: frac_veg_nosno_patch     (:)   ! patch fraction of vegetation not covered by snow (0 OR 1) [-]
      integer  , pointer :: frac_veg_nosno_alb_patch (:)   ! patch fraction of vegetation not covered by snow (0 OR 1) [-]
+     ! real(r8) , pointer :: frac_veg_nosno_patch_hist (:)   ! patch fraction of vegetation not covered by snow (0 OR 1) [-]
 
      real(r8) , pointer :: tlai_patch               (:)   ! patch canopy one-sided leaf area index, no burying by snow
      real(r8) , pointer :: tsai_patch               (:)   ! patch canopy one-sided stem area index, no burying by snow
@@ -116,8 +117,9 @@ contains
     begc = bounds%begc; endc= bounds%endc
     begg = bounds%begg; endg= bounds%endg
 
-    allocate(this%frac_veg_nosno_patch     (begp:endp))           ; this%frac_veg_nosno_patch     (:)   = ispval
+    allocate(this%frac_veg_nosno_patch     (begp:endp))           ; this%frac_veg_nosno_patch     (:)   = spval
     allocate(this%frac_veg_nosno_alb_patch (begp:endp))           ; this%frac_veg_nosno_alb_patch (:)   = 0
+!     allocate(this%frac_veg_nosno_patch_hist(begp:endp))           ; this%frac_veg_nosno_patch_hist(:)   = spval
     allocate(this%tlai_patch               (begp:endp))           ; this%tlai_patch               (:)   = spval
     allocate(this%tsai_patch               (begp:endp))           ; this%tsai_patch               (:)   = spval
     allocate(this%tlai_hist_patch          (begp:endp))           ; this%tlai_hist_patch          (:)   = spval
@@ -175,6 +177,12 @@ contains
 
     begp = bounds%begp; endp= bounds%endp
     begc = bounds%begc; endc= bounds%endc
+
+    this%frac_veg_nosno_patch(begp:endp) = spval
+!     this%frac_veg_nosno_patch_hist(begp:endp) = real(this%frac_veg_nosno_patch(begp:endp), r8)
+    call hist_addfld1d (fname='FRAC_VEG_NOSNO', units='1', &
+        avgflag='A', long_name='fraction of vegetation not covered by snow (0 OR 1) ', &
+         ptr_patch=this%frac_veg_nosno_patch)
 
     this%elai_patch(begp:endp) = spval
     call hist_addfld1d (fname='ELAI', units='m^2/m^2', &
@@ -320,6 +328,12 @@ contains
             avgflag='A', long_name='vegetation water matric potential for sun/sha canopy,xyl,root segments', &
             ptr_patch=this%vegwp_patch)
     end if
+
+    ! dleaf_patch
+    this%dleaf_patch(begp:endp) = spval
+    call hist_addfld1d (fname='DLEAF', units='m',  &
+         avgflag='A', long_name='mean leaf diameter', &
+         ptr_patch=this%dleaf_patch, default='inactive')
 
 
   end subroutine InitHistory

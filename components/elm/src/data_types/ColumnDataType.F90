@@ -1161,6 +1161,11 @@ contains
           avgflag='A', long_name='ground temperature', &
            ptr_col=this%t_grnd, c2l_scale_type='urbans')
 
+    this%thv(begc:endc) = spval
+     call hist_addfld1d (fname='THV',  units='K',  &
+          avgflag='A', long_name='virtual potential temperature', &
+           ptr_col=this%thv, c2l_scale_type='urbans')
+           
     this%t_lake(begc:endc,:) = spval
      call hist_addfld2d (fname='TLAKE',  units='K', type2d='levlak', &
           avgflag='A', long_name='lake temperature', &
@@ -1612,6 +1617,11 @@ contains
          avgflag='A', long_name='lake water storage', &
          ptr_col=this%wslake_col)
     end if
+
+    this%qg(begc:endc) = spval
+     call hist_addfld1d (fname='QG',  units='kg/kg',  &
+          avgflag='A', long_name='specific humidity at ground surface', &
+           ptr_col=this%qg, c2l_scale_type='urbanf')
 
     !-----------------------------------------------------------------------
     ! set cold-start initial values for select members of col_ws
