@@ -13,15 +13,15 @@ main() {
 # --- Configuration flags ----
 
 # Machine and project
-readonly MACHINE="dane"
-readonly PROJECT="paescal"
+readonly MACHINE="pm-cpu"
+readonly PROJECT="m4359"
 
 # Simulation
 readonly COMPSET="F2010"
 # readonly RESOLUTION="ne30pg2_r05_IcoswISC30E3r5"
 readonly RESOLUTION="ne30pg2_oECv3"
 # BEFORE RUNNING : CHANGE the following CASE_NAME to desired value
-readonly CASE_NAME="EAMv3_test_canopyfluxes_1year_testfracvegnosno_sfc_inout_"$RESOLUTION
+readonly CASE_NAME="EAMv3_test_canopyfluxes_1year_sfc_inout_"$RESOLUTION
 # readonly COMPSET="GMPAS-JRA1p4"
 # readonly RESOLUTION="TL319_WC14to60E2r3"
 # BEFORE RUNNING : CHANGE the following CASE_NAME to desired value
@@ -32,7 +32,7 @@ readonly CASE_NAME="EAMv3_test_canopyfluxes_1year_testfracvegnosno_sfc_inout_"$R
 # Code and compilation
 # BEFORE RUNNING: CHANGE CHECKOUT to date string like 20240301
 readonly CHECKOUT="20260409"
-readonly BRANCH="maint-3.0"
+readonly BRANCH="ELM-flux-analysis"
 readonly CHERRY=( )
 readonly DEBUG_COMPILE=false
 
@@ -47,9 +47,9 @@ readonly GET_REFCASE=TRUE
 #readonly RUN_REFDATE=""   # same as MODEL_START_DATE for 'branch', can be different for 'hybrid'
 
 # Set paths
-readonly SCRATCH="/p/lustre2/dong9/e3sm_scratch/dane"
-readonly CASE_ROOT="${SCRATCH}/cases/${CASE_NAME}"
-readonly CODE_ROOT="/p/lustre2/"${USER}"/E3SM-maint-3.0"
+readonly CASE_ROOT="${SCRATCH}/sfc_cpl/cases/${CASE_NAME}"
+readonly CODE_ROOT="/global/cfs/projectdirs/"${PROJECT}/${USER}"/sfc_cpl/code/E3SM-fork"
+
 
 # Sub-directories
 readonly CASE_BUILD_DIR=${CASE_ROOT}/build
@@ -205,8 +205,6 @@ cat << EOF >> user_nl_eam
 
  ! -- MAM5 settings ------------------
  is_output_interactive_volc = .true.
-
- ncdata = '/p/vast1/e3sm/ccsm3data/inputdata/atm/cam/inic/homme/eami_mam4_Linoz_ne30np4_L80_c20231010.nc'
 EOF
 
 cat << EOF >> user_nl_elm
