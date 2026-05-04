@@ -33,7 +33,10 @@ real(rtype), parameter, public :: largeneg = -99999999.99_rtype
 real(rtype), parameter, public :: pi = 3.14159265358979323_rtype
 
 !character(len=*), parameter, public :: fmt = '(i8,i4,20ES22.13)'
-character(len=*), parameter, public :: fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)'
+! 7 reals for state (u, v, tke, qv, qc, T, P) plus 3 reals for the diagnostic
+! Larson length scale (lscale, lscale_up, lscale_down). Width F12.4 fits the
+! Lscale_max = 6250 m cap with margin.
+character(len=*), parameter, public :: fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10,3(1X,F12.4))'
 !=========================================================
 ! Physical constants used in SHOC
 !=========================================================
@@ -241,7 +244,8 @@ subroutine shoc_main ( &
      w_sec, thl_sec, qw_sec, qwthl_sec,&  ! Output (diagnostic)
      wthl_sec, wqw_sec, wtke_sec,&        ! Output (diagnostic)
      uw_sec, vw_sec, w3,&                 ! Output (diagnostic)
-     wqls_sec, brunt, shoc_ql2 &          ! Output (diagnostic)
+     wqls_sec, brunt, shoc_ql2, &         ! Output (diagnostic)
+     lscale_shoc, lscale_up_shoc, lscale_down_shoc & ! Output (diagnostic, NEW)
 #ifdef SCREAM_CONFIG_IS_CMAKE
      , elapsed_s &
 #endif
@@ -252,6 +256,7 @@ subroutine shoc_main ( &
 #endif
 
   use cam_history,    only: outfld
+  use shoc_lscale_mod, only: shoc_compute_lscale
 
   implicit none
 
@@ -374,6 +379,14 @@ subroutine shoc_main ( &
   real(rtype), intent(out) :: brunt(shcol,nlev)
   ! return to isotropic timescale [s]
   real(rtype), intent(out) :: isotropy(shcol,nlev)
+  ! Larson nonlocal moist length scale (diagnostic, SHOC-internal port of
+  ! the standalone calculate_lscale used at physpkg.F90:tphysbc). Computed
+  ! once per nadv substep right after pblintd and right before shoc_length,
+  ! analogous to where CLUBB calls compute_mixing_length inside
+  ! advance_clubb_core.
+  real(rtype), intent(out) :: lscale_shoc     (shcol, nlev)  ! [m]
+  real(rtype), intent(out) :: lscale_up_shoc  (shcol, nlev)  ! [m]
+  real(rtype), intent(out) :: lscale_down_shoc(shcol, nlev)  ! [m]
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
   real(rtype), optional, intent(out) :: elapsed_s ! duration of main loop in seconds
@@ -400,6 +413,17 @@ subroutine shoc_main ( &
   real(rtype) :: dz_zt(shcol,nlev)
   ! Grid difference centereted on interface grid [m]
   real(rtype) :: dz_zi(shcol,nlevi)
+
+  ! Virtual potential temperature recomputed each nadv iteration from the
+  ! current substep state (thetal, qw, shoc_ql, inv_exner). The intent(in)
+  ! `thv` argument is computed once per shoc_tend_e3sm call (in shoc_intr,
+  ! before the i_shoc_main loop) and then held constant. Inside the nadv
+  ! loop here, thetal/qw/tke evolve via update_prognostics_implicit but
+  ! `thv` does not, so it goes stale. This local thv_now is used in place
+  ! of `thv` for shoc_length (-> compute_brunt_shoc_length) and the
+  ! diagnostic shoc_compute_lscale, so they see the same substep state as
+  ! the rest of the SHOC closure.
+  real(rtype) :: thv_now(shcol,nlev)
 
   ! Surface friction velocity [m/s]
   real(rtype) :: ustar(shcol)
@@ -438,6 +462,22 @@ subroutine shoc_main ( &
                      wthl_sec, wqw_sec, wtke_sec,&           ! Output (diagnostic)
                      uw_sec, vw_sec, w3,&                    ! Output (diagnostic)
                      wqls_sec, brunt, shoc_ql2)              ! Output (diagnostic)
+
+    ! Diagnostic Larson nonlocal moist length scale. Computed in F90 even
+    ! when the SHOC core runs as C++, so the LSCALE_SHOC history field is
+    ! always populated. Uses end-of-kernel state (the C++ kernel has just
+    ! evolved thetal, qw, tke, etc.). Recompute thv_now here so it is
+    ! consistent with the other end-of-kernel arrays passed in.
+    ! Formula matches pblintd_init_pot (shoc.F90:4475-4477): theta =
+    ! thetal + (Lv/cp)*qc, thv = theta * (1 + eps*qv - qc), with
+    ! qv = qw - shoc_ql.
+    thv_now(:,:) = ( thetal(:,:) + (lcond/cp) * shoc_ql(:,:) ) &
+                   * ( 1.0_rtype + eps * ( qw(:,:) - shoc_ql(:,:) ) - shoc_ql(:,:) )
+    call shoc_compute_lscale(                                 &
+         shcol, nlev, nlevi,                                  &  ! Input
+         thetal, qw, tke, thv_now,                            &  ! Input
+         pres, inv_exner, zt_grid, zi_grid,                   &  ! Input
+         lscale_shoc, lscale_up_shoc, lscale_down_shoc)          ! Output
      return
   endif
 #endif
@@ -456,6 +496,18 @@ subroutine shoc_main ( &
      se_b,ke_b,wv_b,wl_b)                   ! Input/Output
 
   do t=1,nadv
+
+    ! Refresh virtual potential temperature from the current substep state.
+    ! The intent(in) `thv` argument is set once per shoc_tend_e3sm call
+    ! (in shoc_intr.F90, before the i_shoc_main loop) and then held
+    ! constant, while thetal/qw/shoc_ql evolve via update_prognostics_implicit
+    ! within this loop. Using a stale `thv` would bias compute_brunt_shoc_length
+    ! (and therefore shoc_mix above the cloud-top inversion in DYCOMS), and
+    ! would also bias the diagnostic shoc_compute_lscale at all levels.
+    ! Formula matches pblintd_init_pot (shoc.F90:4475-4477): theta = thetal
+    ! + (Lv/cp)*qc, thv = theta * (1 + eps*qv - qc), with qv = qw - shoc_ql.
+    thv_now(:,:) = ( thetal(:,:) + (lcond/cp) * shoc_ql(:,:) ) &
+                   * ( 1.0_rtype + eps * ( qw(:,:) - shoc_ql(:,:) ) - shoc_ql(:,:) )
 
     ! Check TKE to make sure values lie within acceptable
     !  bounds after host model performs horizontal advection
@@ -496,12 +548,32 @@ subroutine shoc_main ( &
        ustar,obklen,kbfs,shoc_cldfrac,&     ! Input
        pblh)                                ! Output
 
-    ! Update the turbulent length scale
+    ! Diagnostic Larson nonlocal moist length scale (SHOC-side parallel of
+    ! H. Xiao's standalone calculate_lscale used by tphysbc).
+    !
+    ! Placed after pblintd (which sets the boundary-layer state used by
+    ! the surface-layer taper inside the algorithm) and before shoc_length
+    ! (so this diagnostic and SHOC's own mixing length see the same input
+    ! state, making them directly comparable).
+    !
+    ! Reads SHOC's evolved state; does NOT modify it. Output goes to
+    ! history (LSCALE_SHOC, LSCALE_UP_SHOC, LSCALE_DOWN_SHOC) via the host
+    ! interface, and to the in-and-out txt file from inside the substep
+    ! loop below when l_txt_write=.true.
+    call shoc_compute_lscale(                                 &
+         shcol, nlev, nlevi,                                  &  ! Input
+         thetal, qw, tke, thv_now,                            &  ! Input
+         pres, inv_exner, zt_grid, zi_grid,                   &  ! Input
+         lscale_shoc, lscale_up_shoc, lscale_down_shoc)          ! Output
+
+    ! Update the turbulent length scale.  Note: thv_now (refreshed at top
+    ! of this nadv iteration) is used instead of the intent(in) thv so
+    ! that compute_brunt_shoc_length sees the current substep state.
     call shoc_length(&
        shcol,nlev,nlevi,&                ! Input
        host_dx,host_dy,&                 ! Input
        zt_grid,zi_grid,dz_zt,&           ! Input
-       tke,thv,&                         ! Input
+       tke,thv_now,&                     ! Input
        brunt,shoc_mix)                   ! Output
 
     ! Advance the SGS TKE equation
@@ -582,13 +654,16 @@ subroutine shoc_main ( &
 
     if (l_txt_write.and.masterproc) then
       do kk=nlev,1,-1
-         write(txtout_unit,fmt) t*nint(dtime),                                           &! time elapsed inside this subroutine 
+         write(txtout_unit,fmt) t*nint(dtime),                                           &! time elapsed inside this subroutine
                                 kk-1,                                                    &! vertical layer index (0 = TOM, nlev - 1 = sfc)
                                 u_wind(1,kk), v_wind(1,kk), tke(1,kk),                   &! u, v, and tke
                                     qw(1,kk)-shoc_ql(1,kk),                              &! qv
                                shoc_ql(1,kk),                                            &! qc
                                 thetal(1,kk)/inv_exner(1,kk) + lcond/cp * shoc_ql(1,kk), &! temperature
-                                  pres(1,kk)                                              ! pressure
+                                  pres(1,kk),                                            &! pressure
+                            lscale_shoc(1,kk),                                           &! Larson Lscale [m]
+                         lscale_up_shoc(1,kk),                                           &! Larson Lscale (upward) [m]
+                       lscale_down_shoc(1,kk)                                             ! Larson Lscale (downward) [m]
       end do
     end if
     !---------------------------------------------
