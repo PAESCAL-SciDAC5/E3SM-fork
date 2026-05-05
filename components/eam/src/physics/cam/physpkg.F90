@@ -2892,8 +2892,8 @@ end if
 	   endif
    
            if (do_shoc_sgs) then
-             call shoc_tend_e3sm(state,ptend,pbuf,cld_macmic_ztodt,&
-                cmfmc, cam_in, sgh30, macmic_it, cld_macmic_num_steps, & 
+             call shoc_tend_e3sm(state,ptend,pbuf,diag, cld_macmic_ztodt,&
+                cmfmc, cam_in, cam_out, sgh30, macmic_it, cld_macmic_num_steps, & 
                 dlf, det_s, det_ice, lcldo)
            endif   
 

@@ -37,6 +37,8 @@ module shoc_intr
 
   ! define physics buffer indicies here
   integer :: tke_idx, &     ! turbulent kinetic energy
+             rtm_idx, &
+             thlm_idx, &
              tkh_idx, &
              tk_idx, &
              wthv_idx, &       ! buoyancy flux
@@ -185,6 +187,9 @@ module shoc_intr
     call pbuf_add_field('WTHV', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), wthv_idx)
     call pbuf_add_field('TKH', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), tkh_idx)
     call pbuf_add_field('TK', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), tk_idx)
+
+    call pbuf_add_field('RTM', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), rtm_idx)
+    call pbuf_add_field('THLM', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), thlm_idx)
 
     call pbuf_add_field('pblh',       'global', dtype_r8, (/pcols/), pblh_idx)
     call pbuf_add_field('tke',        'global', dtype_r8, (/pcols, pverp/), tke_idx)
@@ -540,8 +545,8 @@ end function shoc_implements_cnst
   ! =============================================================================== !
 
   subroutine shoc_tend_e3sm( &
-                             state, ptend_all, pbuf, hdtime, &
-			     cmfmc, cam_in, sgh30, &
+                             state, ptend_all, pbuf, diag, hdtime, &
+			     cmfmc, cam_in, cam_out, sgh30, &
 			     macmic_it, cld_macmic_num_steps, &
 			     dlf, det_s, det_ice, alst_o)
 
@@ -561,7 +566,7 @@ end function shoc_implements_cnst
 
     use ppgrid,         only: pver, pverp, pcols
     use constituents,   only: cnst_get_ind
-    use camsrfexch,     only: cam_in_t
+    use camsrfexch,     only: cam_in_t, cam_out_t
     use ref_pres,       only: top_lev => trop_cloud_top_lev
     use time_manager,   only: is_first_step
     use wv_saturation,  only: qsat
@@ -572,6 +577,9 @@ end function shoc_implements_cnst
     use cam_history,    only: outfld
     use iop_data_mod,   only: single_column, dp_crm
 
+    use conditional_diag,      only: cnd_diag_t
+    use conditional_diag_main, only: cnd_diag_checkpoint
+
     implicit none
 
    ! --------------- !
@@ -580,6 +588,7 @@ end function shoc_implements_cnst
 
    type(physics_state), intent(in)    :: state                    ! Physics state variables                 [vary]
    type(cam_in_t),      intent(in)    :: cam_in
+   type(cam_out_t),     intent(in)    :: cam_out
    real(r8),            intent(in)    :: hdtime                   ! Host model timestep                     [s]
    real(r8),            intent(in)    :: dlf(pcols,pver)          ! Detraining cld H20 from deep convection [kg/ks/s]
    real(r8),            intent(in)    :: cmfmc(pcols,pverp)       ! convective mass flux--m sub c           [kg/m2/s]
@@ -591,6 +600,7 @@ end function shoc_implements_cnst
    ! ---------------------- !
 
    type(physics_buffer_desc), pointer :: pbuf(:)
+   type(cnd_diag_t),    intent(inout) :: diag                     !  conditionally sampled fields
 
    ! ---------------------- !
    ! Output Auguments !
@@ -710,11 +720,15 @@ end function shoc_implements_cnst
    integer :: hdtime_int
    integer :: modeltime
    integer :: endtime
-   
+
+   character(len=2) :: char_macmic_it
 
    ! --------------- !
    ! Pointers        !
    ! --------------- !
+
+   real(r8), pointer, dimension(:,:) :: thlm_in_pbuf
+   real(r8), pointer, dimension(:,:) :: rtm_in_pbuf
 
    real(r8), pointer, dimension(:,:) :: tke_zi  ! turbulent kinetic energy, interface
    real(r8), pointer, dimension(:,:) :: wthv ! buoyancy flux
@@ -754,6 +768,11 @@ end function shoc_implements_cnst
    !------------------------------------------------------------------!
    call phys_getopts(turb_nadv_out_nstep_out = turb_nadv_out_nstep)
 
+   if (macmic_it > 99) then
+      call endrun('clubb_tend_cam: macmic_it > 99. Revise checkpoint name for cnd_diag_checkpoint.')
+   end if
+      write(char_macmic_it,'(i2.2)') macmic_it
+
  !  Get indicees for cloud and ice mass and cloud and ice number
    ic_limit   = 1.e-12_r8
    frac_limit = 0.01_r8
@@ -788,6 +807,9 @@ end function shoc_implements_cnst
    call pbuf_get_field(pbuf, qlst_idx,    qlst,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call pbuf_get_field(pbuf, qist_idx,    qist,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
 
+   call pbuf_get_field(pbuf, thlm_idx,    thlm_in_pbuf, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+   call pbuf_get_field(pbuf, rtm_idx,     rtm_in_pbuf,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+
    call pbuf_get_field(pbuf, prer_evap_idx, prer_evap)
    call pbuf_get_field(pbuf, accre_enhan_idx, accre_enhan)
    call pbuf_get_field(pbuf, cmeliq_idx,  cmeliq)
@@ -800,6 +822,7 @@ end function shoc_implements_cnst
    call pbuf_get_field(pbuf, icwmrdp_idx, dp_icwmr)
    call pbuf_get_field(pbuf, cmfmc_sh_idx, cmfmc_sh)
 
+   call cnd_diag_checkpoint(diag, 'SHOCa'//char_macmic_it, state1, pbuf, cam_in, cam_out)
    !--------------------
    !  Determine SHOC time step.
 
@@ -886,6 +909,8 @@ end function shoc_implements_cnst
      enddo
    enddo
 
+   thlm_in_pbuf = thlm
+    rtm_in_pbuf = rtm
    ! ------------------------------------------------- !
    ! Prepare inputs for SHOC call                      !
    ! ------------------------------------------------- !
@@ -944,6 +969,7 @@ end function shoc_implements_cnst
      end if
    enddo
 
+   call cnd_diag_checkpoint(diag, 'SHOCb'//char_macmic_it, state1, pbuf, cam_in, cam_out)
    !-------------------------------------------
    ! Substepping configuration (if applicable)
    !-------------------------------------------
@@ -1043,6 +1069,7 @@ end function shoc_implements_cnst
    wm_zt(:ncol,:) = 0.0_r8  ! BJG -- hardwiring wm_zt = 0.0 to be consistent with no_omega test.
 
    
+   call cnd_diag_checkpoint(diag, 'SHOCc'//char_macmic_it, state1, pbuf, cam_in, cam_out)
    ! ------------------------------------------------- !
    ! Actually call SHOC                                !
    ! ------------------------------------------------- !
@@ -1091,6 +1118,9 @@ end function shoc_implements_cnst
 
   end do  ! end i_shoc_main loop
   !============================
+
+   thlm_in_pbuf = thlm
+    rtm_in_pbuf = rtm
 
        ! Write results to txt file after each shoc_main call in other cases
 
@@ -1180,6 +1210,7 @@ end function shoc_implements_cnst
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
 
+   call cnd_diag_checkpoint(diag, 'SHOCd'//char_macmic_it, state1, pbuf, cam_in, cam_out)
    ! ------------------------------------------------------------ !
    ! ------------------------------------------------------------ !
    ! ------------------------------------------------------------ !
@@ -1417,7 +1448,9 @@ end function shoc_implements_cnst
     call outfld('TOT_CLOUD_FRAC',tot_cloud_frac,pcols,lchnk)
     call outfld('PBLH',pblh,pcols,lchnk)
 
+    call cnd_diag_checkpoint(diag, 'SHOCz'//char_macmic_it, state1, pbuf, cam_in, cam_out)
 #endif
+
     return
   end subroutine shoc_tend_e3sm
 

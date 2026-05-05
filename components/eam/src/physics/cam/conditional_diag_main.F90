@@ -26,8 +26,8 @@ module conditional_diag_main
 
   ! start time step for increment calculation
 
-  integer,parameter :: NS0INC = 3 ! start time step for increment calculation
-  integer,parameter :: NS0SMP = 4 ! start time step for conditional sampling
+  integer,parameter :: NS0INC = 1 ! start time step for increment calculation
+  integer,parameter :: NS0SMP = 1 ! start time step for conditional sampling
 contains
 
 !======================================================
@@ -561,9 +561,25 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
             idx = pbuf_get_index('LAMBDAC')  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
+        ! CLUBB/SHOC variables saved in pbuf
+
+        case('RTMp')
+            idx = pbuf_get_index('RTM')  ; call pbuf_get_field( pbuf, idx, ptr2d )
+            arrayout(:,:) = ptr2d
+
+        case('THLMp')
+            idx = pbuf_get_index('THLM')  ; call pbuf_get_field( pbuf, idx, ptr2d )
+            arrayout(:,:) = ptr2d
+
         !-----------------------------------------------------------
         ! physical quantities that need to be calculated on the fly 
         !-----------------------------------------------------------
+        case ('RTMs')
+          call rtm_in_clubb_calculated_from_state( state, pcols, pver, &! in
+                                                   arrayout(:,:)       )! out
+        case ('THLMs')
+          call thlm_in_clubb_calculated_from_state( state, pcols, pver, &! in
+                                                    arrayout(:,:)       )! out
 
         case ('QSATW')
           call qsat_water( state%t(:ncol,:), state%pmid(:ncol,:), &! in
