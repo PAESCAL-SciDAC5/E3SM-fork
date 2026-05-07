@@ -136,7 +136,7 @@ contains
     this%forc_hgt_u_patch(begp:endp) = spval
     call hist_addfld1d (fname='FORC_HGT_U', units='m', &
          avgflag='A', long_name='zldis', &
-         ptr_col=this%forc_hgt_u_patch, default='inactive')
+         ptr_patch=this%forc_hgt_u_patch, default='inactive')
 
     this%z0mg_col(begc:endc) = spval
     call hist_addfld1d (fname='Z0MG', units='m', &

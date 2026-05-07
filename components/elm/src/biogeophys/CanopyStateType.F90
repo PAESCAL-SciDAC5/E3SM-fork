@@ -72,6 +72,13 @@ module CanopyStateType
                                                           ! for non-ED/FATES this is the same as pftcon%dleaf()
      real(r8),  pointer :: lbl_rsc_h2o_patch        (:)   ! laminar boundary layer resistance for water over dry leaf (s/m)
      real(r8) , pointer :: vegwp_patch              (:,:) ! patch vegetation water matric potential (mm)
+     real(r8) , pointer :: c3psn_patch              (:)   ! patch photosynthetic pathway: 0. = c4, 1. = c3
+     real(r8) , pointer :: slatop_patch             (:)   ! patch specific leaf area at top of canopy, projected area basis [m^2/gC]
+     real(r8) , pointer :: leafcn_patch             (:)   ! patch leaf C:N (gC/gN)
+     real(r8) , pointer :: flnr_patch               (:)   ! patch fraction of leaf N in the Rubisco enzyme (gN Rubisco / gN leaf)
+     real(r8) , pointer :: fnitr_patch              (:)   ! patch foliage nitrogen limitation factor (-)
+     real(r8) , pointer :: i_vc_patch               (:)   ! patch intercept of photosynthesis vcmax ~ leaf n content regression model
+     real(r8) , pointer :: s_vc_patch               (:)   ! patch slope of photosynthesis vcmax ~ leaf n content regression model
    contains
 
      procedure, public  :: Init
@@ -152,6 +159,14 @@ contains
     allocate(this%dleaf_patch              (begp:endp))           ; this%dleaf_patch              (:)   = spval
     allocate(this%lbl_rsc_h2o_patch        (begp:endp))           ; this%lbl_rsc_h2o_patch        (:)   = spval
     allocate(this%vegwp_patch              (begp:endp,1:nvegwcs)) ; this%vegwp_patch              (:,:) = spval
+
+    allocate(this%c3psn_patch              (begp:endp))           ; this%c3psn_patch              (:)   = spval
+    allocate(this%slatop_patch             (begp:endp))           ; this%slatop_patch             (:)   = spval
+    allocate(this%leafcn_patch             (begp:endp))           ; this%leafcn_patch             (:)   = spval
+    allocate(this%flnr_patch               (begp:endp))           ; this%flnr_patch               (:)   = spval
+    allocate(this%fnitr_patch              (begp:endp))           ; this%fnitr_patch              (:)   = spval
+    allocate(this%i_vc_patch               (begp:endp))           ; this%i_vc_patch               (:)   = spval
+    allocate(this%s_vc_patch               (begp:endp))           ; this%s_vc_patch               (:)   = spval
 
 
   end subroutine InitAllocate
@@ -335,6 +350,53 @@ contains
          avgflag='A', long_name='mean leaf diameter', &
          ptr_patch=this%dleaf_patch, default='inactive')
 
+    this%c3psn_patch(begp:endp) = spval
+    call hist_addfld1d (fname='C3PSN', units='m2/gC',  &
+         avgflag='A', long_name='photosynthetic pathway', &
+         ptr_patch=this%c3psn_patch, default='inactive')
+
+    this%slatop_patch(begp:endp) = spval
+    call hist_addfld1d (fname='SLATOP', units='m2/gC',  &
+         avgflag='A', long_name='specific leaf area', &
+         ptr_patch=this%slatop_patch, default='inactive')
+
+    this%leafcn_patch(begp:endp) = spval
+    call hist_addfld1d (fname='LEAFCN', units='(gC/gN)',  &
+         avgflag='A', long_name='leaf C:N', &
+         ptr_patch=this%leafcn_patch, default='inactive')
+
+    this%flnr_patch(begp:endp) = spval
+    call hist_addfld1d (fname='FLNR', units='gN Rubisco / gN leaf',  &
+         avgflag='A', long_name='fraction of leaf N in Rubisco enzyme', &
+         ptr_patch=this%flnr_patch, default='inactive')
+
+    this%fnitr_patch(begp:endp) = spval
+    call hist_addfld1d (fname='FNITR', units='',  &
+         avgflag='A', long_name='foliage nitrogen limitation factor', &
+         ptr_patch=this%fnitr_patch, default='inactive')
+
+    this%i_vc_patch(begp:endp) = spval
+    call hist_addfld1d (fname='I_VC', units='-',  &
+         avgflag='A', long_name='intercept of regression model', &
+         ptr_patch=this%i_vc_patch, default='inactive')
+
+    this%s_vc_patch(begp:endp) = spval
+    call hist_addfld1d (fname='S_VC', units='',  &
+         avgflag='A', long_name='slope of regression model', &
+         ptr_patch=this%s_vc_patch, default='inactive')
+
+     ! ! 2d arrays
+     ! this%laisun_z_patch(begp:endp,:) = spval
+     ! data2dptr => this%laisun_z_patch(:,1:nlevcan)
+     ! call hist_addfld2d (fname='LAISUN_Z',  units='m2', type2d='levcan', &
+     !      avgflag='A', long_name='sunlit leaf area for canopy layer', &
+     !      standard_name='', ptr_patch=data2dptr)
+
+     ! this%laisha_z_patch(begp:endp,:) = spval
+     ! data2dptr => this%laisha_z_patch(:,1:nlevcan)
+     ! call hist_addfld2d (fname='LAISHA_Z',  units='m2', type2d='levcan', &
+     !      avgflag='A', long_name='shaded leaf area for canopy layer', &
+     !      standard_name='', ptr_patch=data2dptr)
 
   end subroutine InitHistory
 

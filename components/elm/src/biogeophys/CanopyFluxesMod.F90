@@ -344,6 +344,13 @@ contains
          dleaf                => veg_vp%dleaf                          , & ! Input:  [real(r8) (:)   ]  characteristic leaf dimension (m)
          smpso                => veg_vp%smpso                          , & ! Input:  [real(r8) (:)   ]  soil water potential at full stomatal opening (mm)
          smpsc                => veg_vp%smpsc                          , & ! Input:  [real(r8) (:)   ]  soil water potential at full stomatal closure (mm)
+         c3psn                => veg_vp%c3psn                          , & ! Input:  [real(r8) (:)   ]  photosynthetic pathway: 0. = c4, 1. = c3
+         slatop               => veg_vp%slatop                         , & ! Input:  [real(r8) (:)   ]  specific leaf area at top of canopy, projected area basis [m^2/gC]
+         leafcn               => veg_vp%leafcn                         , & ! Input:  [real(r8) (:)   ]  leaf C:N (gC/gN)
+         flnr                 => veg_vp%flnr                           , & ! Input:  [real(r8) (:)   ]  fraction of leaf N in the Rubisco enzyme (gN Rubisco / gN leaf)
+         fnitr                => veg_vp%fnitr                          , & ! Input:  [real(r8) (:)   ]  foliage nitrogen limitation factor (-)
+         i_vc                 => veg_vp%i_vc                           , & ! Input:  [real(r8) (:)   ]  intercept of photosynthesis vcmax ~ leaf n content regression model
+         s_vc                 => veg_vp%s_vc                           , & ! Input:  [real(r8) (:)   ]  slope of photosynthesis vcmax ~ leaf n content regression model
 
          htvp                 => col_ef%htvp                  , & ! Input:  [real(r8) (:)   ]  latent heat of evaporation (/sublimation) [J/kg] (constant)
 
@@ -360,7 +367,14 @@ contains
          altmax_lastyear_indx => canopystate_vars%altmax_lastyear_indx_col , & ! Input:  [integer  (:)   ]  prior year maximum annual depth of thaw
          altmax_indx          => canopystate_vars%altmax_indx_col          , & ! Input:  [integer  (:)   ]  maximum annual depth of thaw
 
-         dleaf_patch          => canopystate_vars%dleaf_patch                 , & ! Output: [real(r8) (:)   ]  mean leaf diameter for this patch/pft
+         dleaf_patch          => canopystate_vars%dleaf_patch              , & ! Output: [real(r8) (:)   ]  mean leaf diameter for this patch/pft
+         c3psn_patch          => canopystate_vars%c3psn_patch              , & ! Output: [real(r8) (:)   ]  photosynthetic pathway: 0. = c4, 1. = c3 for this patch/pft
+         slatop_patch         => canopystate_vars%slatop_patch             , & ! Output: [real(r8) (:)   ]  specific leaf area at top of canopy, projected area basis [m^2/gC] for this patch/pft
+         leafcn_patch         => canopystate_vars%leafcn_patch             , & ! Output: [real(r8) (:)   ]  leaf C:N (gC/gN) for this patch/pft
+         flnr_patch           => canopystate_vars%flnr_patch               , & ! Output: [real(r8) (:)   ]  fraction of leaf N in the Rubisco enzyme (gN Rubisco / gN leaf) for this patch/pft
+         fnitr_patch          => canopystate_vars%fnitr_patch              , & ! Output: [real(r8) (:)   ]  foliage nitrogen limitation factor (-) for this patch/pft
+         i_vc_patch           => canopystate_vars%i_vc_patch               , & ! Output: [real(r8) (:)   ]  intercept of photosynthesis vcmax ~ leaf n content regression model for this patch/pft
+         s_vc_patch           => canopystate_vars%s_vc_patch               , & ! Output: [real(r8) (:)   ]  slope of photosynthesis vcmax ~ leaf n content regression model for this patch/pft
          watsat               => soilstate_vars%watsat_col                 , & ! Input:  [real(r8) (:,:) ]  volumetric soil water at saturation (porosity)   (constant)
          watdry               => soilstate_vars%watdry_col                 , & ! Input:  [real(r8) (:,:) ]  btran parameter for btran=0                      (constant)
          watopt               => soilstate_vars%watopt_col                 , & ! Input:  [real(r8) (:,:) ]  btran parameter for btran=1                      (constant)
@@ -808,6 +822,12 @@ contains
             ! during the FATES dynamics and/or initialization call
             if(.not.veg_pp%is_fates(p)) then
                dleaf_patch(p) = dleaf(veg_pp%itype(p))
+               c3psn_patch(p) = c3psn(veg_pp%itype(p))
+               slatop_patch(p) = slatop(veg_pp%itype(p))
+               flnr_patch(p) = flnr(veg_pp%itype(p))
+               fnitr_patch(p) = fnitr(veg_pp%itype(p))
+               i_vc_patch(p) = i_vc(veg_pp%itype(p))
+               s_vc_patch(p) = s_vc(veg_pp%itype(p))
             end if
 
 
