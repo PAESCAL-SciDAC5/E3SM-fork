@@ -33,7 +33,7 @@ real(rtype), parameter, public :: largeneg = -99999999.99_rtype
 real(rtype), parameter, public :: pi = 3.14159265358979323_rtype
 
 !character(len=*), parameter, public :: fmt = '(i8,i4,20ES22.13)'
-character(len=*), parameter, public :: fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)'
+character(len=*), parameter, public :: fmt = '(F12.3,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)'
 !=========================================================
 ! Physical constants used in SHOC
 !=========================================================
@@ -582,7 +582,7 @@ subroutine shoc_main ( &
 
     if (l_txt_write.and.masterproc) then
       do kk=nlev,1,-1
-         write(txtout_unit,fmt) t*nint(dtime),                                           &! time elapsed inside this subroutine 
+         write(txtout_unit,fmt) t*dtime,                                                 &! time elapsed inside this subroutine
                                 kk-1,                                                    &! vertical layer index (0 = TOM, nlev - 1 = sfc)
                                 u_wind(1,kk), v_wind(1,kk), tke(1,kk),                   &! u, v, and tke
                                     qw(1,kk)-shoc_ql(1,kk),                              &! qv
