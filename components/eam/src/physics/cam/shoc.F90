@@ -32,8 +32,6 @@ logical :: use_cxx = .true.
 real(rtype), parameter, public :: largeneg = -99999999.99_rtype
 real(rtype), parameter, public :: pi = 3.14159265358979323_rtype
 
-!character(len=*), parameter, public :: fmt = '(i8,i4,20ES22.13)'
-character(len=*), parameter, public :: fmt = '(F12.3,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)'
 !=========================================================
 ! Physical constants used in SHOC
 !=========================================================
@@ -252,6 +250,7 @@ subroutine shoc_main ( &
 #endif
 
   use cam_history,    only: outfld
+  use turb_test,      only: txt_write_one_column
 
   implicit none
 
@@ -583,18 +582,16 @@ subroutine shoc_main ( &
     end if
 
     !---------------------------------------------
-    ! Write out fields to SHOC text output file
+    ! Write out fields to text file
 
     if (l_txt_write.and.masterproc) then
-      do kk=nlev,1,-1
-         write(txtout_unit,fmt) t*dtime,                                                 &! time elapsed inside this subroutine
-                                kk-1,                                                    &! vertical layer index (0 = TOM, nlev - 1 = sfc)
-                                u_wind(1,kk), v_wind(1,kk), tke(1,kk),                   &! u, v, and tke
-                                    qw(1,kk)-shoc_ql(1,kk),                              &! qv
-                               shoc_ql(1,kk),                                            &! qc
-                                thetal(1,kk)/inv_exner(1,kk) + lcond/cp * shoc_ql(1,kk), &! temperature
-                                  pres(1,kk)                                              ! pressure
-      end do
+         call txt_write_one_column( txtout_unit, t*dtime, nlev,         &
+                                    u_wind(1,:), v_wind(1,:), tke(1,:), &
+                                    qw(1,:)-shoc_ql(1,:),               &! qv
+                                   shoc_ql(1,:),                        &! qc
+                                    thetal(1,:)/inv_exner(1,:) + lcond/cp * shoc_ql(1,:), &! temperature
+                                    thetal(1,:), &
+                                      pres(1,:)  )! pressure
     end if
     !---------------------------------------------
 

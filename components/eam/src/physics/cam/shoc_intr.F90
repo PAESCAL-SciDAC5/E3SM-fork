@@ -573,12 +573,14 @@ end function shoc_implements_cnst
     use micro_mg_cam,   only: micro_mg_version
     use cldfrc2m,                  only: aist_vector
     use trb_mtn_stress,            only: compute_tms
-    use shoc,           only: shoc_main, fmt
+    use shoc,           only: shoc_main
     use cam_history,    only: outfld
     use iop_data_mod,   only: single_column, dp_crm
 
     use conditional_diag,      only: cnd_diag_t
     use conditional_diag_main, only: cnd_diag_checkpoint
+
+    use turb_test, only: set_switches_for_txt_output, txt_file_open_and_init, txt_write_one_column
 
     implicit none
 
@@ -636,7 +638,6 @@ end function shoc_implements_cnst
    integer :: nadv                              ! Number of timesteps inside each call of shoc_main
 
    logical :: l_inner_write
-   character(len=256)  :: txt_output_prefix = ''
 
    integer :: ixcldice, ixcldliq, ixnumliq, ixnumice
    integer :: itim_old
@@ -715,7 +716,6 @@ end function shoc_implements_cnst
    logical :: l_open_txt_output
 
    integer, save :: txtout_unit
-   character(len=512) :: outfname
    integer :: i_shoc_main
 
    integer :: kk
@@ -1005,6 +1005,7 @@ end function shoc_implements_cnst
              thlm, rtm, um, vm, wm_zt, rcm, cloud_frac, tkh, tk )
 
       wthv(:ncol,:) = 0.0_r8
+     wm_zt(:ncol,:) = 0.0_r8  ! BJG -- hardwiring wm_zt = 0.0 to be consistent with no_omega test.
 
    end if ! l_turb_standalone
 
@@ -1013,74 +1014,15 @@ end function shoc_implements_cnst
   !wprtp_sfc(:ncol) = 0.0_r8  ! BJG test to hardwire surface moisture flux to zero
    upwp_sfc(:ncol) = -0.068547301186844697_r8  ! BJG test to hardwire surface u flux to input text file value
    vpwp_sfc(:ncol) = 0.053858593789663699_r8  ! BJG test to hardwire surface v flux to input text file value
-   wm_zt(:ncol,:) = 0.0_r8  ! BJG -- hardwiring wm_zt = 0.0 to be consistent with no_omega test.
 
-   !-------------------------------------------------------------------------------------
-   ! Set switches for opening and closing txt file(s) when it's time.
-   !-------------------------------------------------------------------------------------
-   ! Txt output is handled only by the master MPI process in an SCM run.
+   !--------------------------------------------------------------------------------------------
+   ! Prepare for txt output. Only relevant when this is the master MPI process in an SCM run.
+   !--------------------------------------------------------------------------------------------
+   call set_switches_for_txt_output( single_column, masterproc, l_turb_standalone, &! in
+                                     l_open_txt_output, l_clse_txt_output          )! out
 
-   if (single_column.and.masterproc) then
-
-      ! If the SCM is configured to be turb standalone, in principle
-      ! we only need a single call of this subroutine (shoc_tend_eam)
-      ! and a single txt file from the call, despite the fact
-      ! that a 1-timestep EAM run will call this subroutine 3 times
-      ! because of model initialization and finalization.
-
-      if (l_turb_standalone) then
-
-         l_open_txt_output = .true.   ! open a new file and write header info everytime we get here.
-         l_clse_txt_output = .true.   ! close the file and free i/o unit in this subroutine after shoc is called.
-
-      ! If the SCM is not confugured to be turb standalone,
-      ! open a new file and write header info at the very beginning of the simulation,
-      ! i.e., in the very first EAM time step during the first macmic substep;
-      ! keep the file open during the entire simulation.
-      else
-
-         l_open_txt_output = (is_first_step()) .and. (macmic_it.eq.1)
-         l_clse_txt_output = .false.
-
-      end if
-
-   else
-   ! In global simulations, we won't have txt output; set both switches to .false.
-   ! In case an SCM simulation contains multiple grid columns for some reason,
-   ! do not produce txt output from MPI processes other than the master.
-
-      l_open_txt_output = .false.
-      l_clse_txt_output = .false.
-
-   end if
-
-   !--------------------------------------------
    ! Open txt output file if it's time to do so
-   !--------------------------------------------
-   if (l_open_txt_output) then
-
-      ! Determine name of txt output file
-
-      txt_output_prefix = 'shoc_output'                                                  ! set a default
-      if (len_trim(shoc_output_prefix) > 0) txt_output_prefix = trim(shoc_output_prefix) ! overwrite by nml input
-      write(outfname, '(A,4(A,I0),A)') trim(txt_output_prefix), &
-                                       '_nstep',get_nstep(), '_macmicsub',macmic_it,&
-                                       '.txt'
-
-      ! Open txt file and write a header
-
-       txtout_unit = getunit()
-       open(txtout_unit, file=trim(outfname), status='replace')
-       write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), u, v, tke, qv, qc, T, P'
-
-   end if ! l_open_txt_output
-
-
-   call cnd_diag_checkpoint(diag, 'SHOCc'//char_macmic_it, state1, pbuf, cam_in, cam_out)
-   ! ------------------------------------------------- !
-   ! Actually call SHOC                                !
-   ! ------------------------------------------------- !
-   ! Note that each call includes nadv time steps of integration for SHOC
+   if (l_open_txt_output) call txt_file_open_and_init( trim(shoc_output_prefix), get_nstep(), macmic_it, txtout_unit )
 
    ! Write statement inside shoc_main will only be executed when the simulation
    ! is run in an SCM "turb standalone" model when the nadv loop inside shoc_main
@@ -1088,7 +1030,13 @@ end function shoc_implements_cnst
 
    l_inner_write = l_turb_standalone .and. (.not.l_shoc_outer_loop)
 
-   !============================
+   ! ================================================= !
+   ! Actually call SHOC                                !
+   ! ================================================= !
+   ! Note that each call includes nadv time steps of integration for SHOC
+
+   call cnd_diag_checkpoint(diag, 'SHOCc'//char_macmic_it, state1, pbuf, cam_in, cam_out)
+
    do i_shoc_main = 1, n_shoc_main_calls
 
       call shoc_main( &
@@ -1113,7 +1061,7 @@ end function shoc_implements_cnst
            uw_sec_out(:ncol,:), vw_sec_out(:ncol,:), w3_out(:ncol,:), & ! Output (diagnostic)
            wqls_out(:ncol,:),brunt_out(:ncol,:),rcm2(:ncol,:)) ! Output (diagnostic)
 
-      ! Write results to txt file after each shoc_main call if conditions are met.
+      ! Write results to txt file after each shoc_main call if conditions are met. -------------------
 
       if (single_column .and. l_shoc_outer_loop .and. masterproc) then
 
@@ -1124,18 +1072,14 @@ end function shoc_implements_cnst
                        +  dtime * i_shoc_main
          end if
 
-         do kk = pver, 1, -1
-            write(txtout_unit,fmt) modeltime,                 &!
-                                   kk - 1,                    &! 0 = TOM, pver - 1 = sfc
-                                   um(1,kk),                  &!
-                                   vm(1,kk),                  &!
-                                   tke_zt(1,kk),              &!
-                                   rtm(1,kk) - rcm(1,kk),     &! qv
-                                   rcm(1,kk),                 &! qc
-                                   thlm(1,kk) / inv_exner(1,kk) + latvap/cpair * rcm(1,kk), &! temperature
-                                   state1%pmid(1,kk)                                         ! pressure
-         end do
-      end if
+         call txt_write_one_column( txtout_unit, modeltime, pver,  &
+                                    um(1,:), vm(1,:), tke_zt(1,:), &
+                                   rtm(1,:) - rcm(1,:),            &
+                                   rcm(1,:),                       &
+                                  thlm(1,:) / inv_exner(1,:) + latvap/cpair * rcm(1,:), &! temperature
+                                  thlm(1,:),                       &
+                                  state1%pmid(1,:)                 )
+      end if !-----------
 
   end do  ! end i_shoc_main loop
   !============================
@@ -1143,9 +1087,6 @@ end function shoc_implements_cnst
   if (l_clse_txt_output) then
      close(txtout_unit)
      call freeunit(txtout_unit)
- !else if(masterproc.and.(.not.(l_turb_standalone)).and.(modeltime.ge.endtime)) then
- !   close(txtout_unit)
- !   call freeunit(txtout_unit)
   end if
 
   !---------------------------------
