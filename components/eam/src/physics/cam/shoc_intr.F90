@@ -154,7 +154,7 @@ module shoc_intr
   logical :: relvar_fix = .FALSE. !PMA for relvar fix
 
   ! Prefix for SHOC text output filenames (set via namelist shoc_output_prefix)
-  character(len=256) :: shoc_output_prefix = ''
+  character(len=256) :: shoc_output_prefix = 'shoc_output'
 
 
 
@@ -1019,10 +1019,11 @@ end function shoc_implements_cnst
    ! Prepare for txt output. Only relevant when this is the master MPI process in an SCM run.
    !--------------------------------------------------------------------------------------------
    call set_switches_for_txt_output( single_column, masterproc, l_turb_standalone, &! in
+                                     is_first_step(), macmic_it,                   &! in
                                      l_open_txt_output, l_clse_txt_output          )! out
 
    ! Open txt output file if it's time to do so
-   if (l_open_txt_output) call txt_file_open_and_init( trim(shoc_output_prefix), get_nstep(), macmic_it, txtout_unit )
+   if (l_open_txt_output) call txt_file_open_and_init( shoc_output_prefix, get_nstep(), macmic_it, txtout_unit )
 
    ! Write statement inside shoc_main will only be executed when the simulation
    ! is run in an SCM "turb standalone" model when the nadv loop inside shoc_main

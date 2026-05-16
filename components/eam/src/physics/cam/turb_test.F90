@@ -2,18 +2,21 @@ module turb_test
 
   use shr_kind_mod,  only: r8=>shr_kind_r8
 
+  implicit none
+
   public
 
 contains
 
 subroutine set_switches_for_txt_output( single_column, masterproc, l_turb_standalone, &! in
+                                        l_first_step, macmic_it,                      &! in
                                         l_open_txt_output, l_clse_txt_output          )! out
-
-   use time_manager, only: is_first_step
 
    logical, intent(in) :: single_column
    logical, intent(in) :: masterproc
    logical, intent(in) :: l_turb_standalone
+   logical, intent(in) :: l_first_step
+   integer, intent(in) :: macmic_it
 
    logical, intent(out) :: l_open_txt_output
    logical, intent(out) :: l_clse_txt_output
@@ -39,7 +42,7 @@ subroutine set_switches_for_txt_output( single_column, masterproc, l_turb_standa
       ! keep the file open during the entire simulation.
       else
 
-         l_open_txt_output = (is_first_step()) .and. (macmic_it.eq.1)
+         l_open_txt_output = l_first_step .and. (macmic_it.eq.1)
          l_clse_txt_output = .false.
 
       end if
