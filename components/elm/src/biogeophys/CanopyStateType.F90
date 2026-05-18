@@ -79,6 +79,9 @@ module CanopyStateType
      real(r8) , pointer :: fnitr_patch              (:)   ! patch foliage nitrogen limitation factor (-)
      real(r8) , pointer :: i_vc_patch               (:)   ! patch intercept of photosynthesis vcmax ~ leaf n content regression model
      real(r8) , pointer :: s_vc_patch               (:)   ! patch slope of photosynthesis vcmax ~ leaf n content regression model
+     real(r8) , pointer :: crop_patch               (:)   ! patch crop
+     real(r8) , pointer :: nfixer_patch             (:)   ! patch nitrogen
+     
    contains
 
      procedure, public  :: Init
@@ -167,7 +170,8 @@ contains
     allocate(this%fnitr_patch              (begp:endp))           ; this%fnitr_patch              (:)   = spval
     allocate(this%i_vc_patch               (begp:endp))           ; this%i_vc_patch               (:)   = spval
     allocate(this%s_vc_patch               (begp:endp))           ; this%s_vc_patch               (:)   = spval
-
+    allocate(this%crop_patch               (begp:endp))           ; this%s_vc_patch               (:)   = spval
+    allocate(this%nfixer_patch             (begp:endp))           ; this%s_vc_patch               (:)   = spval
 
   end subroutine InitAllocate
 
@@ -385,18 +389,28 @@ contains
          avgflag='A', long_name='slope of regression model', &
          ptr_patch=this%s_vc_patch, default='inactive')
 
-     ! ! 2d arrays
-     ! this%laisun_z_patch(begp:endp,:) = spval
-     ! data2dptr => this%laisun_z_patch(:,1:nlevcan)
-     ! call hist_addfld2d (fname='LAISUN_Z',  units='m2', type2d='levcan', &
-     !      avgflag='A', long_name='sunlit leaf area for canopy layer', &
-     !      standard_name='', ptr_patch=data2dptr)
+    this%crop_patch(begp:endp) = spval
+    call hist_addfld1d (fname='CROP', units='',  &
+         avgflag='A', long_name='crop', &
+         ptr_patch=this%crop_patch, default='inactive')
 
-     ! this%laisha_z_patch(begp:endp,:) = spval
-     ! data2dptr => this%laisha_z_patch(:,1:nlevcan)
-     ! call hist_addfld2d (fname='LAISHA_Z',  units='m2', type2d='levcan', &
-     !      avgflag='A', long_name='shaded leaf area for canopy layer', &
-     !      standard_name='', ptr_patch=data2dptr)
+    this%nfixer_patch(begp:endp) = spval
+    call hist_addfld1d (fname='NFIXER', units='',  &
+         avgflag='A', long_name='nitrogen', &
+         ptr_patch=this%nfixer_patch, default='inactive')
+
+     ! 2d arrays
+     this%laisun_z_patch(begp:endp,:) = spval
+     data2dptr => this%laisun_z_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='LAISUN_Z',  units='m2', type2d='levcan', &
+          avgflag='A', long_name='sunlit leaf area for canopy layer', &
+          standard_name='', ptr_patch=data2dptr)
+
+     this%laisha_z_patch(begp:endp,:) = spval
+     data2dptr => this%laisha_z_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='LAISHA_Z',  units='m2', type2d='levcan', &
+          avgflag='A', long_name='shaded leaf area for canopy layer', &
+          standard_name='', ptr_patch=data2dptr)
 
   end subroutine InitHistory
 

@@ -504,7 +504,7 @@ contains
 
          ! C3 and C4 dependent parameters
 
-         if (c3flag(p)) then
+         if (int(c3flag(p))) then
             qe(p)       = veg_vp%qe(veg_pp%itype(p))       !0._r8
             theta_cj(p) = veg_vp%theta_cj(veg_pp%itype(p)) !0.98_r8
             bbbopt(p)   = veg_vp%bbbopt(veg_pp%itype(p))   !10000._r8
@@ -706,7 +706,7 @@ contains
          else
             ! Leaf maintenance respiration in proportion to vcmax25top
 
-            if (c3flag(p)) then
+            if (int(c3flag(p))) then
                lmr25top = vcmax25top * 0.015_r8
             else
                lmr25top = vcmax25top * 0.025_r8
@@ -738,7 +738,7 @@ contains
             ! Maintenance respiration
 
             lmr25 = lmr25top * nscaler
-            if (c3flag(p)) then
+            if (int(c3flag(p))) then
                lmr_z(p,iv) = lmr25 * ft(t_veg(p), lmrha) * fth(t_veg(p), lmrhd, lmrse, lmrc)
             else
                lmr_z(p,iv) = lmr25 * 2._r8**((t_veg(p)-(tfrz+25._r8))/10._r8)
@@ -775,7 +775,7 @@ contains
                jmax_z(p,iv) = jmax25 * ft(t_veg(p), jmaxha) * fth(t_veg(p), jmaxhd, jmaxse, jmaxc)
                tpu_z(p,iv) = tpu25 * ft(t_veg(p), tpuha) * fth(t_veg(p), tpuhd, tpuse, tpuc)
 
-               if (.not. c3flag(p)) then
+               if (.not. int(c3flag(p))) then
                   vcmax_z(p,iv) = vcmax25 * 2._r8**((t_veg(p)-(tfrz+25._r8))/10._r8)
                   vcmax_z(p,iv) = vcmax_z(p,iv) / (1._r8 + exp( 0.2_r8*((tfrz+15._r8)-t_veg(p)) ))
                   vcmax_z(p,iv) = vcmax_z(p,iv) / (1._r8 + exp( 0.3_r8*(t_veg(p)-(tfrz+40._r8)) ))
@@ -848,7 +848,7 @@ contains
 
                ! Iterative loop for ci beginning with initial guess
 
-               if (c3flag(p)) then
+               if (int(c3flag(p))) then
                   ci_z(p,iv) = 0.7_r8 * cair(p)
                else
                   ci_z(p,iv) = 0.4_r8 * cair(p)
@@ -1511,7 +1511,7 @@ contains
       theta_psii = 0.7_r8
       theta_ip = 0.95_r8
 
-      if (c3flag(p)) then
+      if (int(c3flag(p))) then
          ! C3: Rubisco-limited photosynthesis
          ac(p,iv) = vcmax_z(p,iv) * max(ci-cp(p), 0._r8) / (ci+kc(p)*(1._r8+oair/ko(p)))
 
@@ -2034,7 +2034,7 @@ contains
 
          ! C3 and C4 dependent parameters
 
-         if (c3flag(p)) then
+         if (int(c3flag(p))) then
             qe(p)       = veg_vp%qe(veg_pp%itype(p))       !0._r8
             theta_cj(p) = veg_vp%theta_cj(veg_pp%itype(p)) !0.98_r8
             bbbopt(p)   = veg_vp%bbbopt(veg_pp%itype(p))   !10000._r8
@@ -2254,7 +2254,7 @@ contains
          else
             ! Leaf maintenance respiration in proportion to vcmax25top
 
-            if (c3flag(p)) then
+            if (int(c3flag(p))) then
                lmr25top = vcmax25top * 0.015_r8
             else
                lmr25top = vcmax25top * 0.025_r8
@@ -2295,7 +2295,7 @@ contains
             lmr25_sun = lmr25top * nscaler_sun
             lmr25_sha = lmr25top * nscaler_sha
 
-            if (c3flag(p)) then
+            if (int(c3flag(p))) then
                lmr_z_sun(p,iv) = lmr25_sun * ft(t_veg(p), lmrha) * fth(t_veg(p), lmrhd, lmrse, lmrc)
                lmr_z_sha(p,iv) = lmr25_sha * ft(t_veg(p), lmrha) * fth(t_veg(p), lmrhd, lmrse, lmrc)
             else
@@ -2349,7 +2349,7 @@ contains
                jmax_z(p,sha,iv) = jmax25_sha * ft(t_veg(p), jmaxha) * fth(t_veg(p), jmaxhd, jmaxse, jmaxc)
                tpu_z(p,sha,iv) = tpu25_sha * ft(t_veg(p), tpuha) * fth(t_veg(p), tpuhd, tpuse, tpuc)
 
-               if (.not. c3flag(p)) then
+               if (.not. int(c3flag(p))) then
                   vcmax_z(p,sun,iv) = vcmax25_sun * 2._r8**((t_veg(p)-(tfrz+25._r8))/10._r8)
                   vcmax_z(p,sun,iv) = vcmax_z(p,sun,iv) / (1._r8 + exp( 0.2_r8*((tfrz+15._r8)-t_veg(p)) ))
                   vcmax_z(p,sun,iv) = vcmax_z(p,sun,iv) / (1._r8 + exp( 0.3_r8*(t_veg(p)-(tfrz+40._r8)) ))
@@ -2456,7 +2456,7 @@ contains
 
                ! Iterative loop for ci beginning with initial guess
 
-               if (c3flag(p)) then
+               if (int(c3flag(p))) then
                   ci_z_sun(p,iv) = 0.7_r8 * cair(p)
                   ci_z_sha(p,iv) = 0.7_r8 * cair(p)
                else
@@ -3134,7 +3134,7 @@ contains
             atm2lnd_inst,canopystate_inst,soilstate_inst)
     endif
 
-    if (c3flag(p)) then
+    if (int(c3flag(p))) then
        ! C3: Rubisco-limited photosynthesis
        ac(p,sun,iv) = bsun * vcmax_z(p,sun,iv) * max(cisun-cp(p), 0._r8) / (cisun+kc(p)*(1._r8+oair/ko(p)))
        ac(p,sha,iv) = bsha * vcmax_z(p,sha,iv) * max(cisha-cp(p), 0._r8) / (cisha+kc(p)*(1._r8+oair/ko(p)))

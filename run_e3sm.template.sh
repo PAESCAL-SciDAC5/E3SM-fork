@@ -13,15 +13,15 @@ main() {
 # --- Configuration flags ----
 
 # Machine and project
-readonly MACHINE="pm-cpu"
-readonly PROJECT="m4359"
+readonly MACHINE="dane"
+readonly PROJECT="paescal"
 
 # Simulation
 readonly COMPSET="F2010"
 readonly RESOLUTION="ne30pg2_r05_IcoswISC30E3r5"
 # readonly RESOLUTION="ne30pg2_r05_oECv3"
 # BEFORE RUNNING : CHANGE the following CASE_NAME to desired value
-readonly CASE_NAME="EAMv3_test_canopyfluxes_vegvp_2x5ndays_sfc_inout_"$RESOLUTION
+readonly CASE_NAME="EAMv3_test_canopyfluxes_reducedpelayout_1year_sfc_inout_"$RESOLUTION
 # readonly COMPSET="GMPAS-JRA1p4"
 # readonly RESOLUTION="TL319_WC14to60E2r3"
 # BEFORE RUNNING : CHANGE the following CASE_NAME to desired value
@@ -47,8 +47,8 @@ readonly GET_REFCASE=TRUE
 #readonly RUN_REFDATE=""   # same as MODEL_START_DATE for 'branch', can be different for 'hybrid'
 
 # Set paths
-readonly CASE_ROOT="${SCRATCH}/sfc_cpl/cases/${CASE_NAME}"
-readonly CODE_ROOT="/global/cfs/projectdirs/"${PROJECT}/${USER}"/sfc_cpl/code/E3SM-fork"
+readonly CASE_ROOT="/p/lustre2/dong9/e3sm_scratch/dane/cases/${CASE_NAME}"
+readonly CODE_ROOT="/p/lustre2/dong9/E3SM-maint-3.0"
 
 
 # Sub-directories
@@ -60,7 +60,7 @@ readonly CASE_ARCHIVE_DIR=${CASE_ROOT}/archive
 #               'M_1x10_ndays', 'M2_1x10_ndays', 'M80_1x10_ndays', 'L_1x10_ndays'
 #               * can replace XS, M, etc. with custom-XY with XY being the node count
 #  or 'production' for full simulation
-readonly run='XS_2x5_ndays'
+readonly run='production'
 if [ "${run}" != "production" ]; then
   echo "setting up Short test simulations: ${run}"
   # Short test simulations
@@ -72,8 +72,8 @@ if [ "${run}" != "production" ]; then
 
   readonly CASE_SCRIPTS_DIR=${CASE_ROOT}/tests/${run}/case_scripts
   readonly CASE_RUN_DIR=${CASE_ROOT}/tests/${run}/run
-  readonly PELAYOUT=${layout}
-  readonly WALLTIME="2:00:00"
+  readonly PELAYOUT="custom-8"
+  readonly WALLTIME="1:00:00"
   readonly STOP_OPTION=${units}
   readonly STOP_N=${length}
   readonly REST_OPTION=${STOP_OPTION}
@@ -86,8 +86,8 @@ else
   # Production simulation
   readonly CASE_SCRIPTS_DIR=${CASE_ROOT}/case_scripts
   readonly CASE_RUN_DIR=${CASE_ROOT}/run
-  readonly PELAYOUT="custom-4"
-  readonly WALLTIME="6:00:00"
+  readonly PELAYOUT="custom-8"
+  readonly WALLTIME="3:00:00"
   readonly STOP_OPTION="nmonths"
   readonly STOP_N="15"
   readonly REST_OPTION="nmonths"
@@ -167,16 +167,21 @@ EOF
 
 cat << EOF >> user_nl_elm
 hist_empty_htapes = .true.
-hist_dov2xy = .true.,.true.,.true.
+hist_dov2xy = .true.,.true.
  hist_fincl1 = 'SNOWDP','COL_FIRE_CLOSS','NPOOL','PPOOL','TOTPRODC'
  hist_fincl2 = 'H2OSNO', 'FSNO', 'QRUNOFF', 'QSNOMELT', 'FSNO_EFF', 'SNORDSL', 'SNOW', 'FSDS', 'FSR', 'FLDS', 'FIRE', 'FIRA',
                'UBOT', 'VBOT', 'RHOBOT', 'UGUST', 'THM', 'TG', 'QBOT', 'QG', 'THBOT', 'FORC_HGT_U', 'Z0MG', 'Z0HG', 'Z0QG', 'THV', 'ZII',
                'DISPLA', 'ELAI', 'ESAI', 'Z0MG', 'Z0MV', 'DLEAF', 'HTOP', 'PBOT', 'TV', 'FDRY', 'LAISUN', 'LAISHA', 'RSSUN', 'RSSHA', 
-               'RH', 'FWET', 'QVEGT', 'H2OCAN', 'FRAC_VEG_NOSNO', 'SNOW_DEPTH', 'SoilBeta', 'TSOI', 'FH2OSFC', 'SABV', 'EMV', 'EMG', 'QFLX_EVAP_VEG'
- hist_fincl3 = 'C3PSN', 'SLATOP', 'LEAFCN', 'FLNR', 'FNITR', 'I_VC', 'S_VC', 'LEAFN', 'LEAFP', 'T10'
- hist_mfilt = 1,30,30
- hist_nhtfrq = 0,-24,-24
- hist_avgflag_pertape = 'A','I','I'
+               'RH', 'FWET', 'QVEGT', 'H2OCAN', 'FRAC_VEG_NOSNO', 'SNOW_DEPTH', 'SoilBeta', 'SNO_T', 'TSOI', 'FH2OSFC', 'TH2OSFC' 'SABV', 'EMV', 'EMG', 'QFLX_EVAP_VEG',
+               'C3PSN', 'SLATOP', 'LEAFCN', 'FLNR', 'FNITR', 'I_VC', 'S_VC', 'LEAFN', 'LEAFP', 'T10', 'LAISUN_Z', 'LAISHA_Z',
+               'NRAD', 'VCMAXCINTSUN', 'VCMAXCINTSHA', 'TLAI_Z', 'PARSUN_Z', 'PARSHA_Z',
+               'C3FLAG', 'KC', 'KO', 'CP', 'QE', 'THETA_CJ', 'BBB', 'MBB', 'GB_MOL', 'GS_MOL', 'AC', 'AJ', 'AP', 'AG', 'AN', 'RH_LEAF',
+               'VCMAX_Z', 'TPU_Z', 'KP_Z', 'DAYL', 'MAX_DAYL', 'SNL', 
+               'watsat', 'SOILICE', 'EFF_POROSITY', 'SOILLIQ', 'H2OSOI_LIQVOL', 'SMPSO', 'SMPSC', 'TC_STRESS', 'sucsat',
+               'bsw', 'ROOTFR', 'ROOTR', 'BTRAN', 'BTRAN2', 'RRESIS', 'Z0HV', 'Z0QV'
+ hist_mfilt = 1,30
+ hist_nhtfrq = 0,-24
+ hist_avgflag_pertape = 'A','I'
 
  finidat = '/p/lustre2/dong9/e3sm_inputdata/v3.LR.amip_0101.elm.r.2010-01-01-00000.nc'
  fsurdat = '/p/vast1/e3sm/ccsm3data/inputdata/lnd/clm2/surfdata_map/surfdata_0.5x0.5_simyr1850_c200609_with_TOP.nc'
@@ -184,6 +189,8 @@ hist_dov2xy = .true.,.true.,.true.
 EOF
 
 }
+
+#  hist_fincl3 = 'C3PSN', 'SLATOP', 'LEAFCN', 'FLNR', 'FNITR', 'I_VC', 'S_VC', 'LEAFN', 'LEAFP', 'T10'
 
 #  hist_fincl2 = 'H2OSNO', 'FSNO', 'QRUNOFF', 'QSNOMELT', 'FSNO_EFF', 'SNORDSL', 'SNOW', 'FSDS', 'FSR', 'FLDS', 'FIRE', 'FIRA',
 #                'UBOT', 'VBOT', 'RHOBOT', 'UGUST', 'THM', 'TG', 'QBOT', 'QG', 'THBOT', 'FORC_HGT_U', 'Z0MG', 'Z0HG', 'Z0QG', 'THV', 'ZII',
@@ -376,7 +383,7 @@ then
     pushd ${CASE_SCRIPTS_DIR}
     ./xmlchange NTASKS=$(( $nnodes * $ncore ))
     ./xmlchange NTHRDS=1
-    ./xmlchange LND_NTASKS=400
+    ./xmlchange LND_NTASKS=560
     ./xmlchange MAX_MPITASKS_PER_NODE=$ncore
     ./xmlchange MAX_TASKS_PER_NODE=$ncore
     popd

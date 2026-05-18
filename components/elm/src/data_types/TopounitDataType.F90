@@ -196,6 +196,11 @@ module TopounitDataType
          avgflag='A', long_name='atmospheric partial pressure of CO2', &
          ptr_topo=this%pco2bot,t2g_scale_type='unity')
 
+    this%po2bot(begt:endt) = spval
+    call hist_addfld1d (fname='PO2', units='Pa',  &
+         avgflag='A', long_name='atmospheric partial pressure of O2', &
+         ptr_topo=this%po2bot,t2g_scale_type='unity')
+
     if (use_lch4) then
        this%pch4bot(begt:endt) = spval
        call hist_addfld1d (fname='PCH4', units='Pa',  &

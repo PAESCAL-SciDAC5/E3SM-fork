@@ -59,7 +59,7 @@ module ColumnType
      real(r8), pointer :: zibed        (:) => null() ! bedrock depth in model (interface level at nlevbed)
 
      ! vertical levels
-     integer , pointer :: snl          (:)   => null() ! number of snow layers
+     real(r8), pointer :: snl          (:)   => null() ! number of snow layers
      real(r8), pointer :: dz           (:,:) => null() ! layer thickness (m)  (-nlevsno+1:nlevgrnd)
      real(r8), pointer :: z            (:,:) => null() ! layer depth (m) (-nlevsno+1:nlevgrnd)
      real(r8), pointer :: zi           (:,:) => null() ! interface level below a "z" level (m) (-nlevsno+0:nlevgrnd)
@@ -114,7 +114,7 @@ contains
     allocate(this%active      (begc:endc))                     ; this%active      (:)   = .false.
 
     ! The following is set in initVerticalMod
-    allocate(this%snl         (begc:endc))                     ; this%snl         (:)   = ispval  !* cannot be averaged up
+    allocate(this%snl         (begc:endc))                     ; this%snl         (:)   = spval  !* cannot be averaged up
     allocate(this%dz          (begc:endc,-nlevsno+1:nlevgrnd)) ; this%dz          (:,:) = spval
     allocate(this%z           (begc:endc,-nlevsno+1:nlevgrnd)) ; this%z           (:,:) = spval
     allocate(this%zi          (begc:endc,-nlevsno+0:nlevgrnd)) ; this%zi          (:,:) = spval

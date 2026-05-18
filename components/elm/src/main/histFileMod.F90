@@ -15,6 +15,7 @@ module histFileMod
   use elm_varctl     , only : iulog, use_vertsoilc, use_fates, use_extrasnowlayers
   use elm_varcon     , only : spval, ispval, dzsoi_decomp 
   use elm_varcon     , only : grlnd, nameg, namet, namel, namec, namep
+  use elm_varpar     , only : nlevcan
   use decompMod      , only : get_proc_bounds, get_proc_global, bounds_type
   use GridcellType   , only : grc_pp                
   use LandunitType   , only : lun_pp                
@@ -1902,6 +1903,7 @@ contains
        call ncd_defdim(lnfid, 'levurb' , nlevurb, dimid)
     end if
     call ncd_defdim(lnfid, 'levlak' , nlevlak, dimid)
+    call ncd_defdim(lnfid, 'levcan' , nlevcan, dimid)
     call ncd_defdim(lnfid, 'numrad' , numrad , dimid)
     call ncd_defdim(lnfid, 'month'  , nmonth,  dimid)
     call ncd_defdim(lnfid, 'levsno' , nlevsno , dimid)
@@ -4777,6 +4779,8 @@ contains
        num2d = nlevlak
     case ('numrad')
        num2d = numrad
+    case ('levcan')
+       num2d = nlevcan
     case ('month')
        num2d = nmonth
     case ('levdcmp')

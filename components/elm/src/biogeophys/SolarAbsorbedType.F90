@@ -143,7 +143,7 @@ contains
     ! !USES:
     use shr_infnan_mod, only : nan => shr_infnan_nan, assignment(=)
     use elm_varctl    , only : use_snicar_frc
-    use elm_varpar    , only : nlevsno
+    use elm_varpar    , only : nlevsno, nlevcan
     use histFileMod   , only : hist_addfld1d, hist_addfld2d
     use histFileMod   , only : no_snow_normal
     !
@@ -240,6 +240,18 @@ contains
     call hist_addfld1d (fname='SNOINTABS', units='%', &
          avgflag='A', long_name='Percent of incoming solar absorbed by lower snow layers', &
          ptr_col=this%sub_surf_abs_SW_col, set_lake=spval, set_urb=spval)
+
+     this%parsun_z_patch(begp:endp,:) = spval
+     data2dptr => this%parsun_z_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='PARSUN_Z',  units='W/m^2', type2d='levcan', &
+          avgflag='A', long_name='absorbed PAR for sunlit leaves in canopy layer', &
+          standard_name='', ptr_patch=data2dptr)
+
+     this%parsha_z_patch(begp:endp,:) = spval
+     data2dptr => this%parsha_z_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='PARSHA_Z',  units='W/m^2', type2d='levcan', &
+          avgflag='A', long_name='absorbed PAR for shaded leaves in canopy layer', &
+          standard_name='', ptr_patch=data2dptr)
 
   end subroutine InitHistory
 

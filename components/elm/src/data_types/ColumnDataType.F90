@@ -1491,6 +1491,16 @@ contains
           avgflag='A', long_name='volumetric soil water (vegetated landunits only)', &
            ptr_col=this%h2osoi_vol, l2g_scale_type='veg')
 
+    this%h2osoi_liqvol(begc:endc,:) = spval
+     call hist_addfld2d (fname='H2OSOI_LIQVOL',  units='m3/m3', type2d='levgrnd', &
+          avgflag='A', long_name='volumetric liquid water content (vegetated landunits only)', &
+           ptr_col=this%h2osoi_liqvol, l2g_scale_type='veg')
+
+    this%h2osoi_liqvol(begc:endc,:) = spval
+     call hist_addfld2d (fname='H2OSOI_LIQVOL_ICE',  units='m3/m3', type2d='levgrnd', &
+          avgflag='A', long_name='volumetric liquid water content (ice landunits only)', &
+           ptr_col=this%h2osoi_liqvol, l2g_scale_type='ice')
+
     this%bw(begc:endc,-nlevsno+1:0) = spval
     data2dptr => this%bw(:,-nlevsno+1:0)
      call hist_addfld2d (fname='SNO_BW', units='kg/m3', type2d='levsno', &

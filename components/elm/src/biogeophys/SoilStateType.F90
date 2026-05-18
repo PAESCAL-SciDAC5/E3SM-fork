@@ -92,6 +92,10 @@ module SoilStateType
      real(r8), pointer :: tillage_col          (:)    ! col soil conserved tillage fraction 
      real(r8), pointer :: litho_col            (:)    ! col soil lithology erodiblity index
 
+     real(r8) , pointer :: smpso_patch              (:)   ! patch soil water potential at full stomatal opening (mm)
+     real(r8) , pointer :: smpsc_patch              (:)   ! patch soil water potential at full stomatal closure (mm)
+     real(r8) , pointer :: tc_stress_patch          (:)   ! patch Critial temperature for moisture stress
+
    contains
 
      procedure, public  :: Init
@@ -192,6 +196,10 @@ contains
 
     allocate(this%tillage_col          (begc:endc))                     ; this%tillage_col          (:)   = spval
     allocate(this%litho_col            (begc:endc))                     ; this%litho_col            (:)   = spval
+
+    allocate(this%smpso_patch              (begp:endp))           ; this%smpso_patch              (:)   = spval
+    allocate(this%smpsc_patch              (begp:endp))           ; this%smpsc_patch              (:)   = spval
+    allocate(this%tc_stress_patch          (begp:endp))           ; this%tc_stress_patch          (:)   = spval
 
   end subroutine InitAllocate
 
@@ -320,6 +328,27 @@ contains
             avgflag='A', long_name='water field capacity', &
             ptr_col=this%watfc_col, default='inactive')
     end if
+
+   this%sucsat_col(begc:endc,:) = spval
+   call hist_addfld2d (fname='sucsat', units='mm', type2d='levgrnd', &
+      avgflag='A', long_name='minimum soil suction', &
+      ptr_col=this%sucsat_col, default='inactive')
+
+    this%smpso_patch(begp:endp) = spval
+    call hist_addfld1d (fname='SMPSO', units='mm',  &
+         avgflag='A', long_name='soil water potential at full stomatal opening', &
+         ptr_patch=this%smpso_patch, default='inactive')
+
+    this%smpsc_patch(begp:endp) = spval
+    call hist_addfld1d (fname='SMPSC', units='mm',  &
+         avgflag='A', long_name='soil water potential at full stomatal closure', &
+         ptr_patch=this%smpsc_patch, default='inactive')
+
+    this%tc_stress_patch(begp:endp) = spval
+    call hist_addfld1d (fname='TC_STRESS', units='K',  &
+         avgflag='A', long_name='Critial temperature for moisture stress', &
+         ptr_patch=this%tc_stress_patch, default='inactive')
+
 
   end subroutine InitHistory
 

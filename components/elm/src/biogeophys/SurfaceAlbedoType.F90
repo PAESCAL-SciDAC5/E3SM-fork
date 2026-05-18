@@ -105,7 +105,7 @@ module SurfaceAlbedoType
      real(r8) , pointer :: tlai_z_patch        (:,:) => null() ! patch tlai increment for canopy layer
      real(r8) , pointer :: tsai_z_patch        (:,:) => null() ! patch tsai increment for canopy layer
      integer  , pointer :: ncan_patch          (:)   => null() ! patch number of canopy layers
-     integer  , pointer :: nrad_patch          (:)   => null() ! patch number of canopy layers, above snow for radiative transfer
+     real(r8) , pointer :: nrad_patch          (:)   => null() ! patch number of canopy layers, above snow for radiative transfer
      real(r8) , pointer :: vcmaxcintsun_patch  (:)   => null() ! patch leaf to canopy scaling coefficient, sunlit leaf vcmax
      real(r8) , pointer :: vcmaxcintsha_patch  (:)   => null() ! patch leaf to canopy scaling coefficient, shaded leaf vcmax
 
@@ -324,6 +324,7 @@ contains
     ! !LOCAL VARIABLES:
     integer :: begp, endp
     integer :: begc, endc
+    real(r8), pointer :: data2dptr(:,:), data1dptr(:) ! temp. pointers for slicing larger arrays
     !---------------------------------------------------------------------
 
     begp = bounds%begp; endp = bounds%endp
@@ -353,6 +354,27 @@ contains
     call hist_addfld2d (fname='ALBI', units='proportion', type2d='numrad', &
          avgflag='A', long_name='surface albedo (indirect)', &
          ptr_patch=this%albi_patch, default='inactive', c2l_scale_type='urbanf')
+
+    this%nrad_patch(begp:endp) = spval
+    call hist_addfld1d (fname='NRAD', units='1', &
+         avgflag='A', long_name='number of canopy layers above snow', &
+         ptr_patch=this%nrad_patch, default='inactive')
+
+    this%vcmaxcintsun_patch(begp:endp) = spval
+    call hist_addfld1d (fname='VCMAXCINTSUN', units='1', &
+         avgflag='A', long_name='leaf to canopy scaling coefficient, sunlit leaf vcmax', &
+         ptr_patch=this%vcmaxcintsun_patch, default='inactive')
+
+    this%vcmaxcintsha_patch(begp:endp) = spval
+    call hist_addfld1d (fname='VCMAXCINTSHA', units='1', &
+         avgflag='A', long_name='leaf to canopy scaling coefficient, shaded leaf vcmax', &
+         ptr_patch=this%vcmaxcintsha_patch, default='inactive')
+
+     this%tlai_z_patch(begp:endp,:) = spval
+     data2dptr => this%tlai_z_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='TLAI_Z',  units='m', type2d='levcan', &
+          avgflag='A', long_name='tlai increment for canopy layer', &
+          standard_name='', ptr_patch=data2dptr)
     
   end subroutine InitHistory
 

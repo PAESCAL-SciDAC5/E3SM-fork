@@ -19,7 +19,7 @@ module PhotosynthesisType
   !
   type, public :: photosyns_type
 
-     logical , pointer :: c3flag_patch      (:)   => null()! patch true if C3 and false if C4
+     real(r8), pointer :: c3flag_patch      (:)   => null()! patch true if C3 and false if C4
      real(r8), pointer :: ac_patch          (:,:) => null()! patch Rubisco-limited gross photosynthesis (umol CO2/m**2/s)
      real(r8), pointer :: aj_patch          (:,:) => null()! patch RuBP-limited gross photosynthesis (umol CO2/m**2/s)
      real(r8), pointer :: ap_patch          (:,:) => null()! patch product-limited (C3) or CO2-limited (C4) gross photosynthesis (umol CO2/m**2/s)
@@ -218,7 +218,7 @@ contains
   subroutine InitHistory(this, bounds)
     !
     ! !USES:
-    use histFileMod   , only: hist_addfld1d
+    use histFileMod   , only: hist_addfld1d, hist_addfld2d
     !
     ! !ARGUMENTS:
     class(photosyns_type) :: this
@@ -226,6 +226,7 @@ contains
     !
     ! !LOCAL VARIABLES:
     integer :: begp, endp
+    real(r8), pointer :: data2dptr(:,:), data1dptr(:) ! temp. pointers for slicing larger arrays
     !---------------------------------------------------------------------
 
     begp = bounds%begp; endp= bounds%endp
@@ -337,6 +338,107 @@ contains
     call hist_addfld1d (fname='RSSHA', units='s/m',  &
          avgflag='M', long_name='shaded leaf stomatal resistance', &
          ptr_patch=this%rssha_patch, set_lake=spval, set_urb=spval, default='inactive')
+
+    this%c3flag_patch(begp:endp) = spval
+    call hist_addfld1d (fname='C3FLAG', units='1',  &
+         avgflag='A', long_name='flag for C3', &
+         ptr_patch=this%c3flag_patch, default='inactive')
+
+    this%kc_patch(begp:endp) = spval
+    call hist_addfld1d (fname='KC', units='Pa',  &
+         avgflag='A', long_name='Michaelis-Menten constant for CO2', &
+         ptr_patch=this%kc_patch, default='inactive')
+
+    this%ko_patch(begp:endp) = spval
+    call hist_addfld1d (fname='KO', units='Pa',  &
+         avgflag='A', long_name='Michaelis-Menten constant for O2', &
+         ptr_patch=this%ko_patch, default='inactive')
+
+    this%cp_patch(begp:endp) = spval
+    call hist_addfld1d (fname='CP', units='Pa',  &
+         avgflag='A', long_name='CO2 compensation point', &
+         ptr_patch=this%cp_patch, default='inactive')
+
+    this%qe_patch(begp:endp) = spval
+    call hist_addfld1d (fname='QE', units='mol CO2/mol photons',  &
+         avgflag='A', long_name='quantum efficiency, used only for C4', &
+         ptr_patch=this%qe_patch, default='inactive')
+
+    this%theta_cj_patch(begp:endp) = spval
+    call hist_addfld1d (fname='THETA_CJ', units='1',  &
+         avgflag='A', long_name='empirical curvature parameter for ac, aj photosynthesis co-limitation', &
+         ptr_patch=this%theta_cj_patch, default='inactive')
+
+    this%bbb_patch(begp:endp) = spval
+    call hist_addfld1d (fname='BBB', units='umol H2O/m^2/s',  &
+         avgflag='A', long_name='Ball-Berry minimum leaf conductance', &
+         ptr_patch=this%bbb_patch, default='inactive')
+
+    this%mbb_patch(begp:endp) = spval
+    call hist_addfld1d (fname='MBB', units='umol H2O/m^2/s',  &
+         avgflag='A', long_name='Ball-Berry slope of conductance-photosynthesis relationship', &
+         ptr_patch=this%mbb_patch, default='inactive')
+
+    this%gb_mol_patch(begp:endp) = spval
+    call hist_addfld1d (fname='GB_MOL', units='umol H2O/m^2/s',  &
+         avgflag='A', long_name='leaf boundary layer conductance', &
+         ptr_patch=this%gb_mol_patch, default='inactive')
+
+   ! 2D arrays
+     this%gs_mol_patch(begp:endp,:) = spval
+     data2dptr => this%gs_mol_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='GS_MOL',  units='umol H2O/m^2/s', type2d='levcan', &
+          avgflag='A', long_name='leaf stomatal conductance', &
+          standard_name='', ptr_patch=data2dptr)
+
+     this%ac_patch(begp:endp,:) = spval
+     data2dptr => this%ac_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='AC',  units='umol CO2/m^2/s', type2d='levcan', &
+          avgflag='A', long_name='Rubisco-limited gross photosynthesis', &
+          standard_name='', ptr_patch=data2dptr)
+
+     this%aj_patch(begp:endp,:) = spval
+     data2dptr => this%aj_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='AJ',  units='umol CO2/m^2/s', type2d='levcan', &
+          avgflag='A', long_name='RuBP-limited gross photosynthesis', &
+          standard_name='', ptr_patch=data2dptr)
+
+     this%ap_patch(begp:endp,:) = spval
+     data2dptr => this%ap_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='AP',  units='umol CO2/m^2/s', type2d='levcan', &
+          avgflag='A', long_name='product-limited (C3) or CO2-limited (C4) gross photosynthesis', &
+          standard_name='', ptr_patch=data2dptr)
+
+     this%ag_patch(begp:endp,:) = spval
+     data2dptr => this%ag_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='AG',  units='umol CO2/m^2/s', type2d='levcan', &
+          avgflag='A', long_name='co-limited gross leaf photosynthesis', &
+          standard_name='', ptr_patch=data2dptr)
+
+     this%an_patch(begp:endp,:) = spval
+     data2dptr => this%an_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='AN',  units='umol CO2/m^2/s', type2d='levcan', &
+          avgflag='A', long_name='net leaf photosynthesis', &
+          standard_name='', ptr_patch=data2dptr)
+
+     this%vcmax_z_patch(begp:endp,:) = spval
+     data2dptr => this%vcmax_z_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='VCMAX_Z',  units='umol CO2/m^2/s', type2d='levcan', &
+          avgflag='A', long_name='maximum rate of carboxylation', &
+          standard_name='', ptr_patch=data2dptr)
+
+     this%tpu_z_patch(begp:endp,:) = spval
+     data2dptr => this%tpu_z_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='TPU_Z',  units='umol CO2/m^2/s', type2d='levcan', &
+          avgflag='A', long_name='triose phosphate utilization rate', &
+          standard_name='', ptr_patch=data2dptr)
+
+     this%kp_z_patch(begp:endp,:) = spval
+     data2dptr => this%kp_z_patch(:,1:nlevcan)
+     call hist_addfld2d (fname='KP_Z',  units='1', type2d='levcan', &
+          avgflag='A', long_name='initial slope of CO2 response curve (C4 plants)', &
+          standard_name='', ptr_patch=data2dptr)
+
 
   end subroutine InitHistory
 

@@ -315,6 +315,7 @@ contains
     use shr_kind_mod         , only : r8 => shr_kind_r8
     use decompMod            , only : bounds_type
     use elm_varcon           , only : tfrz      !temperature where water freezes [K], this is taken as constant at the moment
+    use CanopyStateType      , only : canopystate_type
     use VegetationPropertiesType     , only : veg_vp
     use SoilStateType        , only : soilstate_type
     use EnergyFluxType       , only : energyflux_type
@@ -346,6 +347,10 @@ contains
          tc_stress     => veg_vp%tc_stress              , & ! Input:  [real(r8)       ]  critical soil temperature for soil water stress (C)
          t_soisno      => col_es%t_soisno     , & ! Input:  [real(r8) (:,:) ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
 
+         smpso_patch   => soilstate_vars%smpso_patch      , &
+         smpsc_patch   => soilstate_vars%smpsc_patch      , &
+         tc_stress_patch   => soilstate_vars%tc_stress_patch      , &
+
          watsat        => soilstate_vars%watsat_col         , & ! Input:  [real(r8) (:,:) ]  volumetric soil water at saturation (porosity)   (constant)
          sucsat        => soilstate_vars%sucsat_col         , & ! Input:  [real(r8) (:,:) ]  minimum soil suction (mm)                        (constant)
          bsw           => soilstate_vars%bsw_col            , & ! Input:  [real(r8) (:,:) ]  Clapp and Hornberger "b"                         (constant)
@@ -365,6 +370,11 @@ contains
             p = filterp(f)
             c = veg_pp%column(p)
             l = veg_pp%landunit(p)
+
+            ! write variables to patch arrays for history tapes
+            smpso_patch(p) = smpso(veg_pp%itype(p))
+            smpsc_patch(p) = smpsc(veg_pp%itype(p))
+            tc_stress_patch(p) = tc_stress
 
             ! Root resistance factors
             ! rootr effectively defines the active root fraction in each layer

@@ -633,10 +633,18 @@ contains
             avgflag='A', long_name='daylength', &
             ptr_gcell=grc_pp%dayl, default='inactive')
 
+       call hist_addfld1d (fname='MAX_DAYL',  units='s', &
+            avgflag='A', long_name='maximum daylength', &
+            ptr_gcell=grc_pp%max_dayl, default='inactive')
+
        call hist_addfld1d (fname='PREV_DAYL', units='s', &
             avgflag='A', long_name='daylength from previous timestep', &
             ptr_gcell=grc_pp%prev_dayl, default='inactive')
     end if
+
+   call hist_addfld1d (fname='SNL',  units='1', &
+      avgflag='A', long_name='number of snow layers', &
+      ptr_col=col_pp%snl, default='inactive')
 
     ! ------------------------------------------------------------------------
     ! Initialize component data structures

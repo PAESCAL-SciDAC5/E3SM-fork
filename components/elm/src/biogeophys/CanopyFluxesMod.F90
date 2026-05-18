@@ -368,6 +368,8 @@ contains
          altmax_indx          => canopystate_vars%altmax_indx_col          , & ! Input:  [integer  (:)   ]  maximum annual depth of thaw
 
          dleaf_patch          => canopystate_vars%dleaf_patch              , & ! Output: [real(r8) (:)   ]  mean leaf diameter for this patch/pft
+         crop_patch           => canopystate_vars%crop_patch               , & ! Output: [real(r8) (:)   ]  crop logical for this patch/pft
+         nfixer_patch         => canopystate_vars%nfixer_patch             , & ! Output: [real(r8) (:)   ]  nitrogen logical for this patch/pft
          c3psn_patch          => canopystate_vars%c3psn_patch              , & ! Output: [real(r8) (:)   ]  photosynthetic pathway: 0. = c4, 1. = c3 for this patch/pft
          slatop_patch         => canopystate_vars%slatop_patch             , & ! Output: [real(r8) (:)   ]  specific leaf area at top of canopy, projected area basis [m^2/gC] for this patch/pft
          leafcn_patch         => canopystate_vars%leafcn_patch             , & ! Output: [real(r8) (:)   ]  leaf C:N (gC/gN) for this patch/pft
@@ -824,10 +826,13 @@ contains
                dleaf_patch(p) = dleaf(veg_pp%itype(p))
                c3psn_patch(p) = c3psn(veg_pp%itype(p))
                slatop_patch(p) = slatop(veg_pp%itype(p))
+               leafcn_patch(p) = leafcn(veg_pp%itype(p))
                flnr_patch(p) = flnr(veg_pp%itype(p))
                fnitr_patch(p) = fnitr(veg_pp%itype(p))
                i_vc_patch(p) = i_vc(veg_pp%itype(p))
                s_vc_patch(p) = s_vc(veg_pp%itype(p))
+               crop_patch(p) = crop(veg_pp%itype(p))
+               nfixer_patch(p) = nfixer(veg_pp%itype(p))
             end if
 
 
