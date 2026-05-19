@@ -250,7 +250,7 @@ subroutine shoc_main ( &
 #endif
 
   use cam_history,    only: outfld
-  use turb_test,      only: txt_write_one_column
+  use turb_test_utils,only: txt_write_one_column
 
   implicit none
 
@@ -414,6 +414,10 @@ subroutine shoc_main ( &
               wv_a(shcol),wl_a(shcol)
 
   integer :: kk
+
+  integer,parameter :: txtout_nvar_max = 20
+  real(rtype) :: txtout_array(nlev,txtout_nvar_max)
+  integer     :: iv 
 
   real(rtype) :: thv_updated(shcol,nlev)
 
@@ -585,13 +589,22 @@ subroutine shoc_main ( &
     ! Write out fields to text file
 
     if (l_txt_write.and.masterproc) then
-         call txt_write_one_column( txtout_unit, t*dtime, nlev,         &
-                                    u_wind(1,:), v_wind(1,:), tke(1,:), &
-                                    qw(1,:)-shoc_ql(1,:),               &! qv
-                                   shoc_ql(1,:),                        &! qc
-                                    thetal(1,:)/inv_exner(1,:) + lcond/cp * shoc_ql(1,:), &! temperature
-                                    thetal(1,:), &
-                                      pres(1,:)  )! pressure
+
+       ! Reminder: txtout_varnames(1:txtout_nvar) = (/"time","k","zm","pmid","u","v","tke","qv","qc","cldf","T","qt","thlm"/)
+       iv = 0
+       iv = iv + 1; txtout_array(:,iv) = zt_grid(1,:) ! height above sfc
+       iv = iv + 1; txtout_array(:,iv) =    pres(1,:) ! pressure
+       iv = iv + 1; txtout_array(:,iv) =  u_wind(1,:)
+       iv = iv + 1; txtout_array(:,iv) =  v_wind(1,:)
+       iv = iv + 1; txtout_array(:,iv) =     tke(1,:)
+       iv = iv + 1; txtout_array(:,iv) =      qw(1,:) - shoc_ql(1,:) ! qv 
+       iv = iv + 1; txtout_array(:,iv) = shoc_ql(1,:)
+       iv = iv + 1; txtout_array(:,iv) = shoc_cldfrac(1,:)
+       iv = iv + 1; txtout_array(:,iv) =  thetal(1,:)/inv_exner(1,:) + lcond/cp * shoc_ql(1,:)  ! temperature
+       iv = iv + 1; txtout_array(:,iv) =      qw(1,:)                ! qt
+       iv = iv + 1; txtout_array(:,iv) =  thetal(1,:)
+
+       call txt_write_one_column( txtout_unit, t*dtime, nlev, iv, txtout_array )
     end if
     !---------------------------------------------
 

@@ -580,7 +580,7 @@ end function shoc_implements_cnst
     use conditional_diag,      only: cnd_diag_t
     use conditional_diag_main, only: cnd_diag_checkpoint
 
-    use turb_test, only: set_switches_for_txt_output, txt_file_open_and_init, txt_write_one_column
+    use turb_test_utils, only: set_switches_for_txt_output, txt_file_open_and_init, txt_write_one_column
 
     implicit none
 
@@ -718,7 +718,12 @@ end function shoc_implements_cnst
    integer, save :: txtout_unit
    integer :: i_shoc_main
 
-   integer :: kk
+   integer,parameter :: txtout_nvar_max = 20
+   character(len=22) :: txtout_varnames(txtout_nvar_max) = ""
+   integer           :: txtout_nvar                      ! actual number of variables to be written to txt file(s)
+
+   real(r8) :: txtout_array(pver,txtout_nvar_max)
+   integer  :: iv 
 
    integer :: hdtime_int
    integer :: endtime
@@ -1023,7 +1028,12 @@ end function shoc_implements_cnst
                                      l_open_txt_output, l_clse_txt_output          )! out
 
    ! Open txt output file if it's time to do so
-   if (l_open_txt_output) call txt_file_open_and_init( shoc_output_prefix, get_nstep(), macmic_it, txtout_unit )
+
+   txtout_nvar = 13
+   txtout_varnames(1:txtout_nvar) = (/"time","k","zm","pmid","u","v","tke","qv","qc","cldf","T","qt","thlm"/)
+   if (l_open_txt_output) call txt_file_open_and_init( shoc_output_prefix, get_nstep(), macmic_it,  &! in
+                                                       txtout_nvar, txtout_varnames(1:txtout_nvar), &! in
+                                                       txtout_unit                                  )! out
 
    ! Write statement inside shoc_main will only be executed when the simulation
    ! is run in an SCM "turb standalone" model when the nadv loop inside shoc_main
@@ -1073,13 +1083,24 @@ end function shoc_implements_cnst
                        +  dtime * i_shoc_main
          end if
 
-         call txt_write_one_column( txtout_unit, modeltime, pver,  &
-                                    um(1,:), vm(1,:), tke_zt(1,:), &
-                                   rtm(1,:) - rcm(1,:),            &
-                                   rcm(1,:),                       &
-                                  thlm(1,:) / inv_exner(1,:) + latvap/cpair * rcm(1,:), &! temperature
-                                  thlm(1,:),                       &
-                                  state1%pmid(1,:)                 )
+         ! Reminder: txtout_varnames(1:txtout_nvar) = (/"time","k","zm","pmid","u","v","tke","qv","qc","cldf","T","qt","thlm"/)
+
+         iv = 0
+         iv = iv + 1; txtout_array(:,iv) =  zt_g(1,:)
+         iv = iv + 1; txtout_array(:,iv) =  state1%pmid(1,:)
+         iv = iv + 1; txtout_array(:,iv) =  um(1,:)
+         iv = iv + 1; txtout_array(:,iv) =  vm(1,:)
+         iv = iv + 1; txtout_array(:,iv) =  tke_zt(1,:)
+         iv = iv + 1; txtout_array(:,iv) =  rtm(1,:) - rcm(1,:) ! qv
+         iv = iv + 1; txtout_array(:,iv) =  rcm(1,:)
+         iv = iv + 1; txtout_array(:,iv) =  cloud_frac(1,:)
+         iv = iv + 1; txtout_array(:,iv) =  thlm(1,:) / inv_exner(1,:) + latvap/cpair * rcm(1,:)  ! temperature
+         iv = iv + 1; txtout_array(:,iv) =   rtm(1,:)
+         iv = iv + 1; txtout_array(:,iv) =  thlm(1,:)
+
+         if (iv.ne.(txtout_nvar-2)) call endrun('call txt_write_one_column: iv and txtout_nvar are inconsistent')
+         call txt_write_one_column( txtout_unit, modeltime, pver, iv, txtout_array )
+
       end if !-----------
 
   end do  ! end i_shoc_main loop
