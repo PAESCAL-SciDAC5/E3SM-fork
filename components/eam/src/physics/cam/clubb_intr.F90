@@ -505,7 +505,7 @@ end subroutine clubb_init_cnst
     clubb_ipdf_call_placement = -999
    ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
    clubb_output_prefix = ''
-   l_clubb_outer_loop = .true.
+   l_clubb_outer_loop = .false.
    ! <<< CLUBB_INOUT_CHANGES END
 
 
@@ -1205,6 +1205,8 @@ end subroutine clubb_init_cnst
    use conditional_diag,      only: cnd_diag_t
    use conditional_diag_main, only: cnd_diag_checkpoint
 
+   use turb_test_utils, only: set_switches_for_txt_output, txt_file_open_and_init, txt_write_one_column
+
 #ifdef CLUBB_SGS
    use hb_diff,                   only: pblintd
    use iop_data_mod,              only: single_column
@@ -1303,14 +1305,26 @@ end subroutine clubb_init_cnst
    ! for single-column mode only:
    character(len=8) :: numstr         ! a string like "_0001" that corresponds to a single value of CLUBB's timestep counter t
    integer :: turb_nadv_out_nstep     ! # of CLUBB's time steps to write out fields for
+
    ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
    integer :: i_clubb_main
-   integer :: txtout_unit
-   integer :: kk
-   logical :: l_inner_write
+
+   real(r8) :: modeltime
+
+   logical :: l_open_txt_output ! Open  ASCII output file in SCM mode
+   logical :: l_clse_txt_output ! Close ASCII output file in SCM mode
+
+   integer, save :: txtout_unit
    character(len=256) :: txt_output_prefix
    character(len=512) :: outfname
-   character(len=*), parameter :: clubb_txt_fmt = '(I5,1X,I4,F12.5, 5(1X,F17.14),1X,F16.12,1X,F17.10)'
+
+   integer,parameter :: txtout_nvar_max = 20
+   character(len=22) :: txtout_varnames(txtout_nvar_max) = ""
+   integer           :: txtout_nvar                      ! actual number of variables to be written to txt file(s)
+
+   real(r8) :: txtout_array(pver,txtout_nvar_max)
+   integer  :: iv
+
    ! this one is for getting input for CLUBB in-n-out mode
    real(core_rknd) :: pdel_input(pverp)
    ! <<< CLUBB_INOUT_CHANGES END
@@ -1940,10 +1954,9 @@ end subroutine clubb_init_cnst
 
    !  determine number of timesteps CLUBB core should be advanced,
    !  host time step divided by CLUBB time step
-   nadv = max(hdtime_core_rknd/dtime,1._core_rknd)
-   ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
-   clubb_num_steps = max(int(hdtime_core_rknd/dtime),1)
+   clubb_num_steps = max(hdtime_core_rknd/dtime,1._core_rknd)
 
+   ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
    if (l_clubb_outer_loop) then
       n_clubb_main_calls = clubb_num_steps
       nadv = 1
@@ -1951,6 +1964,16 @@ end subroutine clubb_init_cnst
       n_clubb_main_calls = 1
       nadv = clubb_num_steps
    end if
+
+   ! Send info to iulog to double check
+
+   if (masterproc.and.is_first_step()) then
+      write(iulog,*) 'clubb_num_steps    = ', clubb_num_steps
+      write(iulog,*) 'n_clubb_main_calls = ', n_clubb_main_calls
+      write(iulog,*) 'nadv               = ', nadv
+      write(iulog,*) 'do_expldiff        = ', do_expldiff
+   end if
+
    ! <<< CLUBB_INOUT_CHANGES END
 
    minqn = 0._r8
@@ -2391,10 +2414,14 @@ end subroutine clubb_init_cnst
          pdf_params_zm%mixt_frac = pdf_zm_mixt_frac_inout
       end if
 
-      ! ---------------------------------------------------------------------------
+      ! ----------------------------------------------------------------------------------
       ! Initialization/preparation for "standalone"/"in-and-out" test (only in SCM mode)
+      ! In this mode, we overwrite the ICs that have been read in from IOP file during
+      ! SCM initialization, then diagnose various additional variables that are sent to
+      ! subr. advance_clubb_core_api as input varialbes.
+      ! We also overwrite the surface fluxes using prescribed values.
       ! - Heng XIAO
-      ! ---------------------------------------------------------------------------
+      ! ----------------------------------------------------------------------------------
       if (l_turb_standalone) then
 
          ! (1) Set the height levels (zt_g, zi_g), 
@@ -2404,11 +2431,14 @@ end subroutine clubb_init_cnst
          ! and sfc fluxes (wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc)
          ! directly using SHOC IC file.
          ! All the profile variables are on zt_g levels with the ghost level filled already.
+
          call read_and_set_input_to_clubb_core( &
               ncol, zt_g, zi_g, p_in_Pa, exner, pdel_input, thv_ds_zt, &
               wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, &
               thlm_in, rtm_in, um_in, vm_in, rcm_inout, cloud_frac_inout )
+
          ! (2) Calculate derived variables 
+
          do k = 1, pver
             dz_g(k) = zi_g(k+1) - zi_g(k)
             rho_ds_zt(k+1) = invrs_gravit * pdel_input(k+1) / dz_g(k)
@@ -2444,63 +2474,62 @@ end subroutine clubb_init_cnst
          !     these two seems to be read in through the state data structure.
          !     edscrl_in is probably irrelevant for now,
          !     rfrzm is set to zero here just to be safe,
+
          rfrzm(:) = 0._core_rknd
+
          !     (iv) wm_zm and wm_zts,
          !     also set to zero here to be safe,
+
          wm_zm = 0._core_rknd
          wm_zt = 0._core_rknd
+
          !     (v) upwp_sfc_pert, vpwp_sfc_pert, um_pert_col, vm_pert_col,
          !     upwp_pert_col, vpwp_pert_col for linearize_pbl_winds
          !     (vi) varmu2 for clubb_do_deep 
          !     (vii) misc: dtime, l_implemented, error_code, host_dx, host_dy, hydromet_dim
 
          ! (4) set the heights and parameters again for CLUBB internals
+
          call setup_grid_heights_api(l_implemented, grid_type, zi_g(2), &
             zi_g(1), zi_g, zt_g)
          call setup_parameters_api(zi_g(2), clubb_params, pverp, grid_type, &
-            zi_g, zt_g, err_code)     
-      end if
+            zi_g, zt_g, err_code)
 
+      end if ! if l_turb_standalone
+
+      ! When running the SCM but not in the "standalone"/"in-and-out" mode, still
+      ! overwrite the surface fluxes using prescribed values.
       if ((.not. l_turb_standalone) .and. single_column) then
          call read_and_set_sfc_input_to_clubb_core( &
               ncol, wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc)
       end if
 
-      ! Open txt file for output (SCM only)
-      ! if (l_turb_standalone .and. masterproc) then
-      if (single_column .and. masterproc) then
+      !wprtp_sfc = 0._core_rknd  ! only for sensitivity test
+      !wpthlp_sfc = 0._core_rknd ! only for sensitivity test 
 
-         txt_output_prefix = 'clubb_output'
-         if (len_trim(clubb_output_prefix) > 0) txt_output_prefix = trim(clubb_output_prefix)
+      !--------------------------------------------------------------------------------------------
+      ! Prepare for txt output. Only relevant when this is the master MPI process in an SCM run.
+      !--------------------------------------------------------------------------------------------
+      call set_switches_for_txt_output( single_column, masterproc, l_turb_standalone, &! in
+                                        is_first_step(), macmic_it,                   &! in
+                                        l_open_txt_output, l_clse_txt_output          )! out
 
-         ! write out surface fluxes for verification
-         txtout_unit = getunit()
-         write(outfname, '(A,A, 4(A,I0),A)') trim(txt_output_prefix), '_sfc', &
-                                 '_nadv', nadv, '_x_clubb', n_clubb_main_calls, &
-                                 '_nstep', get_nstep(), '_macmicsub', macmic_it, &
-                                 '.txt'
-         open(txtout_unit, file=trim(outfname), status='replace')
+      ! Open txt output file if it's time to do so
 
-         write(txtout_unit,*) 'wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc'
-         write(txtout_unit,*) wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc
-         close(txtout_unit)
-         call freeunit(txtout_unit)
+      txtout_nvar = 13
+      txtout_varnames(1:txtout_nvar) = (/"time","k","zm","pmid","u","v","tke","qv","qc","cldf","T","qt","thlm"/)
+      if (l_open_txt_output) call txt_file_open_and_init( clubb_output_prefix, get_nstep(), macmic_it,  &! in
+                                                          txtout_nvar, txtout_varnames(1:txtout_nvar),  &! in
+                                                          txtout_unit                                   )! out
 
-         write(outfname, '(A,4(A,I0),A)') trim(txt_output_prefix), &
-                                          '_nadv', nadv, '_x_clubb', n_clubb_main_calls, &
-                                          '_nstep', get_nstep(), '_macmicsub', macmic_it, &
-                                          '.txt'
-
-         txtout_unit = getunit()
-         open(txtout_unit, file=trim(outfname), status='replace')
-         write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), z, u, v, tke, qt, qc, tl, P'
-
-         write(iulog,*) 'clubb_num_steps    = ', clubb_num_steps
-         write(iulog,*) 'n_clubb_main_calls = ', n_clubb_main_calls
-         write(iulog,*) 'nadv              = ', nadv
+      if (l_open_txt_output) then
+         write(iulog,*) 'clubb_intr in SCM =========='
+         write(iulog,*) '  wpthlp_sfc = ', wpthlp_sfc
+         write(iulog,*) '   wprtp_sfc = ',  wprtp_sfc
+         write(iulog,*) '    upwp_sfc = ',   upwp_sfc
+         write(iulog,*) '    vpwp_sfc = ',   vpwp_sfc
+         write(iulog,*) 'clubb_intr in SCM =========='
       end if
-
-      l_inner_write = single_column .and. (.not.l_clubb_outer_loop)
 
       ! ------------------------------------------------------------- !
       ! Time integration for CLUBB only
@@ -2627,49 +2656,45 @@ end subroutine clubb_init_cnst
              call outfld( 'CLDFRAC'//trim(adjustl(numstr)), cloud_frac_inout(pverp:2:-1),ncol,lchnk)
           end if
 
-          ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
-          ! inner loop output
-          if (l_inner_write .and. masterproc) then
-             do kk=pver,1,-1
-                ixind = pverp-kk+1
-                write(txtout_unit,clubb_txt_fmt) t*nint(real(dtime, kind=r8)), &
-                     kk-1, &
-                     real(zt_g(ixind), kind=r8), &
-                     real(um_in(ixind), kind=r8), &
-                     real(vm_in(ixind), kind=r8), &
-                     0.5_r8*(real(up2_in(ixind), kind=r8)+real(vp2_in(ixind), kind=r8)+real(wp2_in(ixind), kind=r8)), &
-                     real(rtm_in(ixind), kind=r8), &
-                     real(rcm_inout(ixind), kind=r8), &
-                     real(thlm_in(ixind), kind=r8), &
-                     real(p_in_Pa(ixind), kind=r8)
-             end do
-          end if
-          ! <<< CLUBB_INOUT_CHANGES END
+          if (single_column.and.masterproc) then
 
-      enddo  ! end time loop
+             if (l_turb_standalone) then
+                modeltime = t * real(dtime, kind=r8)
+             else
+                modeltime =  hdtime * ( get_nstep() * cld_macmic_num_steps + macmic_it - 1 ) &
+                           + real(dtime, kind=r8) * t 
+             end if
+
+             ! Reminder: txtout_varnames(1:txtout_nvar) = (/"time","k","zm","pmid","u","v","tke","qv","qc","cldf","T","qt","thlm"/)
+
+             iv = 0
+             iv = iv + 1; txtout_array(:,iv) =  real(      zt_g(pverp:2:-1),kind=r8 )
+             iv = iv + 1; txtout_array(:,iv) =  real(   p_in_Pa(pverp:2:-1),kind=r8 )
+             iv = iv + 1; txtout_array(:,iv) =  real(     um_in(pverp:2:-1),kind=r8 )
+             iv = iv + 1; txtout_array(:,iv) =  real(     vm_in(pverp:2:-1),kind=r8 )
+
+             iv = iv + 1; txtout_array(:,iv) =  0.5_r8*real( up2_in(pverp:2:-1)+vp2_in(pverp:2:-1)+wp2_in(pverp:2:-1), kind=r8 )
+
+             iv = iv + 1; txtout_array(:,iv) =  real(    rtm_in(pverp:2:-1)-rcm_inout(pverp:2:-1), kind=r8 )  ! qv
+             iv = iv + 1; txtout_array(:,iv) =  real( rcm_inout(pverp:2:-1),kind=r8 )
+             iv = iv + 1; txtout_array(:,iv) =  real( cloud_frac_inout(pverp:2:-1),kind=r8 ) 
+
+             iv = iv + 1; txtout_array(:,iv) =  real(thlm_in(pverp:2:-1),kind=r8) / exner_clubb(i,1:pver) &
+                                              + latvap/cpair * real( rcm_inout(pverp:2:-1),kind=r8 )  ! temperature
+
+             iv = iv + 1; txtout_array(:,iv) =  real(    rtm_in(pverp:2:-1), kind=r8 )
+             iv = iv + 1; txtout_array(:,iv) =  real(   thlm_in(pverp:2:-1), kind=r8 ) 
+
+             if (iv.ne.(txtout_nvar-2)) call endrun('call txt_write_one_column: iv and txtout_nvar are inconsistent')
+             call txt_write_one_column( txtout_unit, modeltime, pver, iv, txtout_array )
+
+          end if !-----------
+
+      enddo  ! end time loop t=1,nadv
+      end do  ! end i_clubb_main loop
       call t_stopf('adv_clubb_core_ts_loop')
 
-      ! >>> CLUBB_INOUT_CHANGES BEGIN - Heng XIAO
-      ! outer loop output
-      if (single_column .and. l_clubb_outer_loop .and. masterproc) then
-         do kk=pver,1,-1
-            ixind = pverp-kk+1
-            write(txtout_unit,clubb_txt_fmt) i_clubb_main*nint(real(dtime, kind=r8)), &
-                 kk-1, &
-                 real(zt_g(ixind), kind=r8), &
-                 real(um_in(ixind), kind=r8), &
-                 real(vm_in(ixind), kind=r8), &
-                 0.5_r8*(real(up2_in(ixind), kind=r8)+real(vp2_in(ixind), kind=r8)+real(wp2_in(ixind), kind=r8)), &
-                 real(rtm_in(ixind), kind=r8), &
-                 real(rcm_inout(ixind), kind=r8), &
-                 real(thlm_in(ixind), kind=r8), &
-                 real(p_in_Pa(ixind), kind=r8)
-         end do
-      end if
-
-      end do  ! end i_clubb_main loop
-
-      if (single_column .and. masterproc) then
+      if (l_clse_txt_output) then
          close(txtout_unit)
          call freeunit(txtout_unit)
       end if
