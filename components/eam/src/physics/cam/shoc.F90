@@ -32,8 +32,6 @@ logical :: use_cxx = .true.
 real(rtype), parameter, public :: largeneg = -99999999.99_rtype
 real(rtype), parameter, public :: pi = 3.14159265358979323_rtype
 
-!character(len=*), parameter, public :: fmt = '(i8,i4,20ES22.13)'
-character(len=*), parameter, public :: fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)'
 !=========================================================
 ! Physical constants used in SHOC
 !=========================================================
@@ -252,6 +250,7 @@ subroutine shoc_main ( &
 #endif
 
   use cam_history,    only: outfld
+  use turb_test_utils,only: txt_write_one_column
 
   implicit none
 
@@ -416,6 +415,12 @@ subroutine shoc_main ( &
 
   integer :: kk
 
+  integer,parameter :: txtout_nvar_max = 20
+  real(rtype) :: txtout_array(nlev,txtout_nvar_max)
+  integer     :: iv 
+
+  real(rtype) :: thv_updated(shcol,nlev)
+
 #ifdef SCREAM_CONFIG_IS_CMAKE
   integer :: clock_count1, clock_count_rate, clock_count_max, clock_count2, clock_count_diff
 #endif
@@ -496,12 +501,15 @@ subroutine shoc_main ( &
        ustar,obklen,kbfs,shoc_cldfrac,&     ! Input
        pblh)                                ! Output
 
+    thv_updated(:,:)= (thetal(:,:)+(lcond/cp)*shoc_ql(:,:)*inv_exner(:,:)) &
+                     *(1._rtype+eps*(qw(:,:) - shoc_ql(:,:))-shoc_ql(:,:))
+
     ! Update the turbulent length scale
     call shoc_length(&
        shcol,nlev,nlevi,&                ! Input
        host_dx,host_dy,&                 ! Input
        zt_grid,zi_grid,dz_zt,&           ! Input
-       tke,thv,&                         ! Input
+       tke,thv_updated,&                 ! Input
        brunt,shoc_mix)                   ! Output
 
     ! Advance the SGS TKE equation
@@ -578,18 +586,25 @@ subroutine shoc_main ( &
     end if
 
     !---------------------------------------------
-    ! Write out fields to SHOC text output file
+    ! Write out fields to text file
 
     if (l_txt_write.and.masterproc) then
-      do kk=nlev,1,-1
-         write(txtout_unit,fmt) t*nint(dtime),                                           &! time elapsed inside this subroutine 
-                                kk-1,                                                    &! vertical layer index (0 = TOM, nlev - 1 = sfc)
-                                u_wind(1,kk), v_wind(1,kk), tke(1,kk),                   &! u, v, and tke
-                                    qw(1,kk)-shoc_ql(1,kk),                              &! qv
-                               shoc_ql(1,kk),                                            &! qc
-                                thetal(1,kk)/inv_exner(1,kk) + lcond/cp * shoc_ql(1,kk), &! temperature
-                                  pres(1,kk)                                              ! pressure
-      end do
+
+       ! Reminder: txtout_varnames(1:txtout_nvar) = (/"time","k","zm","pmid","u","v","tke","qv","qc","cldf","T","qt","thlm"/)
+       iv = 0
+       iv = iv + 1; txtout_array(:,iv) = zt_grid(1,:) ! height above sfc
+       iv = iv + 1; txtout_array(:,iv) =    pres(1,:) ! pressure
+       iv = iv + 1; txtout_array(:,iv) =  u_wind(1,:)
+       iv = iv + 1; txtout_array(:,iv) =  v_wind(1,:)
+       iv = iv + 1; txtout_array(:,iv) =     tke(1,:)
+       iv = iv + 1; txtout_array(:,iv) =      qw(1,:) - shoc_ql(1,:) ! qv 
+       iv = iv + 1; txtout_array(:,iv) = shoc_ql(1,:)
+       iv = iv + 1; txtout_array(:,iv) = shoc_cldfrac(1,:)
+       iv = iv + 1; txtout_array(:,iv) =  thetal(1,:)/inv_exner(1,:) + lcond/cp * shoc_ql(1,:)  ! temperature
+       iv = iv + 1; txtout_array(:,iv) =      qw(1,:)                ! qt
+       iv = iv + 1; txtout_array(:,iv) =  thetal(1,:)
+
+       call txt_write_one_column( txtout_unit, t*dtime, nlev, iv, txtout_array )
     end if
     !---------------------------------------------
 
