@@ -245,7 +245,8 @@ subroutine shoc_main ( &
      wthl_sec, wqw_sec, wtke_sec,&        ! Output (diagnostic)
      uw_sec, vw_sec, w3,&                 ! Output (diagnostic)
      wqls_sec, brunt, shoc_ql2, &         ! Output (diagnostic)
-     lscale_shoc, lscale_up_shoc, lscale_down_shoc & ! Output (diagnostic, NEW)
+     lscale_shoc, lscale_up_shoc, lscale_down_shoc, & ! Output (diagnostic, NEW)
+     shoc_mix_surf, shoc_mix_linf, shoc_mix_strat & ! Output (diagnostic, NEW: shoc_mix term decomposition)
 #ifdef SCREAM_CONFIG_IS_CMAKE
      , elapsed_s &
 #endif
@@ -387,6 +388,14 @@ subroutine shoc_main ( &
   real(rtype), intent(out) :: lscale_shoc     (shcol, nlev)  ! [m]
   real(rtype), intent(out) :: lscale_up_shoc  (shcol, nlev)  ! [m]
   real(rtype), intent(out) :: lscale_down_shoc(shcol, nlev)  ! [m]
+  ! Decomposition of SHOC's own mixing length shoc_mix into its three component
+  ! length scales (diagnostic). All in [m] so they are directly comparable to
+  ! SHOC_MIX. shoc_mix combines them in quadrature:
+  !   1/shoc_mix^2 = 1/shoc_mix_surf^2 + 1/shoc_mix_linf^2 + 1/shoc_mix_strat^2
+  ! (before the min/max/grid-mesh clipping in check_length_scale_shoc_length).
+  real(rtype), intent(out) :: shoc_mix_surf (shcol, nlev)  ! [m] surface/wall (von Karman) term
+  real(rtype), intent(out) :: shoc_mix_linf (shcol, nlev)  ! [m] asymptotic (l_inf / BL-depth) term
+  real(rtype), intent(out) :: shoc_mix_strat(shcol, nlev)  ! [m] stable-stratification term (capped where N^2<=0)
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
   real(rtype), optional, intent(out) :: elapsed_s ! duration of main loop in seconds
@@ -567,6 +576,16 @@ subroutine shoc_main ( &
        zt_grid,zi_grid,dz_zt,&           ! Input
        tke,shoc_thv,&                    ! Input
        brunt,shoc_mix)                   ! Output
+
+    ! Diagnostic decomposition of shoc_mix into its three component length
+    ! scales (surface/wall, asymptotic l_inf, stable stratification), in [m].
+    ! Uses the same brunt shoc_length just produced; reuses
+    ! compute_l_inf_shoc_length for l_inf. Output to history only
+    ! (SHOC_MIX_SURF/LINF/STRAT); does not feed back into the solution.
+    call compute_shoc_mix_terms(&
+       shcol,nlev,&                                    ! Input
+       tke,brunt,zt_grid,dz_zt,&                       ! Input
+       shoc_mix_surf,shoc_mix_linf,shoc_mix_strat)     ! Output
 
     ! Advance the SGS TKE equation
     call shoc_tke(&
@@ -4989,6 +5008,84 @@ subroutine compute_shoc_mix_shoc_length(nlev,shcol,tke,brunt,zt_grid,l_inf,shoc_
   enddo ! end k loop (vertical loop)
 
 end subroutine compute_shoc_mix_shoc_length
+
+subroutine compute_shoc_mix_terms(&
+     shcol,nlev,&                                    ! Input
+     tke,brunt,zt_grid,dz_zt,&                       ! Input
+     shoc_mix_surf,shoc_mix_linf,shoc_mix_strat)     ! Output
+
+  !=========================================================
+  ! Diagnostic decomposition of the SHOC mixing length (compute_shoc_mix_shoc_length)
+  ! into its three component length scales, each in [m] so they are directly
+  ! comparable to SHOC_MIX and the Larson LSCALE diagnostics.
+  !
+  ! shoc_mix = (2.8284/length_fac)*sqrt(1/(A_surf + A_linf + A_strat)), with
+  !   A_surf  = 1/(tscale*sqrt(tke)*vk*z)     (surface/wall, von Karman)
+  !   A_linf  = 1/(tscale*sqrt(tke)*l_inf)    (asymptotic / BL-depth)
+  !   A_strat = 0.01*max(brunt,0)/tke         (stable stratification)
+  ! Each component length L_k = (2.8284/length_fac)*sqrt(1/A_k), so (pre-clip)
+  !   1/shoc_mix^2 = 1/L_surf^2 + 1/L_linf^2 + 1/L_strat^2.
+  !
+  ! These three term expressions MIRROR compute_shoc_mix_shoc_length; if that
+  ! formula is ever retuned, update both. Diagnostic only: does not modify
+  ! shoc_mix. l_inf is obtained by reusing compute_l_inf_shoc_length (no
+  ! duplication of the asymptotic-length-scale calculation).
+  !=========================================================
+
+  implicit none
+
+  integer, intent(in) :: nlev, shcol
+  ! turbulent kinetic energy [m^2/s^2]
+  real(rtype), intent(in) :: tke(shcol,nlev)
+  ! brunt vaisala frequency [s-1]
+  real(rtype), intent(in) :: brunt(shcol,nlev)
+  ! heights on thermo (midpoint) grid [m]
+  real(rtype), intent(in) :: zt_grid(shcol,nlev)
+  ! layer thickness on thermo grid [m]
+  real(rtype), intent(in) :: dz_zt(shcol,nlev)
+
+  ! Component length scales [m]
+  real(rtype), intent(out) :: shoc_mix_surf (shcol,nlev)
+  real(rtype), intent(out) :: shoc_mix_linf (shcol,nlev)
+  real(rtype), intent(out) :: shoc_mix_strat(shcol,nlev)
+
+  ! LOCAL VARIABLES
+  real(rtype) :: l_inf(shcol)
+  real(rtype) :: tkes, brunt2, term_surf, term_linf, term_strat, cfac
+  integer :: i, k
+
+  ! Turnover timescale [s] (matches compute_shoc_mix_shoc_length)
+  real(rtype), parameter :: tscale = 400._rtype
+
+  ! Reuse the existing asymptotic-length-scale routine (single source of truth)
+  l_inf(:) = 0._rtype
+  call compute_l_inf_shoc_length(nlev,shcol,zt_grid,dz_zt,tke,l_inf)
+
+  cfac = 2.8284_rtype/length_fac
+
+  do k=1,nlev
+    do i=1,shcol
+      tkes = sqrt(tke(i,k))
+      brunt2 = 0._rtype
+      if (brunt(i,k) .ge. 0._rtype) brunt2 = brunt(i,k)
+
+      term_surf  = 1._rtype/(tscale*tkes*vk*zt_grid(i,k))
+      term_linf  = 1._rtype/(tscale*tkes*l_inf(i))
+      term_strat = 0.01_rtype*(brunt2/tke(i,k))
+
+      shoc_mix_surf(i,k) = cfac*sqrt(1._rtype/term_surf)
+      shoc_mix_linf(i,k) = cfac*sqrt(1._rtype/term_linf)
+      ! term_strat = 0 in neutral/unstable air (brunt<=0) -> length unbounded;
+      ! cap at maxlen so the field is finite ("stratification imposes no limit").
+      if (term_strat > 0._rtype) then
+        shoc_mix_strat(i,k) = min(maxlen, cfac*sqrt(1._rtype/term_strat))
+      else
+        shoc_mix_strat(i,k) = maxlen
+      endif
+    enddo
+  enddo
+
+end subroutine compute_shoc_mix_terms
 
 subroutine check_length_scale_shoc_length(nlev,shcol,host_dx,host_dy,shoc_mix)
   ! Do checks on the length scale.  Make sure it is not

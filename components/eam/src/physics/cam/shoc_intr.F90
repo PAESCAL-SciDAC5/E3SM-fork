@@ -473,6 +473,12 @@ end function shoc_implements_cnst
     call addfld('LSCALE_UP_SHOC',  (/'lev'/), 'A', 'm', 'SHOC-internal Larson upward length scale')
     call addfld('LSCALE_DOWN_SHOC',(/'lev'/), 'A', 'm', 'SHOC-internal Larson downward length scale')
 
+    ! Decomposition of SHOC's own mixing length SHOC_MIX into its three component
+    ! length scales (surface/wall, asymptotic l_inf, stable stratification), [m].
+    call addfld('SHOC_MIX_SURF', (/'lev'/), 'A', 'm', 'SHOC_MIX surface/wall (von Karman) component length')
+    call addfld('SHOC_MIX_LINF', (/'lev'/), 'A', 'm', 'SHOC_MIX asymptotic (l_inf) component length')
+    call addfld('SHOC_MIX_STRAT',(/'lev'/), 'A', 'm', 'SHOC_MIX stable-stratification component length (capped where N2<=0)')
+
     call add_default('SHOC_TKE', 1, ' ')
     call add_default('WTHV_SEC', 1, ' ')
     call add_default('SHOC_MIX', 1, ' ')
@@ -501,6 +507,9 @@ end function shoc_implements_cnst
     call add_default('LSCALE_SHOC',     1, ' ')
     call add_default('LSCALE_UP_SHOC',  1, ' ')
     call add_default('LSCALE_DOWN_SHOC',1, ' ')
+    call add_default('SHOC_MIX_SURF', 1, ' ')
+    call add_default('SHOC_MIX_LINF', 1, ' ')
+    call add_default('SHOC_MIX_STRAT',1, ' ')
 
     ! Add output variables from SHOC's internal substeps
 
@@ -689,6 +698,9 @@ end function shoc_implements_cnst
    real(r8) :: lscale_shoc_out     (pcols, pver)
    real(r8) :: lscale_up_shoc_out  (pcols, pver)
    real(r8) :: lscale_down_shoc_out(pcols, pver)
+   real(r8) :: shoc_mix_surf_out (pcols, pver)
+   real(r8) :: shoc_mix_linf_out (pcols, pver)
+   real(r8) :: shoc_mix_strat_out(pcols, pver)
 
    real(r8) :: wthl_output(pcols,pverp)
    real(r8) :: wqw_output(pcols,pverp)
@@ -1045,7 +1057,9 @@ end function shoc_implements_cnst
            uw_sec_out(:ncol,:), vw_sec_out(:ncol,:), w3_out(:ncol,:), & ! Output (diagnostic)
            wqls_out(:ncol,:),brunt_out(:ncol,:),rcm2(:ncol,:), &     ! Output (diagnostic)
            lscale_shoc_out(:ncol,:), lscale_up_shoc_out(:ncol,:), &  ! Output (diagnostic, NEW)
-           lscale_down_shoc_out(:ncol,:))                            ! Output (diagnostic, NEW)
+           lscale_down_shoc_out(:ncol,:), &                          ! Output (diagnostic, NEW)
+           shoc_mix_surf_out(:ncol,:), shoc_mix_linf_out(:ncol,:), & ! Output (diagnostic, NEW: shoc_mix decomposition)
+           shoc_mix_strat_out(:ncol,:))                              ! Output (diagnostic, NEW: shoc_mix decomposition)
 
       ! Write results to txt file after each shoc_main call if conditions are met.
 
@@ -1377,6 +1391,9 @@ end function shoc_implements_cnst
     call outfld('LSCALE_SHOC',     lscale_shoc_out,      pcols, lchnk)
     call outfld('LSCALE_UP_SHOC',  lscale_up_shoc_out,   pcols, lchnk)
     call outfld('LSCALE_DOWN_SHOC',lscale_down_shoc_out, pcols, lchnk)
+    call outfld('SHOC_MIX_SURF',   shoc_mix_surf_out,    pcols, lchnk)
+    call outfld('SHOC_MIX_LINF',   shoc_mix_linf_out,    pcols, lchnk)
+    call outfld('SHOC_MIX_STRAT',  shoc_mix_strat_out,   pcols, lchnk)
 
 #endif
     return
