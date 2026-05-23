@@ -415,15 +415,17 @@ subroutine shoc_main ( &
   real(rtype) :: dz_zi(shcol,nlevi)
 
   ! Virtual potential temperature recomputed each nadv iteration from the
-  ! current substep state (thetal, qw, shoc_ql, inv_exner). The intent(in)
-  ! `thv` argument is computed once per shoc_tend_e3sm call (in shoc_intr,
-  ! before the i_shoc_main loop) and then held constant. Inside the nadv
-  ! loop here, thetal/qw/tke evolve via update_prognostics_implicit but
-  ! `thv` does not, so it goes stale. This local thv_now is used in place
-  ! of `thv` for shoc_length (-> compute_brunt_shoc_length) and the
-  ! diagnostic shoc_compute_lscale, so they see the same substep state as
-  ! the rest of the SHOC closure.
-  real(rtype) :: thv_now(shcol,nlev)
+  ! current substep state. The intent(in) `thv` argument is computed once per
+  ! shoc_tend_e3sm call (in shoc_intr, before the i_shoc_main loop) and then
+  ! held constant. Inside the nadv loop here, thetal and qw evolve via
+  ! update_prognostics_implicit and the cloud liquid shoc_ql is re-diagnosed
+  ! each substep by shoc_assumed_pdf, so the host-side `thv` goes stale. This
+  ! local shoc_thv is recomputed each substep and used in place of `thv` for
+  ! shoc_length (-> compute_brunt_shoc_length) and the diagnostic
+  ! shoc_compute_lscale, so they see the current substep state. It is built
+  ! from SHOC's own diagnosed temperature (shoc_tabs) and vapor (shoc_qv) using
+  ! the identical formula to shoc_intr's host-side thv (shoc_intr.F90:887).
+  real(rtype) :: shoc_thv(shcol,nlev)
 
   ! Surface friction velocity [m/s]
   real(rtype) :: ustar(shcol)
@@ -463,21 +465,9 @@ subroutine shoc_main ( &
                      uw_sec, vw_sec, w3,&                    ! Output (diagnostic)
                      wqls_sec, brunt, shoc_ql2)              ! Output (diagnostic)
 
-    ! Diagnostic Larson nonlocal moist length scale. Computed in F90 even
-    ! when the SHOC core runs as C++, so the LSCALE_SHOC history field is
-    ! always populated. Uses end-of-kernel state (the C++ kernel has just
-    ! evolved thetal, qw, tke, etc.). Recompute thv_now here so it is
-    ! consistent with the other end-of-kernel arrays passed in.
-    ! Formula matches pblintd_init_pot (shoc.F90:4475-4477): theta =
-    ! thetal + (Lv/cp)*qc, thv = theta * (1 + eps*qv - qc), with
-    ! qv = qw - shoc_ql.
-    thv_now(:,:) = ( thetal(:,:) + (lcond/cp) * shoc_ql(:,:) ) &
-                   * ( 1.0_rtype + eps * ( qw(:,:) - shoc_ql(:,:) ) - shoc_ql(:,:) )
-    call shoc_compute_lscale(                                 &
-         shcol, nlev, nlevi,                                  &  ! Input
-         thetal, qw, tke, thv_now,                            &  ! Input
-         pres, inv_exner, zt_grid, zi_grid,                   &  ! Input
-         lscale_shoc, lscale_up_shoc, lscale_down_shoc)          ! Output
+    ! NOTE: the diagnostic Larson length scale (shoc_compute_lscale -> LSCALE_SHOC)
+    ! is computed only in the Fortran path below, where it has been validated.
+    ! It is intentionally NOT computed here in the C++ (SCREAM CMAKE) path.
      return
   endif
 #endif
@@ -496,18 +486,6 @@ subroutine shoc_main ( &
      se_b,ke_b,wv_b,wl_b)                   ! Input/Output
 
   do t=1,nadv
-
-    ! Refresh virtual potential temperature from the current substep state.
-    ! The intent(in) `thv` argument is set once per shoc_tend_e3sm call
-    ! (in shoc_intr.F90, before the i_shoc_main loop) and then held
-    ! constant, while thetal/qw/shoc_ql evolve via update_prognostics_implicit
-    ! within this loop. Using a stale `thv` would bias compute_brunt_shoc_length
-    ! (and therefore shoc_mix above the cloud-top inversion in DYCOMS), and
-    ! would also bias the diagnostic shoc_compute_lscale at all levels.
-    ! Formula matches pblintd_init_pot (shoc.F90:4475-4477): theta = thetal
-    ! + (Lv/cp)*qc, thv = theta * (1 + eps*qv - qc), with qv = qw - shoc_ql.
-    thv_now(:,:) = ( thetal(:,:) + (lcond/cp) * shoc_ql(:,:) ) &
-                   * ( 1.0_rtype + eps * ( qw(:,:) - shoc_ql(:,:) ) - shoc_ql(:,:) )
 
     ! Check TKE to make sure values lie within acceptable
     !  bounds after host model performs horizontal advection
@@ -534,6 +512,20 @@ subroutine shoc_main ( &
     call compute_shoc_temperature(&
        shcol,nlev,thetal,shoc_ql,inv_exner,& ! Input
        shoc_tabs)                            ! Output
+
+    ! Refresh virtual potential temperature for this substep, identical in
+    ! form to shoc_intr's host-side thv (shoc_intr.F90:887):
+    !   thv = T * inv_exner * (1 + eps*qv - qc).
+    ! Built from SHOC's own diagnosed temperature (shoc_tabs) and vapor
+    ! (shoc_qv) computed just above, so shoc_thv matches the host-side thv
+    ! exactly (no theta reconstruction; the Exner factor is carried by
+    ! shoc_tabs = thetal/inv_exner + (Lv/cp)*shoc_ql). The intent(in) `thv`
+    ! is set once per shoc_tend_e3sm call and goes stale as thetal/qw evolve
+    ! (update_prognostics_implicit) and shoc_ql is re-diagnosed
+    ! (shoc_assumed_pdf) each substep; shoc_thv is used below by
+    ! shoc_compute_lscale and shoc_length (-> compute_brunt_shoc_length).
+    shoc_thv(:,:) = shoc_tabs(:,:) * inv_exner(:,:) &
+                    * ( 1.0_rtype + eps * shoc_qv(:,:) - shoc_ql(:,:) )
 
     call shoc_diag_obklen(&
        shcol,uw_sfc,vw_sfc,&                          ! Input
@@ -562,18 +554,18 @@ subroutine shoc_main ( &
     ! loop below when l_txt_write=.true.
     call shoc_compute_lscale(                                 &
          shcol, nlev, nlevi,                                  &  ! Input
-         thetal, qw, tke, thv_now,                            &  ! Input
+         thetal, qw, tke, shoc_thv,                           &  ! Input
          pres, inv_exner, zt_grid, zi_grid,                   &  ! Input
          lscale_shoc, lscale_up_shoc, lscale_down_shoc)          ! Output
 
-    ! Update the turbulent length scale.  Note: thv_now (refreshed at top
-    ! of this nadv iteration) is used instead of the intent(in) thv so
-    ! that compute_brunt_shoc_length sees the current substep state.
+    ! Update the turbulent length scale.  Note: shoc_thv (refreshed this
+    ! nadv iteration) is used instead of the intent(in) thv so that
+    ! compute_brunt_shoc_length sees the current substep state.
     call shoc_length(&
        shcol,nlev,nlevi,&                ! Input
        host_dx,host_dy,&                 ! Input
        zt_grid,zi_grid,dz_zt,&           ! Input
-       tke,thv_now,&                     ! Input
+       tke,shoc_thv,&                    ! Input
        brunt,shoc_mix)                   ! Output
 
     ! Advance the SGS TKE equation
