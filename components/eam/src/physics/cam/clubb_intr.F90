@@ -1218,6 +1218,7 @@ end subroutine clubb_init_cnst
 
    use parameters_tunable,        only: mu
    use clubb_api_module, only: &
+        init_pdf_params_api, &
         cleanup_clubb_core_api, &
         nparams, &
         read_parameters_api, &
@@ -2437,7 +2438,21 @@ end subroutine clubb_init_cnst
               wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, &
               thlm_in, rtm_in, um_in, vm_in, rcm_inout, cloud_frac_inout )
 
-         ! (2) Calculate derived variables 
+         ! (2) set the heights and parameters again for CLUBB internals.
+         !     This has to happen here--before any vertical interpolation function,
+         !     e.g., zt2zm_api, is called.
+
+         call setup_grid_heights_api(l_implemented, grid_type, zi_g(2), &
+            zi_g(1), zi_g, zt_g)
+         call setup_parameters_api(zi_g(2), clubb_params, pverp, grid_type, &
+            zi_g, zt_g, err_code)
+
+         ! (3) Initialize pdf parameters
+
+         call init_pdf_params_api( pverp, pdf_params )
+         call init_pdf_params_api( pverp, pdf_params_zm )
+
+         ! (3) Calculate derived variables 
 
          do k = 1, pver
             dz_g(k) = zi_g(k+1) - zi_g(k)
@@ -2454,7 +2469,7 @@ end subroutine clubb_init_cnst
          enddo 
          invrs_rho_ds_zm = zt2zm_api(invrs_rho_ds_zt)
          
-         ! (3) OTHER RELEVANT IN OR INOUT VARIABLES to advance_clubb_core_api include:
+         ! (4) OTHER RELEVANT IN OR INOUT VARIABLES to advance_clubb_core_api include:
          !     (i) those set to the default initial values in `clubb_ini_cam` and 
          !     read in through pbuf_get_field:
          !     radf,
@@ -2462,6 +2477,27 @@ end subroutine clubb_init_cnst
          !     rtp2_in, thlp2_in, rtpthlp_in,
          !     wpthvp_inout, wp2thvp_inout, rtpthvp_inout, thlpthvp_inout
          !     pdf_params, pdf_params_zm),
+
+              wp2_in(:) = w_tol_sqd
+              wp3_in(:) = 0.0_core_rknd
+           wpthlp_in(:) = 0.0_core_rknd
+            wprtp_in(:) = 0.0_core_rknd
+          rtpthlp_in(:) = 0.0_core_rknd
+             rtp2_in(:) = rt_tol**2
+            thlp2_in(:) = thl_tol**2
+              up2_in(:) = w_tol_sqd
+              vp2_in(:) = w_tol_sqd
+
+             upwp_in(:) = 0.0_core_rknd
+             vpwp_in(:) = 0.0_core_rknd
+
+           wpthvp_inout(:) = 0.0_core_rknd
+          wp2thvp_inout(:) = 0.0_core_rknd
+          rtpthvp_inout(:) = 0.0_core_rknd
+         thlpthvp_inout(:) = 0.0_core_rknd
+
+                   radf(:) = 0.0_core_rknd
+
          !     (ii) those set to zero at the top of clubb_tend_cam:
          !     fcor,
          !     thlm_forcing, rtm_forcing, um_forcing, vm_forcing, sclrm_forcing, edsclrm_forcing,
@@ -2487,13 +2523,6 @@ end subroutine clubb_init_cnst
          !     upwp_pert_col, vpwp_pert_col for linearize_pbl_winds
          !     (vi) varmu2 for clubb_do_deep 
          !     (vii) misc: dtime, l_implemented, error_code, host_dx, host_dy, hydromet_dim
-
-         ! (4) set the heights and parameters again for CLUBB internals
-
-         call setup_grid_heights_api(l_implemented, grid_type, zi_g(2), &
-            zi_g(1), zi_g, zt_g)
-         call setup_parameters_api(zi_g(2), clubb_params, pverp, grid_type, &
-            zi_g, zt_g, err_code)
 
       end if ! if l_turb_standalone
 
