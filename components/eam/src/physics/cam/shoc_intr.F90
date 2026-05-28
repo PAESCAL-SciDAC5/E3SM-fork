@@ -1035,8 +1035,6 @@ end function shoc_implements_cnst
 
    l_inner_write = l_turb_standalone .and. (.not.l_shoc_outer_loop)
 
-   wpthlp_sfc(:ncol) = 0.0_r8  ! BJG test to hardwire surface thl flux to zero
-   wprtp_sfc(:ncol) = 0.0_r8  ! BJG test to hardwire surface moisture flux to zero
    upwp_sfc(:ncol) = -0.068547301186844697_r8  ! BJG test to hardwire surface u flux to input text file value
    vpwp_sfc(:ncol) = 0.053858593789663699_r8  ! BJG test to hardwire surface v flux to input text file value
 
@@ -1094,6 +1092,7 @@ end function shoc_implements_cnst
 
        ! Write results to txt file after each shoc_main call in other cases
 
+
   if (.not.(l_turb_standalone) .and. masterproc) then
        modeltime = get_nstep() * nint(hdtime)
        do kk = pver, 1, -1
@@ -1108,7 +1107,7 @@ end function shoc_implements_cnst
                                  state1%pmid(1,kk)                                         ! pressure
        end do
   end if
- 
+
 
   if (l_turb_standalone.and.masterproc) then
      close(txtout_unit)

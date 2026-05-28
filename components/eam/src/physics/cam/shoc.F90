@@ -416,6 +416,8 @@ subroutine shoc_main ( &
 
   integer :: kk
 
+  real(rtype) :: thv_updated(shcol,nlev)    ! BJG
+
 #ifdef SCREAM_CONFIG_IS_CMAKE
   integer :: clock_count1, clock_count_rate, clock_count_max, clock_count2, clock_count_diff
 #endif
@@ -457,6 +459,11 @@ subroutine shoc_main ( &
 
   do t=1,nadv
 
+     thv_updated(:,:)= (thetal(:,:)+(lcond/cp)*shoc_ql(:,:)*inv_exner(:,:))    &
+        * (1._rtype+eps*(qw(:,:) - shoc_ql(:,:))-shoc_ql(:,:))  ! BJG
+
+  
+     
     ! Check TKE to make sure values lie within acceptable
     !  bounds after host model performs horizontal advection
     call check_tke(shcol,nlev,&                 ! Input
@@ -501,7 +508,8 @@ subroutine shoc_main ( &
        shcol,nlev,nlevi,&                ! Input
        host_dx,host_dy,&                 ! Input
        zt_grid,zi_grid,dz_zt,&           ! Input
-       tke,thv,&                         ! Input
+       ! BJG       tke,thv,&                         ! Input
+       tke,thv_updated,&                         ! Input
        brunt,shoc_mix)                   ! Output
 
     ! Advance the SGS TKE equation
