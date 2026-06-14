@@ -467,7 +467,7 @@ contains
     use shr_orb_mod           , only : shr_orb_decl
     use shr_scam_mod          , only : shr_scam_getCloseLatLon
     use seq_drydep_mod        , only : n_drydep, drydep_method, DD_XLND
-    use elm_varpar            , only : nlevsno, numpft, crop_prog, nlevsoi,max_patch_per_col
+    use elm_varpar            , only : nlevsno, numpft, crop_prog, nlevsoi,max_patch_per_col, nlevgrnd
     use elm_varcon            , only : h2osno_max, bdsno, spval
     use landunit_varcon       , only : istice, istice_mec, istsoil
     use elm_varctl            , only : finidat, finidat_interp_source, finidat_interp_dest, fsurdat
@@ -661,6 +661,12 @@ contains
     call hist_addfld2d (fname='SNO_Z', units='m', type2d='levsno',  &
          avgflag='A', long_name='Snow layer thicknesses', &
          ptr_col=data2dptr, no_snow_behavior=no_snow_normal, default='inactive')
+
+    data2dptr => col_pp%dz(:,1:nlevgrnd)
+    col_pp%dz(bounds_proc%begc:bounds_proc%endc,:) = spval
+    call hist_addfld2d (fname='SOI_Z', units='m', type2d='levgrnd',  &
+         avgflag='A', long_name='Soil layer thicknesses', &
+         ptr_col=data2dptr, default='inactive')
 
     col_pp%zii(bounds_proc%begc:bounds_proc%endc) = spval
     call hist_addfld1d (fname='ZII', units='m', &

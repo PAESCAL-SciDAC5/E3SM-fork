@@ -87,7 +87,7 @@ else
   readonly CASE_SCRIPTS_DIR=${CASE_ROOT}/case_scripts
   readonly CASE_RUN_DIR=${CASE_ROOT}/run
   readonly PELAYOUT="custom-8"
-  readonly WALLTIME="3:00:00"
+  readonly WALLTIME="4:00:00"
   readonly STOP_OPTION="nmonths"
   readonly STOP_N="15"
   readonly REST_OPTION="nmonths"
@@ -174,11 +174,9 @@ hist_dov2xy = .true.,.true.
                'DISPLA', 'ELAI', 'ESAI', 'Z0MG', 'Z0MV', 'DLEAF', 'HTOP', 'PBOT', 'TV', 'FDRY', 'LAISUN', 'LAISHA', 'RSSUN', 'RSSHA', 
                'RH', 'FWET', 'QVEGT', 'H2OCAN', 'FRAC_VEG_NOSNO', 'SNOW_DEPTH', 'SoilBeta', 'SNO_T', 'TSOI', 'FH2OSFC', 'TH2OSFC' 'SABV', 'EMV', 'EMG', 'QFLX_EVAP_VEG',
                'C3PSN', 'SLATOP', 'LEAFCN', 'FLNR', 'FNITR', 'I_VC', 'S_VC', 'LEAFN', 'LEAFP', 'T10', 'LAISUN_Z', 'LAISHA_Z',
-               'NRAD', 'VCMAXCINTSUN', 'VCMAXCINTSHA', 'TLAI_Z', 'PARSUN_Z', 'PARSHA_Z',
-               'C3FLAG', 'KC', 'KO', 'CP', 'QE', 'THETA_CJ', 'BBB', 'MBB', 'GB_MOL', 'GS_MOL', 'AC', 'AJ', 'AP', 'AG', 'AN', 'RH_LEAF',
-               'VCMAX_Z', 'TPU_Z', 'KP_Z', 'DAYL', 'MAX_DAYL', 'SNL', 
-               'watsat', 'SOILICE', 'EFF_POROSITY', 'SOILLIQ', 'H2OSOI_LIQVOL', 'SMPSO', 'SMPSC', 'TC_STRESS', 'sucsat',
-               'bsw', 'ROOTFR', 'ROOTR', 'BTRAN', 'BTRAN2', 'RRESIS', 'Z0HV', 'Z0QV'
+               'NRAD', 'VCMAXCINTSUN', 'VCMAXCINTSHA', 'TLAI_Z', 'PARSUN_Z', 'PARSHA_Z', 'DAYL', 'MAX_DAYL', 'SNL', 'TLAI', 'PCT_NAT_PFT',
+               'watsat', 'SOILICE', 'EFF_POROSITY', 'SOILLIQ', 'H2OSOI', 'H2OSOI_LIQVOL', 'SMPSO', 'SMPSC', 'TC_STRESS', 'sucsat',
+               'bsw', 'ROOTFR', 'ROOTR', 'BTRAN', 'BTRAN2', 'RRESIS', 'Z0HV', 'Z0QV', 'PO2', 'PCO2', 'CROP', 'NFIXER', 'SOI_Z', 'PCT_LANDUNIT'
  hist_mfilt = 1,30
  hist_nhtfrq = 0,-24
  hist_avgflag_pertape = 'A','I'
