@@ -457,6 +457,16 @@ subroutine shoc_main ( &
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
   if (use_cxx) then
+    ! The new diagnostics (Larson length scale and shoc_mix term
+    ! decomposition) are intent(out) but are NOT computed on this C++ path
+    ! (see NOTE below). Zero them so the caller never receives undefined
+    ! values that could be written to history/txt output.
+    lscale_shoc      = 0._rtype
+    lscale_up_shoc   = 0._rtype
+    lscale_down_shoc = 0._rtype
+    shoc_mix_surf    = 0._rtype
+    shoc_mix_linf    = 0._rtype
+    shoc_mix_strat   = 0._rtype
     call shoc_main_f(shcol, nlev, nlevi, dtime, nadv, npbl,& ! Input
                      host_dx, host_dy,thv, &                 ! Input
                      zt_grid,zi_grid,pres,presi,pdel,&       ! Input
@@ -557,15 +567,23 @@ subroutine shoc_main ( &
     ! (so this diagnostic and SHOC's own mixing length see the same input
     ! state, making them directly comparable).
     !
-    ! Reads SHOC's evolved state; does NOT modify it. Output goes to
-    ! history (LSCALE_SHOC, LSCALE_UP_SHOC, LSCALE_DOWN_SHOC) via the host
-    ! interface, and to the in-and-out txt file from inside the substep
-    ! loop below when l_txt_write=.true.
-    call shoc_compute_lscale(                                 &
-         shcol, nlev, nlevi,                                  &  ! Input
-         thetal, qw, tke, shoc_thv,                           &  ! Input
-         pres, inv_exner, zt_grid, zi_grid,                   &  ! Input
-         lscale_shoc, lscale_up_shoc, lscale_down_shoc)          ! Output
+    ! Reads SHOC's evolved state; does NOT modify it -- this is a pure
+    ! diagnostic that nothing in the SHOC solver consumes. It has two output
+    ! paths: history (LSCALE_SHOC, LSCALE_UP_SHOC, LSCALE_DOWN_SHOC) via the
+    ! host interface, and the in-and-out txt file written from inside this
+    ! substep loop below when l_txt_write=.true.
+    !
+    ! For history only the final-substep value survives (the array is
+    ! overwritten each t and outfld'd after the loop), so we only need to run
+    ! the (expensive) algorithm on the last substep -- UNLESS we are writing
+    ! the per-substep txt dump, which needs it every t.
+    if (l_txt_write .or. t == nadv) then
+       call shoc_compute_lscale(                              &
+            shcol, nlev, nlevi,                               &  ! Input
+            thetal, qw, tke, shoc_thv,                        &  ! Input
+            pres, inv_exner, zt_grid, zi_grid,                &  ! Input
+            lscale_shoc, lscale_up_shoc, lscale_down_shoc)       ! Output
+    end if
 
     ! Update the turbulent length scale.  Note: shoc_thv (refreshed this
     ! nadv iteration) is used instead of the intent(in) thv so that
@@ -579,13 +597,19 @@ subroutine shoc_main ( &
 
     ! Diagnostic decomposition of shoc_mix into its three component length
     ! scales (surface/wall, asymptotic l_inf, stable stratification), in [m].
-    ! Uses the same brunt shoc_length just produced; reuses
-    ! compute_l_inf_shoc_length for l_inf. Output to history only
+    ! Uses the same brunt shoc_length just produced. Output to history only
     ! (SHOC_MIX_SURF/LINF/STRAT); does not feed back into the solution.
-    call compute_shoc_mix_terms(&
-       shcol,nlev,&                                    ! Input
-       tke,brunt,zt_grid,dz_zt,&                       ! Input
-       shoc_mix_surf,shoc_mix_linf,shoc_mix_strat)     ! Output
+    !
+    ! Pure diagnostic, history-only (not in the txt dump), so only the
+    ! final-substep value survives the loop -- compute it on the last
+    ! substep only. This also collapses the l_inf recompute below (see the
+    ! subroutine header) to once per shoc_main call.
+    if (t == nadv) then
+       call compute_shoc_mix_terms(&
+          shcol,nlev,&                                    ! Input
+          tke,brunt,zt_grid,dz_zt,&                       ! Input
+          shoc_mix_surf,shoc_mix_linf,shoc_mix_strat)     ! Output
+    end if
 
     ! Advance the SGS TKE equation
     call shoc_tke(&
@@ -5026,10 +5050,23 @@ subroutine compute_shoc_mix_terms(&
   ! Each component length L_k = (2.8284/length_fac)*sqrt(1/A_k), so (pre-clip)
   !   1/shoc_mix^2 = 1/L_surf^2 + 1/L_linf^2 + 1/L_strat^2.
   !
-  ! These three term expressions MIRROR compute_shoc_mix_shoc_length; if that
-  ! formula is ever retuned, update both. Diagnostic only: does not modify
-  ! shoc_mix. l_inf is obtained by reusing compute_l_inf_shoc_length (no
-  ! duplication of the asymptotic-length-scale calculation).
+  ! These three term expressions MIRROR compute_shoc_mix_shoc_length. That
+  ! formula is hardcoded in source (its constants are NOT namelist-tunable):
+  ! the literals 2.8284, 0.01, and tscale=400, plus the module parameters
+  ! length_fac, maxlen, and vk. If any of those constants is changed, or the
+  ! formula's structure is changed (a term added/removed, the functional form,
+  ! the maxlen clipping, or the harmonic-sum-of-squares combination), the same
+  ! edit MUST be made here -- otherwise this decomposition silently drifts out
+  ! of sync and no longer sums to the real shoc_mix. Diagnostic only: does not
+  ! modify shoc_mix.
+  !
+  ! l_inf is recomputed here via compute_l_inf_shoc_length rather than reused
+  ! from shoc_length (which keeps it as a local and discards it). Threading
+  ! l_inf out of shoc_length would alter that standard SHOC routine's
+  ! signature -- shared with the SCREAM/C++ port -- so we deliberately accept
+  ! one extra call here. The cost is negligible: compute_l_inf_shoc_length is
+  ! a cheap pair of vertical sums, and the caller only invokes this routine on
+  ! the final nadv substep (history-only), so it runs once per shoc_main call.
   !=========================================================
 
   implicit none
@@ -5037,7 +5074,8 @@ subroutine compute_shoc_mix_terms(&
   integer, intent(in) :: nlev, shcol
   ! turbulent kinetic energy [m^2/s^2]
   real(rtype), intent(in) :: tke(shcol,nlev)
-  ! brunt vaisala frequency [s-1]
+  ! brunt vaisala frequency squared, N^2 [s-2]
+  ! (note: 'brunt' holds N^2, not N; negative where unstable)
   real(rtype), intent(in) :: brunt(shcol,nlev)
   ! heights on thermo (midpoint) grid [m]
   real(rtype), intent(in) :: zt_grid(shcol,nlev)
