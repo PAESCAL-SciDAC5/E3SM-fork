@@ -465,6 +465,20 @@ end function shoc_implements_cnst
     call addfld('TOT_CLOUD_FRAC',(/'lev'/), 'A', 'fraction', 'total cloud fraction')
     call addfld('PBLH',horiz_only,'A','m','PBL height')
 
+    ! Diagnostic Larson nonlocal moist length scale, computed inside
+    ! shoc_main per nadv substep. Mirror of LSCALE / LSCALE_UP / LSCALE_DOWN
+    ! (which are computed once per macmic substep in tphysbc, before shoc_main
+    ! runs). Useful for in-and-out simulations where macmic_num_steps = 1.
+    call addfld('LSCALE_SHOC',     (/'lev'/), 'A', 'm', 'SHOC-internal Larson nonlocal moist length scale')
+    call addfld('LSCALE_UP_SHOC',  (/'lev'/), 'A', 'm', 'SHOC-internal Larson upward length scale')
+    call addfld('LSCALE_DOWN_SHOC',(/'lev'/), 'A', 'm', 'SHOC-internal Larson downward length scale')
+
+    ! Decomposition of SHOC's own mixing length SHOC_MIX into its three component
+    ! length scales (surface/wall, asymptotic l_inf, stable stratification), [m].
+    call addfld('SHOC_MIX_SURF', (/'lev'/), 'A', 'm', 'SHOC_MIX surface/wall (von Karman) component length')
+    call addfld('SHOC_MIX_LINF', (/'lev'/), 'A', 'm', 'SHOC_MIX asymptotic (l_inf) component length')
+    call addfld('SHOC_MIX_STRAT',(/'lev'/), 'A', 'm', 'SHOC_MIX stable-stratification component length (capped where N2<=0)')
+
     call add_default('SHOC_TKE', 1, ' ')
     call add_default('WTHV_SEC', 1, ' ')
     call add_default('SHOC_MIX', 1, ' ')
@@ -490,6 +504,12 @@ end function shoc_implements_cnst
     call add_default('PRECIPITATING_ICE_FRAC',1,' ')
     call add_default('LIQ_CLOUD_FRAC',1,' ')
     call add_default('TOT_CLOUD_FRAC',1,' ')
+    call add_default('LSCALE_SHOC',     1, ' ')
+    call add_default('LSCALE_UP_SHOC',  1, ' ')
+    call add_default('LSCALE_DOWN_SHOC',1, ' ')
+    call add_default('SHOC_MIX_SURF', 1, ' ')
+    call add_default('SHOC_MIX_LINF', 1, ' ')
+    call add_default('SHOC_MIX_STRAT',1, ' ')
 
     ! Add output variables from SHOC's internal substeps
 
@@ -673,6 +693,14 @@ end function shoc_implements_cnst
    real(r8) :: wtke_sec_out(pcols,pverp), uw_sec_out(pcols,pverp)
    real(r8) :: vw_sec_out(pcols,pverp), w3_out(pcols,pverp)
    real(r8) :: wqls_out(pcols,pver), brunt_out(pcols,pver)
+
+   ! Diagnostic Larson nonlocal moist length scale (computed inside shoc_main).
+   real(r8) :: lscale_shoc_out     (pcols, pver)
+   real(r8) :: lscale_up_shoc_out  (pcols, pver)
+   real(r8) :: lscale_down_shoc_out(pcols, pver)
+   real(r8) :: shoc_mix_surf_out (pcols, pver)
+   real(r8) :: shoc_mix_linf_out (pcols, pver)
+   real(r8) :: shoc_mix_strat_out(pcols, pver)
 
    real(r8) :: wthl_output(pcols,pverp)
    real(r8) :: wqw_output(pcols,pverp)
@@ -936,7 +964,7 @@ end function shoc_implements_cnst
        enddo
      end if
    enddo
-
+  
    !-------------------------------------------
    ! Substepping configuration (if applicable)
    !-------------------------------------------
@@ -977,7 +1005,7 @@ end function shoc_implements_cnst
 
          txtout_unit = getunit()
          open(txtout_unit, file=trim(outfname), status='replace')
-         write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), u, v, tke, qv, qc, T, P'
+         write(txtout_unit,*) 'time, k (0 = TOM, pver - 1 = sfc), u, v, tke, qv, qc, T, P, lscale, lscale_up, lscale_down'
 
          ! Send info to iulog to double check
 
@@ -999,7 +1027,7 @@ end function shoc_implements_cnst
    ! Actually call SHOC                                !
    ! ------------------------------------------------- !
    ! Note that each call includes nadv time steps of integration for SHOC
-
+   
    !============================
    do i_shoc_main = 1, n_shoc_main_calls
 
@@ -1023,7 +1051,11 @@ end function shoc_implements_cnst
            w_sec_out(:ncol,:), thl_sec_out(:ncol,:), qw_sec_out(:ncol,:), qwthl_sec_out(:ncol,:), & ! Output (diagnostic)
            wthl_sec_out(:ncol,:), wqw_sec_out(:ncol,:), wtke_sec_out(:ncol,:), & ! Output (diagnostic)
            uw_sec_out(:ncol,:), vw_sec_out(:ncol,:), w3_out(:ncol,:), & ! Output (diagnostic)
-           wqls_out(:ncol,:),brunt_out(:ncol,:),rcm2(:ncol,:)) ! Output (diagnostic)
+           wqls_out(:ncol,:),brunt_out(:ncol,:),rcm2(:ncol,:), &     ! Output (diagnostic)
+           lscale_shoc_out(:ncol,:), lscale_up_shoc_out(:ncol,:), &  ! Output (diagnostic, NEW)
+           lscale_down_shoc_out(:ncol,:), &                          ! Output (diagnostic, NEW)
+           shoc_mix_surf_out(:ncol,:), shoc_mix_linf_out(:ncol,:), & ! Output (diagnostic, NEW: shoc_mix decomposition)
+           shoc_mix_strat_out(:ncol,:))                              ! Output (diagnostic, NEW: shoc_mix decomposition)
 
       ! Write results to txt file after each shoc_main call if conditions are met.
 
@@ -1037,7 +1069,10 @@ end function shoc_implements_cnst
                                      rtm(1,kk) - rcm(1,kk),     &! qv
                                      rcm(1,kk),                 &! qc
                                      thlm(1,kk) / inv_exner(1,kk) + latvap/cpair * rcm(1,kk), &! temperature
-                                     state1%pmid(1,kk)                                         ! pressure
+                                     state1%pmid(1,kk),                                       &! pressure
+                                     lscale_shoc_out(1,kk),                                   &! Larson Lscale [m]
+                                     lscale_up_shoc_out(1,kk),                                &! Larson Lscale (upward) [m]
+                                     lscale_down_shoc_out(1,kk)                                ! Larson Lscale (downward) [m]
            end do
       end if
 
@@ -1347,6 +1382,12 @@ end function shoc_implements_cnst
     call outfld('LIQ_CLOUD_FRAC',liq_cloud_frac,pcols,lchnk)
     call outfld('TOT_CLOUD_FRAC',tot_cloud_frac,pcols,lchnk)
     call outfld('PBLH',pblh,pcols,lchnk)
+    call outfld('LSCALE_SHOC',     lscale_shoc_out,      pcols, lchnk)
+    call outfld('LSCALE_UP_SHOC',  lscale_up_shoc_out,   pcols, lchnk)
+    call outfld('LSCALE_DOWN_SHOC',lscale_down_shoc_out, pcols, lchnk)
+    call outfld('SHOC_MIX_SURF',   shoc_mix_surf_out,    pcols, lchnk)
+    call outfld('SHOC_MIX_LINF',   shoc_mix_linf_out,    pcols, lchnk)
+    call outfld('SHOC_MIX_STRAT',  shoc_mix_strat_out,   pcols, lchnk)
 
 #endif
     return

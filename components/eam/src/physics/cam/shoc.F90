@@ -33,7 +33,10 @@ real(rtype), parameter, public :: largeneg = -99999999.99_rtype
 real(rtype), parameter, public :: pi = 3.14159265358979323_rtype
 
 !character(len=*), parameter, public :: fmt = '(i8,i4,20ES22.13)'
-character(len=*), parameter, public :: fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10)'
+! 7 reals for state (u, v, tke, qv, qc, T, P) plus 3 reals for the diagnostic
+! Larson length scale (lscale, lscale_up, lscale_down). Width F12.4 fits the
+! Lscale_max = 6250 m cap with margin.
+character(len=*), parameter, public :: fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10,3(1X,F12.4))'
 !=========================================================
 ! Physical constants used in SHOC
 !=========================================================
@@ -241,7 +244,9 @@ subroutine shoc_main ( &
      w_sec, thl_sec, qw_sec, qwthl_sec,&  ! Output (diagnostic)
      wthl_sec, wqw_sec, wtke_sec,&        ! Output (diagnostic)
      uw_sec, vw_sec, w3,&                 ! Output (diagnostic)
-     wqls_sec, brunt, shoc_ql2 &          ! Output (diagnostic)
+     wqls_sec, brunt, shoc_ql2, &         ! Output (diagnostic)
+     lscale_shoc, lscale_up_shoc, lscale_down_shoc, & ! Output (diagnostic, NEW)
+     shoc_mix_surf, shoc_mix_linf, shoc_mix_strat & ! Output (diagnostic, NEW: shoc_mix term decomposition)
 #ifdef SCREAM_CONFIG_IS_CMAKE
      , elapsed_s &
 #endif
@@ -252,6 +257,7 @@ subroutine shoc_main ( &
 #endif
 
   use cam_history,    only: outfld
+  use shoc_lscale_mod, only: shoc_compute_lscale
 
   implicit none
 
@@ -374,6 +380,22 @@ subroutine shoc_main ( &
   real(rtype), intent(out) :: brunt(shcol,nlev)
   ! return to isotropic timescale [s]
   real(rtype), intent(out) :: isotropy(shcol,nlev)
+  ! Larson nonlocal moist length scale (diagnostic, SHOC-internal port of
+  ! the standalone calculate_lscale used at physpkg.F90:tphysbc). Computed
+  ! once per nadv substep right after pblintd and right before shoc_length,
+  ! analogous to where CLUBB calls compute_mixing_length inside
+  ! advance_clubb_core.
+  real(rtype), intent(out) :: lscale_shoc     (shcol, nlev)  ! [m]
+  real(rtype), intent(out) :: lscale_up_shoc  (shcol, nlev)  ! [m]
+  real(rtype), intent(out) :: lscale_down_shoc(shcol, nlev)  ! [m]
+  ! Decomposition of SHOC's own mixing length shoc_mix into its three component
+  ! length scales (diagnostic). All in [m] so they are directly comparable to
+  ! SHOC_MIX. shoc_mix combines them in quadrature:
+  !   1/shoc_mix^2 = 1/shoc_mix_surf^2 + 1/shoc_mix_linf^2 + 1/shoc_mix_strat^2
+  ! (before the min/max/grid-mesh clipping in check_length_scale_shoc_length).
+  real(rtype), intent(out) :: shoc_mix_surf (shcol, nlev)  ! [m] surface/wall (von Karman) term
+  real(rtype), intent(out) :: shoc_mix_linf (shcol, nlev)  ! [m] asymptotic (l_inf / BL-depth) term
+  real(rtype), intent(out) :: shoc_mix_strat(shcol, nlev)  ! [m] stable-stratification term (capped where N^2<=0)
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
   real(rtype), optional, intent(out) :: elapsed_s ! duration of main loop in seconds
@@ -401,6 +423,19 @@ subroutine shoc_main ( &
   ! Grid difference centereted on interface grid [m]
   real(rtype) :: dz_zi(shcol,nlevi)
 
+  ! Virtual potential temperature recomputed each nadv iteration from the
+  ! current substep state. The intent(in) `thv` argument is computed once per
+  ! shoc_tend_e3sm call (in shoc_intr, before the i_shoc_main loop) and then
+  ! held constant. Inside the nadv loop here, thetal and qw evolve via
+  ! update_prognostics_implicit and the cloud liquid shoc_ql is re-diagnosed
+  ! each substep by shoc_assumed_pdf, so the host-side `thv` goes stale. This
+  ! local shoc_thv is recomputed each substep and used in place of `thv` for
+  ! shoc_length (-> compute_brunt_shoc_length) and the diagnostic
+  ! shoc_compute_lscale, so they see the current substep state. It is built
+  ! from SHOC's own diagnosed temperature (shoc_tabs) and vapor (shoc_qv) using
+  ! the identical formula to shoc_intr's host-side thv (shoc_intr.F90:887).
+  real(rtype) :: shoc_thv(shcol,nlev)
+
   ! Surface friction velocity [m/s]
   real(rtype) :: ustar(shcol)
   ! Monin Obukhov length [m]
@@ -422,6 +457,16 @@ subroutine shoc_main ( &
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
   if (use_cxx) then
+    ! The new diagnostics (Larson length scale and shoc_mix term
+    ! decomposition) are intent(out) but are NOT computed on this C++ path
+    ! (see NOTE below). Zero them so the caller never receives undefined
+    ! values that could be written to history/txt output.
+    lscale_shoc      = 0._rtype
+    lscale_up_shoc   = 0._rtype
+    lscale_down_shoc = 0._rtype
+    shoc_mix_surf    = 0._rtype
+    shoc_mix_linf    = 0._rtype
+    shoc_mix_strat   = 0._rtype
     call shoc_main_f(shcol, nlev, nlevi, dtime, nadv, npbl,& ! Input
                      host_dx, host_dy,thv, &                 ! Input
                      zt_grid,zi_grid,pres,presi,pdel,&       ! Input
@@ -438,6 +483,10 @@ subroutine shoc_main ( &
                      wthl_sec, wqw_sec, wtke_sec,&           ! Output (diagnostic)
                      uw_sec, vw_sec, w3,&                    ! Output (diagnostic)
                      wqls_sec, brunt, shoc_ql2)              ! Output (diagnostic)
+
+    ! NOTE: the diagnostic Larson length scale (shoc_compute_lscale -> LSCALE_SHOC)
+    ! is computed only in the Fortran path below, where it has been validated.
+    ! It is intentionally NOT computed here in the C++ (SCREAM CMAKE) path.
      return
   endif
 #endif
@@ -483,6 +532,20 @@ subroutine shoc_main ( &
        shcol,nlev,thetal,shoc_ql,inv_exner,& ! Input
        shoc_tabs)                            ! Output
 
+    ! Refresh virtual potential temperature for this substep, identical in
+    ! form to shoc_intr's host-side thv (shoc_intr.F90:887):
+    !   thv = T * inv_exner * (1 + eps*qv - qc).
+    ! Built from SHOC's own diagnosed temperature (shoc_tabs) and vapor
+    ! (shoc_qv) computed just above, so shoc_thv matches the host-side thv
+    ! exactly (no theta reconstruction; the Exner factor is carried by
+    ! shoc_tabs = thetal/inv_exner + (Lv/cp)*shoc_ql). The intent(in) `thv`
+    ! is set once per shoc_tend_e3sm call and goes stale as thetal/qw evolve
+    ! (update_prognostics_implicit) and shoc_ql is re-diagnosed
+    ! (shoc_assumed_pdf) each substep; shoc_thv is used below by
+    ! shoc_compute_lscale and shoc_length (-> compute_brunt_shoc_length).
+    shoc_thv(:,:) = shoc_tabs(:,:) * inv_exner(:,:) &
+                    * ( 1.0_rtype + eps * shoc_qv(:,:) - shoc_ql(:,:) )
+
     call shoc_diag_obklen(&
        shcol,uw_sfc,vw_sfc,&                          ! Input
        wthl_sfc,wqw_sfc,thetal(:shcol,nlev),&         ! Input
@@ -496,13 +559,57 @@ subroutine shoc_main ( &
        ustar,obklen,kbfs,shoc_cldfrac,&     ! Input
        pblh)                                ! Output
 
-    ! Update the turbulent length scale
+    ! Diagnostic Larson nonlocal moist length scale (SHOC-side parallel of
+    ! H. Xiao's standalone calculate_lscale used by tphysbc).
+    !
+    ! Placed after pblintd (which sets the boundary-layer state used by
+    ! the surface-layer taper inside the algorithm) and before shoc_length
+    ! (so this diagnostic and SHOC's own mixing length see the same input
+    ! state, making them directly comparable).
+    !
+    ! Reads SHOC's evolved state; does NOT modify it -- this is a pure
+    ! diagnostic that nothing in the SHOC solver consumes. It has two output
+    ! paths: history (LSCALE_SHOC, LSCALE_UP_SHOC, LSCALE_DOWN_SHOC) via the
+    ! host interface, and the in-and-out txt file written from inside this
+    ! substep loop below when l_txt_write=.true.
+    !
+    ! For history only the final-substep value survives (the array is
+    ! overwritten each t and outfld'd after the loop), so we only need to run
+    ! the (expensive) algorithm on the last substep -- UNLESS we are writing
+    ! the per-substep txt dump, which needs it every t.
+    if (l_txt_write .or. t == nadv) then
+       call shoc_compute_lscale(                              &
+            shcol, nlev, nlevi,                               &  ! Input
+            thetal, qw, tke, shoc_thv,                        &  ! Input
+            pres, inv_exner, zt_grid, zi_grid,                &  ! Input
+            lscale_shoc, lscale_up_shoc, lscale_down_shoc)       ! Output
+    end if
+
+    ! Update the turbulent length scale.  Note: shoc_thv (refreshed this
+    ! nadv iteration) is used instead of the intent(in) thv so that
+    ! compute_brunt_shoc_length sees the current substep state.
     call shoc_length(&
        shcol,nlev,nlevi,&                ! Input
        host_dx,host_dy,&                 ! Input
        zt_grid,zi_grid,dz_zt,&           ! Input
-       tke,thv,&                         ! Input
+       tke,shoc_thv,&                    ! Input
        brunt,shoc_mix)                   ! Output
+
+    ! Diagnostic decomposition of shoc_mix into its three component length
+    ! scales (surface/wall, asymptotic l_inf, stable stratification), in [m].
+    ! Uses the same brunt shoc_length just produced. Output to history only
+    ! (SHOC_MIX_SURF/LINF/STRAT); does not feed back into the solution.
+    !
+    ! Pure diagnostic, history-only (not in the txt dump), so only the
+    ! final-substep value survives the loop -- compute it on the last
+    ! substep only. This also collapses the l_inf recompute below (see the
+    ! subroutine header) to once per shoc_main call.
+    if (t == nadv) then
+       call compute_shoc_mix_terms(&
+          shcol,nlev,&                                    ! Input
+          tke,brunt,zt_grid,dz_zt,&                       ! Input
+          shoc_mix_surf,shoc_mix_linf,shoc_mix_strat)     ! Output
+    end if
 
     ! Advance the SGS TKE equation
     call shoc_tke(&
@@ -582,13 +689,16 @@ subroutine shoc_main ( &
 
     if (l_txt_write.and.masterproc) then
       do kk=nlev,1,-1
-         write(txtout_unit,fmt) t*nint(dtime),                                           &! time elapsed inside this subroutine 
+         write(txtout_unit,fmt) t*nint(dtime),                                           &! time elapsed inside this subroutine
                                 kk-1,                                                    &! vertical layer index (0 = TOM, nlev - 1 = sfc)
                                 u_wind(1,kk), v_wind(1,kk), tke(1,kk),                   &! u, v, and tke
                                     qw(1,kk)-shoc_ql(1,kk),                              &! qv
                                shoc_ql(1,kk),                                            &! qc
                                 thetal(1,kk)/inv_exner(1,kk) + lcond/cp * shoc_ql(1,kk), &! temperature
-                                  pres(1,kk)                                              ! pressure
+                                  pres(1,kk),                                            &! pressure
+                            lscale_shoc(1,kk),                                           &! Larson Lscale [m]
+                         lscale_up_shoc(1,kk),                                           &! Larson Lscale (upward) [m]
+                       lscale_down_shoc(1,kk)                                             ! Larson Lscale (downward) [m]
       end do
     end if
     !---------------------------------------------
@@ -4922,6 +5032,98 @@ subroutine compute_shoc_mix_shoc_length(nlev,shcol,tke,brunt,zt_grid,l_inf,shoc_
   enddo ! end k loop (vertical loop)
 
 end subroutine compute_shoc_mix_shoc_length
+
+subroutine compute_shoc_mix_terms(&
+     shcol,nlev,&                                    ! Input
+     tke,brunt,zt_grid,dz_zt,&                       ! Input
+     shoc_mix_surf,shoc_mix_linf,shoc_mix_strat)     ! Output
+
+  !=========================================================
+  ! Diagnostic decomposition of the SHOC mixing length (compute_shoc_mix_shoc_length)
+  ! into its three component length scales, each in [m] so they are directly
+  ! comparable to SHOC_MIX and the Larson LSCALE diagnostics.
+  !
+  ! shoc_mix = (2.8284/length_fac)*sqrt(1/(A_surf + A_linf + A_strat)), with
+  !   A_surf  = 1/(tscale*sqrt(tke)*vk*z)     (surface/wall, von Karman)
+  !   A_linf  = 1/(tscale*sqrt(tke)*l_inf)    (asymptotic / BL-depth)
+  !   A_strat = 0.01*max(brunt,0)/tke         (stable stratification)
+  ! Each component length L_k = (2.8284/length_fac)*sqrt(1/A_k), so (pre-clip)
+  !   1/shoc_mix^2 = 1/L_surf^2 + 1/L_linf^2 + 1/L_strat^2.
+  !
+  ! These three term expressions MIRROR compute_shoc_mix_shoc_length. That
+  ! formula is hardcoded in source (its constants are NOT namelist-tunable):
+  ! the literals 2.8284, 0.01, and tscale=400, plus the module parameters
+  ! length_fac, maxlen, and vk. If any of those constants is changed, or the
+  ! formula's structure is changed (a term added/removed, the functional form,
+  ! the maxlen clipping, or the harmonic-sum-of-squares combination), the same
+  ! edit MUST be made here -- otherwise this decomposition silently drifts out
+  ! of sync and no longer sums to the real shoc_mix. Diagnostic only: does not
+  ! modify shoc_mix.
+  !
+  ! l_inf is recomputed here via compute_l_inf_shoc_length rather than reused
+  ! from shoc_length (which keeps it as a local and discards it). Threading
+  ! l_inf out of shoc_length would alter that standard SHOC routine's
+  ! signature -- shared with the SCREAM/C++ port -- so we deliberately accept
+  ! one extra call here. The cost is negligible: compute_l_inf_shoc_length is
+  ! a cheap pair of vertical sums, and the caller only invokes this routine on
+  ! the final nadv substep (history-only), so it runs once per shoc_main call.
+  !=========================================================
+
+  implicit none
+
+  integer, intent(in) :: nlev, shcol
+  ! turbulent kinetic energy [m^2/s^2]
+  real(rtype), intent(in) :: tke(shcol,nlev)
+  ! brunt vaisala frequency squared, N^2 [s-2]
+  ! (note: 'brunt' holds N^2, not N; negative where unstable)
+  real(rtype), intent(in) :: brunt(shcol,nlev)
+  ! heights on thermo (midpoint) grid [m]
+  real(rtype), intent(in) :: zt_grid(shcol,nlev)
+  ! layer thickness on thermo grid [m]
+  real(rtype), intent(in) :: dz_zt(shcol,nlev)
+
+  ! Component length scales [m]
+  real(rtype), intent(out) :: shoc_mix_surf (shcol,nlev)
+  real(rtype), intent(out) :: shoc_mix_linf (shcol,nlev)
+  real(rtype), intent(out) :: shoc_mix_strat(shcol,nlev)
+
+  ! LOCAL VARIABLES
+  real(rtype) :: l_inf(shcol)
+  real(rtype) :: tkes, brunt2, term_surf, term_linf, term_strat, cfac
+  integer :: i, k
+
+  ! Turnover timescale [s] (matches compute_shoc_mix_shoc_length)
+  real(rtype), parameter :: tscale = 400._rtype
+
+  ! Reuse the existing asymptotic-length-scale routine (single source of truth)
+  l_inf(:) = 0._rtype
+  call compute_l_inf_shoc_length(nlev,shcol,zt_grid,dz_zt,tke,l_inf)
+
+  cfac = 2.8284_rtype/length_fac
+
+  do k=1,nlev
+    do i=1,shcol
+      tkes = sqrt(tke(i,k))
+      brunt2 = 0._rtype
+      if (brunt(i,k) .ge. 0._rtype) brunt2 = brunt(i,k)
+
+      term_surf  = 1._rtype/(tscale*tkes*vk*zt_grid(i,k))
+      term_linf  = 1._rtype/(tscale*tkes*l_inf(i))
+      term_strat = 0.01_rtype*(brunt2/tke(i,k))
+
+      shoc_mix_surf(i,k) = cfac*sqrt(1._rtype/term_surf)
+      shoc_mix_linf(i,k) = cfac*sqrt(1._rtype/term_linf)
+      ! term_strat = 0 in neutral/unstable air (brunt<=0) -> length unbounded;
+      ! cap at maxlen so the field is finite ("stratification imposes no limit").
+      if (term_strat > 0._rtype) then
+        shoc_mix_strat(i,k) = min(maxlen, cfac*sqrt(1._rtype/term_strat))
+      else
+        shoc_mix_strat(i,k) = maxlen
+      endif
+    enddo
+  enddo
+
+end subroutine compute_shoc_mix_terms
 
 subroutine check_length_scale_shoc_length(nlev,shcol,host_dx,host_dy,shoc_mix)
   ! Do checks on the length scale.  Make sure it is not
