@@ -965,8 +965,6 @@ end function shoc_implements_cnst
      end if
    enddo
   
-   !! Hui added SHOCb here 
-
    !-------------------------------------------
    ! Substepping configuration (if applicable)
    !-------------------------------------------
@@ -1030,8 +1028,6 @@ end function shoc_implements_cnst
    ! ------------------------------------------------- !
    ! Note that each call includes nadv time steps of integration for SHOC
    
-    !! Hui added SHOCc here 
-
    !============================
    do i_shoc_main = 1, n_shoc_main_calls
 
@@ -1149,8 +1145,6 @@ end function shoc_implements_cnst
    call physics_ptend_init(ptend_all, state%psetcols, 'shoc')
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
-
-      !! Hui added SHOCd here 
 
    ! ------------------------------------------------------------ !
    ! ------------------------------------------------------------ !
