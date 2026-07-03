@@ -140,10 +140,10 @@ void Functions<S,D>::shoc_main_internal(
 {
 
   // Define temporary variables
-  uview_1d<Spack> rho_zt, shoc_qv, shoc_tabs, dz_zt, dz_zi;
-  workspace.template take_many_and_reset<5>(
-    {"rho_zt", "shoc_qv", "shoc_tabs", "dz_zt", "dz_zi"},
-    {&rho_zt, &shoc_qv, &shoc_tabs, &dz_zt, &dz_zi});
+  uview_1d<Spack> rho_zt, shoc_qv, shoc_tabs, dz_zt, dz_zi, shoc_thv;
+  workspace.template take_many_and_reset<6>(
+    {"rho_zt", "shoc_qv", "shoc_tabs", "dz_zt", "dz_zi", "shoc_thv"},
+    {&rho_zt, &shoc_qv, &shoc_tabs, &dz_zt, &dz_zi, &shoc_thv});
 
   // Local scalars
   Scalar se_b{0},   ke_b{0},   wv_b{0}, wl_b{0},
@@ -188,6 +188,25 @@ void Functions<S,D>::shoc_main_internal(
                              shoc_ql,inv_exner, // Input
                              shoc_tabs);        // Output
 
+    // Refresh virtual potential temperature for this substep, identical in
+    // form to the host-side thv:
+    //   thv = T * inv_exner * (1 + zvir*qv - qc).
+    // Built from SHOC's own diagnosed temperature (shoc_tabs) and vapor
+    // (shoc_qv) computed just above. The const input `thv` is set once per
+    // shoc_main call and goes stale as thetal/qw evolve
+    // (update_prognostics_implicit) and shoc_ql is re-diagnosed
+    // (shoc_assumed_pdf) each substep; shoc_thv is used below by
+    // shoc_length (-> compute_brunt_shoc_length).
+    // Mirrors the E3SM Fortran fix in shoc.F90 (maint-3.0-scm branches).
+    team.team_barrier();
+    {
+      const Scalar zvir = C::ZVIR;
+      const Int nlev_pack = ekat::npack<Spack>(nlev);
+      Kokkos::parallel_for(Kokkos::TeamVectorRange(team, nlev_pack), [&] (const Int& k) {
+        shoc_thv(k) = shoc_tabs(k)*inv_exner(k)*(1 + zvir*shoc_qv(k) - shoc_ql(k));
+      });
+    }
+
     team.team_barrier();
     shoc_diag_obklen(uw_sfc,vw_sfc,     // Input
                      wthl_sfc, wqw_sfc, // Input
@@ -204,12 +223,14 @@ void Functions<S,D>::shoc_main_internal(
             workspace,                // Workspace
             pblh);                    // Output
 
-    // Update the turbulent length scale
+    // Update the turbulent length scale.  Note: shoc_thv (refreshed this
+    // substep) is used instead of the const input thv so that
+    // compute_brunt_shoc_length sees the current substep state.
     shoc_length(team,nlev,nlevi,       // Input
                 length_fac,            // Runtime Options
                 dx,dy,                 // Input
                 zt_grid,zi_grid,dz_zt, // Input
-                tke,thv,               // Input
+                tke,shoc_thv,          // Input
                 workspace,             // Workspace
                 brunt,shoc_mix);       // Output
 
@@ -314,8 +335,8 @@ void Functions<S,D>::shoc_main_internal(
           pblh);                          // Output
 
   // Release temporary variables from the workspace
-  workspace.template release_many_contiguous<5>(
-    {&rho_zt, &shoc_qv, &shoc_tabs, &dz_zt, &dz_zi});
+  workspace.template release_many_contiguous<6>(
+    {&rho_zt, &shoc_qv, &shoc_tabs, &dz_zt, &dz_zi, &shoc_thv});
 }
 #else
 template<typename S, typename D>
@@ -408,7 +429,8 @@ void Functions<S,D>::shoc_main_internal(
   const view_2d<Spack>& shoc_qv,
   const view_2d<Spack>& shoc_tabs,
   const view_2d<Spack>& dz_zt,
-  const view_2d<Spack>& dz_zi)
+  const view_2d<Spack>& dz_zi,
+  const view_2d<Spack>& shoc_thv)
 {
   // Scalarize some views for single entry access
   const auto s_thetal  = ekat::scalarize(thetal);
@@ -448,6 +470,26 @@ void Functions<S,D>::shoc_main_internal(
                                   shoc_ql,inv_exner, // Input
                                   shoc_tabs);        // Output
 
+    // Refresh virtual potential temperature for this substep from SHOC's
+    // own diagnosed temperature (shoc_tabs) and vapor (shoc_qv):
+    //   thv = T * inv_exner * (1 + zvir*qv - qc).
+    // The const input `thv` is set once per shoc_main call and goes stale
+    // as the prognostics evolve each substep; shoc_thv is used below by
+    // shoc_length (-> compute_brunt_shoc_length).
+    // Mirrors the E3SM Fortran fix in shoc.F90 (maint-3.0-scm branches).
+    {
+      const Scalar zvir = C::ZVIR;
+      using ExeSpace = typename KT::ExeSpace;
+      const Int nlev_packs = ekat::npack<Spack>(nlev);
+      const auto policy = ekat::ExeSpaceUtils<ExeSpace>::get_default_team_policy(shcol, nlev_packs);
+      Kokkos::parallel_for("shoc_refresh_thv", policy, KOKKOS_LAMBDA(const MemberType& team) {
+        const Int i = team.league_rank();
+        Kokkos::parallel_for(Kokkos::TeamVectorRange(team, nlev_packs), [&] (const Int& k) {
+          shoc_thv(i,k) = shoc_tabs(i,k)*inv_exner(i,k)*(1 + zvir*shoc_qv(i,k) - shoc_ql(i,k));
+        });
+      });
+    }
+
     shoc_diag_obklen_disp(shcol, nlev,
                           uw_sfc,vw_sfc,     // Input
                           wthl_sfc, wqw_sfc, // Input
@@ -464,12 +506,14 @@ void Functions<S,D>::shoc_main_internal(
                  workspace_mgr,            // Workspace mgr
                  pblh);                    // Output
 
-    // Update the turbulent length scale
+    // Update the turbulent length scale.  Note: shoc_thv (refreshed this
+    // substep) is used instead of the const input thv so that
+    // compute_brunt_shoc_length sees the current substep state.
     shoc_length_disp(shcol,nlev,nlevi,      // Input
                      length_fac,            // Runtime Options
                      dx,dy,                 // Input
                      zt_grid,zi_grid,dz_zt, // Input
-                     tke,thv,               // Input
+                     tke,shoc_thv,          // Input
                      workspace_mgr,         // Workspace mgr
                      brunt,shoc_mix);       // Output
 
@@ -715,7 +759,8 @@ Int Functions<S,D>::shoc_main(
     shoc_temporaries.se_a, shoc_temporaries.ke_a, shoc_temporaries.wv_a, shoc_temporaries.wl_a,
     shoc_temporaries.kbfs, shoc_temporaries.ustar2,
     shoc_temporaries.wstar, shoc_temporaries.rho_zt, shoc_temporaries.shoc_qv,
-    shoc_temporaries.tabs, shoc_temporaries.dz_zt, shoc_temporaries.dz_zi);
+    shoc_temporaries.tabs, shoc_temporaries.dz_zt, shoc_temporaries.dz_zi,
+    shoc_temporaries.shoc_thv);
 #endif
 
   auto finish = std::chrono::steady_clock::now();

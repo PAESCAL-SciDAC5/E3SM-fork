@@ -14,7 +14,9 @@ module shoc
 
   use physics_utils, only: rtype, rtype8, itype, btype
   use scream_abortutils, only: endscreamrun
+#ifndef SCREAM_CONFIG_IS_CMAKE
   use spmd_utils, only: masterproc
+#endif
 
 ! Bit-for-bit math functions.
 #ifdef SCREAM_CONFIG_IS_CMAKE
@@ -28,6 +30,13 @@ save ! for module variables
 public  :: shoc_init, shoc_main
 
 logical :: use_cxx = .true.
+
+#ifdef SCREAM_CONFIG_IS_CMAKE
+! EAMxx/SCREAM builds compile this file without EAM's spmd_utils. The txt
+! output path (l_txt_write) is never enabled in those builds, so a constant
+! stand-in for masterproc is sufficient to satisfy the compiler.
+logical, parameter :: masterproc = .true.
+#endif
 
 real(rtype), parameter, public :: largeneg = -99999999.99_rtype
 real(rtype), parameter, public :: pi = 3.14159265358979323_rtype
@@ -254,10 +263,13 @@ subroutine shoc_main ( &
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
     use shoc_iso_f, only: shoc_main_f
-#endif
-
+#else
+  ! EAM-only modules: EAMxx/SCREAM builds compile this file but do not build
+  ! cam_history or shoc_lscale_mod; the code that needs them (substep history
+  ! output and the diagnostic Larson length scale) is guarded out below.
   use cam_history,    only: outfld
   use shoc_lscale_mod, only: shoc_compute_lscale
+#endif
 
   implicit none
 
@@ -455,18 +467,20 @@ subroutine shoc_main ( &
   integer :: clock_count1, clock_count_rate, clock_count_max, clock_count2, clock_count_diff
 #endif
 
+  ! The Larson length scale diagnostics are intent(out) but are computed only
+  ! on the EAM Fortran path (shoc_compute_lscale is guarded out of
+  ! EAMxx/SCREAM CMAKE builds, and the C++ dispatch below bypasses it too).
+  ! Zero them up front so the caller never receives undefined values that
+  ! could be written to history/txt output.
+  lscale_shoc      = 0._rtype
+  lscale_up_shoc   = 0._rtype
+  lscale_down_shoc = 0._rtype
+  shoc_mix_surf    = 0._rtype
+  shoc_mix_linf    = 0._rtype
+  shoc_mix_strat   = 0._rtype
+
 #ifdef SCREAM_CONFIG_IS_CMAKE
   if (use_cxx) then
-    ! The new diagnostics (Larson length scale and shoc_mix term
-    ! decomposition) are intent(out) but are NOT computed on this C++ path
-    ! (see NOTE below). Zero them so the caller never receives undefined
-    ! values that could be written to history/txt output.
-    lscale_shoc      = 0._rtype
-    lscale_up_shoc   = 0._rtype
-    lscale_down_shoc = 0._rtype
-    shoc_mix_surf    = 0._rtype
-    shoc_mix_linf    = 0._rtype
-    shoc_mix_strat   = 0._rtype
     call shoc_main_f(shcol, nlev, nlevi, dtime, nadv, npbl,& ! Input
                      host_dx, host_dy,thv, &                 ! Input
                      zt_grid,zi_grid,pres,presi,pdel,&       ! Input
@@ -577,6 +591,7 @@ subroutine shoc_main ( &
     ! overwritten each t and outfld'd after the loop), so we only need to run
     ! the (expensive) algorithm on the last substep -- UNLESS we are writing
     ! the per-substep txt dump, which needs it every t.
+#ifndef SCREAM_CONFIG_IS_CMAKE
     if (l_txt_write .or. t == nadv) then
        call shoc_compute_lscale(                              &
             shcol, nlev, nlevi,                               &  ! Input
@@ -584,6 +599,7 @@ subroutine shoc_main ( &
             pres, inv_exner, zt_grid, zi_grid,                &  ! Input
             lscale_shoc, lscale_up_shoc, lscale_down_shoc)       ! Output
     end if
+#endif
 
     ! Update the turbulent length scale.  Note: shoc_thv (refreshed this
     ! nadv iteration) is used instead of the intent(in) thv so that
@@ -675,6 +691,7 @@ subroutine shoc_main ( &
     ! equals ncol in tphysbc/tphysac, and that nlev/nlevi here equal
     ! pver/pverp in tphysbc/tphysac.
 
+#ifndef SCREAM_CONFIG_IS_CMAKE
     if (t.le.turb_nadv_out_nstep) then
 
        write(numstr,'(a1,i4.4)') '_',t
@@ -683,6 +700,7 @@ subroutine shoc_main ( &
        call outfld(  'THETAL'//trim(adjustl(numstr)),      thetal,shcol,lchnk)
        call outfld( 'CLDFRAC'//trim(adjustl(numstr)),shoc_cldfrac,shcol,lchnk)
     end if
+#endif
 
     !---------------------------------------------
     ! Write out fields to SHOC text output file

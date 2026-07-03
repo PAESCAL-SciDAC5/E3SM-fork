@@ -111,12 +111,21 @@ contains
 
     real(kind=c_real), intent(out) :: elapsed_s
 
-    call shoc_main(shcol, nlev, nlevi, dtime, nadv, host_dx, host_dy, thv,   &
+    ! Dummies for shoc_main's txt-output controls and diagnostic-only outputs
+    ! (Larson length scale and shoc_mix decomposition), which are not
+    ! exercised through this bridge. The txt output path is disabled.
+    real(kind=c_real), dimension(shcol, nlev) :: lscale_shoc, lscale_up_shoc, &
+       lscale_down_shoc, shoc_mix_surf, shoc_mix_linf, shoc_mix_strat
+
+    call shoc_main(.false., -1, 0, 0,                                        &
+     shcol, nlev, nlevi, dtime, nadv, host_dx, host_dy, thv,                 &
      zt_grid, zi_grid, pres, presi, pdel, wthl_sfc, wqw_sfc, uw_sfc, vw_sfc, &
      wtracer_sfc, num_qtracers, w_field, inv_exner, phis, host_dse, tke, thetal, &
      qw, u_wind, v_wind, qtracers, wthv_sec, tkh, tk, shoc_ql, shoc_cldfrac, &
      pblh, shoc_mix, isotropy, w_sec, thl_sec, qw_sec, qwthl_sec, wthl_sec,  &
-     wqw_sec, wtke_sec, uw_sec, vw_sec, w3, wqls_sec, brunt,shoc_ql2,elapsed_s)
+     wqw_sec, wtke_sec, uw_sec, vw_sec, w3, wqls_sec, brunt, shoc_ql2,       &
+     lscale_shoc, lscale_up_shoc, lscale_down_shoc,                          &
+     shoc_mix_surf, shoc_mix_linf, shoc_mix_strat, elapsed_s)
   end subroutine shoc_main_c
 
   subroutine shoc_use_cxx_c(arg_use_cxx) bind(C)
