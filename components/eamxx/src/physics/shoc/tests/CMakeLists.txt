@@ -118,3 +118,12 @@ if (SCREAM_ENABLE_BASELINE_TESTS)
   set_tests_properties (shoc_run_and_cmp_f90${TEST_SUFFIX} PROPERTIES LABELS "baseline_gen;baseline_cmp")
   set_tests_properties (shoc_run_and_cmp_cxx${TEST_SUFFIX} PROPERTIES LABELS "baseline_gen;cxx baseline_cmp")
 endif()
+
+# Standalone SHOC "in-and-out" driver (executable only, not a ctest).
+# Runs a single-column, SHOC-only DYCOMS RF01 case from the team's
+# ShocInOut_IC_*.txt ASCII files, mirroring EAM's turb_standalone mode,
+# with either the C++ or the reference Fortran SHOC (-f). Used for the
+# E3SM (Fortran) vs EAMxx/ERF (C++) apples-to-apples comparison.
+CreateUnitTestExec(shoc_in_and_out "shoc_in_and_out.cpp"
+  LIBS shoc
+  EXCLUDE_MAIN_CPP)
