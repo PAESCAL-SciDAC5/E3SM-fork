@@ -353,13 +353,15 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
   !        = 0.018 + m * (hol - eps_reg), if -eps_reg <= hol <= eps_reg
   !        = 0.0327,                      if hol < -eps_reg
   ! where m = (0.0327 - 0.018)/(-2.0*eps_reg)
-  eps_reg = 0.5_R8
-  alpha_iter = 0.08_R8
-   ! eps_reg = 0.1_R8 
-   ! alpha_iter = 0.016_R8
+!   eps_reg = 1.0_R8 ! CTRL case
+!   alpha_iter = 1.0_R8
+!   eps_reg = 0.5_R8 ! case 1
+!   alpha_iter = 0.08_R8
+   eps_reg = 0.1_R8 ! case 2 (SENS)
+   alpha_iter = 0.016_R8
    ! eps_reg = 0.01_R8 
    ! alpha_iter = 0.0016_R8
-   ! eps_reg = 0.015_R8 
+   ! eps_reg = 0.015_R8 ! case 3
    ! alpha_iter = 0.0024_R8
    ! eps_reg = 0.0015_R8 
    ! alpha_iter = 0.00096_R8
@@ -373,7 +375,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
 
 !   !--- temporary hard-coding change of max iters and convergence ---
   flux_con_tol = 3.e-3_R8
-  flux_con_max_iter = 20000000 ! use for final runs
+  flux_con_max_iter = 20000000 ! use for final runs (SENS)
+!   flux_con_max_iter = 2 ! original value (CTRL)
 !   flux_con_max_iter = 2000 ! use for ctrl run with adaptive limiter
 
    DO n=1,nMax
@@ -412,17 +415,6 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
          !          ! (1.0_R8-stable) * chxcdu + stable * chxcds
          ! ren    = 0.0346_R8 !cexcd
 
-         ! ! !--- replace rhn with regularized version for initial guess
-         ! ! !--- (if this the output of this subroutine, it suggests
-         ! ! !--- extreme sensitivitity of the iteration to the initial guess
-         ! ! if (delt > eps_reg) then
-         ! !    rhn = 0.018_R8
-         ! ! else if (delt > -eps_reg) then
-         ! !    rhn = 0.018_R8 + (0.0327_R8 - 0.018_R8) / (-2.0_R8 * eps_reg) * (delt - eps_reg)
-         ! ! else
-         ! !    rhn = 0.0327_R8
-         ! ! end if 
-
          ! !--- ustar, tstar, qstar ---
          ! ustar = rdn * vmag
          ! tstar = rhn * delt
@@ -452,17 +444,14 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
 
          ! ! iterate until convergence or max iters are reached
          ! iter = 0
-         ! ! do while( (abs((ustar - ustar_prev)/ustar) > flux_con_tol .or. &
-         ! !       abs((tstar - tstar_prev)/tstar) > flux_con_tol .or. &
-         ! !       abs((qstar - qstar_prev)/qstar) > flux_con_tol .or. &
-         ! !       abs(tau_diff) > dtaumin) .and. &
-         ! !       iter < flux_con_max_iter)
-         ! do while( sqrt(((ustar - ustar_prev)/ustar)**2 + ((tstar - tstar_prev)/tstar)**2 + ((qstar - qstar_prev)/qstar)**2 + ((u10n - u10n_prev)/u10n)**2) > flux_con_tol )
+         ! do while( (abs((ustar - ustar_prev)/ustar) > flux_con_tol .or. &
+         !     abs(tau_diff) > dtaumin) .and. &
+         !     iter < flux_con_max_iter)
          !    ! abort if exceeded max iters
-         !    if (iter > flux_con_max_iter) then
-         !       write(s_logunit,*) vmag,thbot(n),ts(n),zbot(n),qbot(n),ssq,ustar,ustar_prev,tstar,tstar_prev,qstar,qstar_prev,flux_con_tol,flux_con_max_iter
-         !       call shr_sys_abort('MAX ITERS (1000) REACHED WITHOUT OCN-ATM ITERATION CONVERGING ' // errMsg(sourcefile, __LINE__))
-         !    end if
+         !    ! if (iter > flux_con_max_iter) then
+         !    !    write(s_logunit,*) vmag,thbot(n),ts(n),zbot(n),qbot(n),ssq,ustar,ustar_prev,tstar,tstar_prev,qstar,qstar_prev,flux_con_tol,flux_con_max_iter
+         !    !    call shr_sys_abort('MAX ITERS (1000) REACHED WITHOUT OCN-ATM ITERATION CONVERGING ' // errMsg(sourcefile, __LINE__))
+         !    ! end if
          !    iter = iter + 1
          !    ustar_prev = ustar
          !    tstar_prev = tstar
@@ -471,7 +460,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
          !    !--- compute stability & evaluate all stability functions ---
          !    hol  = loc_karman*loc_g*zbot(n)*  &
          !          (tstar/thbot(n)+qstar/(1.0_R8/loc_zvir+qbot(n)))/ustar**2
-         !    hol  = sign( min(abs(hol), zeta_max), hol )
+         !    hol  = sign( min(abs(hol), 10.0_R8), hol )
 
          !    stable = 0.5_R8 + sign(0.5_R8 , hol)
          !    xsq    = max(sqrt(abs(1.0_R8 - 16.0_R8*hol)) , 1.0_R8)
@@ -487,17 +476,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
          !    rdn = sqrt(cdn(u10n))
          !    ren = 0.0346_R8 !cexcd
 
-         !    !--- C0 regularization of rhn based on linear function ---
-         !    if (hol > eps_reg) then
-         !       rhn = 0.018_R8
-         !    else if (hol > -eps_reg) then
-         !       rhn = 0.018_R8 + (0.0327_R8 - 0.018_R8)/(-2.0_R8*eps_reg) * (hol - eps_reg)
-         !    else 
-         !       rhn = 0.0327_R8
-         !    end if
-
          !    !--- original rhn (discontinuous) ---
-         !    !--- rhn = (1.0-stable)*0.0327 + stable * 0.018
+         !    rhn = (1.0-stable)*0.0327 + stable * 0.018
 
          !    !--- shift all coeffs to measurement height and stability ---
          !    rd = rdn / max(1.0_R8 + rdn/loc_karman*(alz-psimh), 1.e-3_r8)
@@ -505,9 +485,9 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
          !    re = ren / (1.0_R8 + ren/loc_karman*(alz-psixh))
 
          !    !--- update ustar, tstar, qstar using updated, shifted coeffs --
-         !    ustar = alpha_iter * (rd * vmag) + (1.0_R8 - alpha_iter) * ustar_prev
-         !    tstar = alpha_iter * (rh * delt) + (1.0_R8 - alpha_iter) * tstar_prev
-         !    qstar = alpha_iter * (re * delq) + (1.0_R8 - alpha_iter) * qstar_prev
+         !    ustar = rd * vmag
+         !    tstar = rh * delt
+         !    qstar = re * delq
 
          !    if (present(wsresp) .and. present(tau_est)) then
          !       ! Update stress and magnitude of mean wind.
@@ -521,6 +501,10 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
          !       vmag = max(seq_flux_atmocn_minwind, vmag)
          !    end if
          ! enddo
+         ! if (iter < 1) then
+         !    write(s_logunit,*) ustar,ustar_prev,flux_con_tol,flux_con_max_iter
+         !    call shr_sys_abort('No iterations performed ' // errMsg(sourcefile, __LINE__))
+         ! end if
 
       !    !--- old method with convergence and uniqueness fix but no regularization! ---
       !    !--- set zeta limiter and incrementer ---
@@ -688,7 +672,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
          ! such that zeta =/= zeta_max, accept the solution corresponding to
          ! zeta_max = 10
          zeta_incr = 0.25_R8
-         zeta_max = 1000.0_R8 + zeta_incr
+         zeta_max = 200.0_R8 + zeta_incr
 
         !--- loop over zeta_max ---
         ! zeta initally set to zeta_max so we always do at least one iteration
