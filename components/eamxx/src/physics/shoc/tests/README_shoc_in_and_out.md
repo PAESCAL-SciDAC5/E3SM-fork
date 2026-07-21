@@ -1,28 +1,23 @@
-# SHOC "in-and-out" standalone driver and ERF integration notes
+# SHOC "in-and-out" standalone driver notes
 
-`shoc_in_and_out.cpp` runs a single-column, SHOC-only simulation
-from the AMR team's ASCII initial-condition files for any desired benchmark case (e.g., DYCOMS RF01), mirroring EAM's `turb_standalone` ("in-and-out") mode. It is the reference for making a host
-model that embeds the EAMxx C++ SHOC (e.g. ERF) reproduce the E3SM Fortran
-in-and-out runs.
+`shoc_in_and_out.cpp` runs a single-column, SHOC-only simulation from the AMR team's
+ASCII initial-condition files for any desired benchmark case (e.g., DYCOMS RF01),
+mirroring EAM's `turb_standalone` ("in-and-out") mode. It is the reference for making a host
+model that embeds the EAMxx C++ SHOC reproduce the E3SM Fortran in-and-out runs.
 
 ## Why "in-and-out"
 
-The framework was originally built to answer one question: do the operations
-that *wrap* SHOC's `nadv` substep loop feed back into the turbulence physics?
+The framework was originally built to help answer the following question:
+Do the operations that *wrap* SHOC's `nadv` substep loop feed back into the
+turbulence physics?
 Those wrappers are a pre-loop `shoc_energy_integrals`, and — after the loop —
 `update_host_dse`, `shoc_energy_integrals`, `shoc_energy_fixer`,
-`compute_shoc_vapor`, `shoc_diag_obklen` and `pblintd`. Calling `shoc_main`
-once with `nadv=N` keeps those wrappers *outside* the whole integration
-(`exp1`); calling it `N` times with `nadv=1` runs them *between every substep*
-(`exp2`). So the two modes differ only in how often the wrappers execute — if
-they perturbed the prognostics, `exp1` and `exp2` would diverge. They are
-bit-for-bit identical, which shows the wrappers only touch `host_dse` and the
-pblh/obklen/qv diagnostics, none of which re-enter SHOC's prognostic evolution.
-The exp1-vs-exp2 test is the reason the machinery was built in the first place.
-The framework also *surfaced* the thv-staleness bug: by integrating SHOC
-standalone with a frozen host state, it amplified the thv-staleness into a
-visible artifact — which is how the bug was identified. (The Fortran↔C++ port
-validation came later still.)
+`compute_shoc_vapor`, `shoc_diag_obklen` and `pblintd`.
+Calling `shoc_main` once with `nadv=N` keeps those wrappers *outside* the whole integration
+(`exp1`); calling it `N` times with `nadv=1` runs them *between every substep* (`exp2`).
+The two modes differ only in how often the wrappers execute — if they perturbed the prognostics,
+`exp1` and `exp2` would diverge. They are bit-for-bit identical, which shows the wrappers only touch `host_dse` and the pblh/obklen/qv diagnostics, none of which re-enter SHOC's prognostic evolution.
+The framework also *surfaced* the thv-staleness bug: with a frozen host nothing refreshes `thv` between substeps, so a long (6 h) standalone integration lets the staleness accumulate into a visible artifact — whereas a coupled run, recomputing `thv` every step, hides it.
 
 ## Usage
 
@@ -32,10 +27,9 @@ shoc_in_and_out -d <dir with ShocInOut_IC_*.txt> [-f] [-dt 60] [-s 360]
 ```
 
 - default engine: EAMxx C++ `shoc_main`; `-f`: the reference Fortran
-  `shoc.F90` compiled into EAMxx (with the thv fix).
+  `shoc.F90` compiled into EAMxx (with the `thv` fix).
 - `-x exp2` (default): `-s` calls to `shoc_main` with `nadv=1`, per-substep
-  text output after each call (matches EAM `l_shoc_outer_loop=.true.` and the
-  natural ERF call pattern of one call per host timestep).
+  text output after each call (matches EAM `l_shoc_outer_loop=.true.`).
 - `-x exp1`: one call with `nadv=<s>`; only the final state is written.
 
 Output format is byte-compatible with the Fortran writer
@@ -43,7 +37,7 @@ Output format is byte-compatible with the Fortran writer
 time, k (0 = top), u, v, tke, qv, qc, T, P, lscale×3 (zeros here — the
 Larson length scale is an EAM-side diagnostic).
 
-## What a host (ERF) must do for an apples-to-apples run
+## What a C++-based host must do for an apples-to-apples run with SHOC's Fortran version
 
 1. **Call `shoc_main` directly.** Do not go through the EAMxx atmosphere
    process (`eamxx_shoc_process_interface`): its `SHOCPreprocess` recomputes
@@ -74,8 +68,7 @@ Larson length scale is an EAM-side diagnostic).
 6. **Carry the thv-staleness fix.** `shoc_main_impl.hpp` on this branch
    recomputes `shoc_thv = shoc_tabs*inv_exner*(1 + zvir*shoc_qv - shoc_ql)`
    each substep and uses it in `shoc_length` instead of the (stale) `thv`
-   input. An ERF copy of the EAMxx SHOC taken from upstream lacks this —
-   apply the same change (commit 63e246b4ee).
+   input.
 7. **Precision:** build with `SCREAM_DOUBLE_PRECISION=ON` (default).
 
 ## Validated agreement (DYCOMS RF01, dz = 10/20/50/100 m, dt = 60 s, 6 h)
