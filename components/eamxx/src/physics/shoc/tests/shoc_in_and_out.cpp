@@ -26,6 +26,14 @@
 // phis=0, host_dse = cp*T + g*z). Tunings and physics constants are the
 // shared EAM/EAMxx defaults (see shoc_f90.cpp::shoc_init and
 // shoc_functions_f90.cpp::shoc_main_f).
+//
+// High-level flow of main() below:
+//   [0] with no arguments, print the usage message and exit
+//   [1] READ    : parse the three ShocInOut_IC_*.txt files into an InOutIC
+//   [2] PREPARE : convert InOutIC into a FortranData "d" that shoc_main reads,
+//                 and initialize the chosen engine (C++ or Fortran)
+//   [3] RUN     : loop shoc_main over the substeps, evolving "d" in time
+//   [4] WRITE   : after each step, append the column state to the output file
 
 #include "shoc_main_wrap.hpp"
 #include "shoc_f90.hpp"
@@ -41,6 +49,7 @@
 #include <array>
 #include <cstdio>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -49,22 +58,32 @@ namespace {
 
 using scream::Real;
 using scream::Int;
-using namespace scream::shoc;
+// Bring in only the specific SHOC names we use (rather than the whole
+// scream::shoc namespace), matching the explicit style of the other tests.
+using scream::shoc::FortranData;
+using scream::shoc::shoc_init;
+using scream::shoc::shoc_main;
 
+// Raw container for the values read out of the three IC text files, kept in
+// the files' own "surface-first" order. This is a plain staging struct; the
+// flip to SHOC's top-first layout happens later, in make_fortran_data.
 struct InOutIC {
-  int nz = 0;
-  Real dz = 0, zsurf = 0;
-  Real wqw_sfc = 0, wthl_sfc = 0, uw_sfc = 0, vw_sfc = 0;
+  int nz = 0;                                   // number of model levels
+  Real dz = 0, zsurf = 0;                       // level thickness, surface height
+  Real wqw_sfc = 0, wthl_sfc = 0, uw_sfc = 0, vw_sfc = 0;  // surface fluxes
   // zi-grid profiles, file order (index 0 = surface), size nz+1
   std::vector<Real> zi, presi;
   // zt-grid profiles, file order (index 0 = lowest level), size nz
   std::vector<Real> zt;
-  // The 14 zt-grid field blocks, in file order.
+  // The 14 zt-grid field blocks, in file order. The enum both names each
+  // block and (via NUM_ZT_FIELDS) counts them, so f[THL] is the theta_l block.
   enum ZtField { U=0, V, WM_ZT, TKE, THV, THL, QT, QC, PMID, PDEL,
                  INV_EXNER, TK, TKH, CLOUD_FRAC, NUM_ZT_FIELDS };
   std::array<std::vector<Real>, NUM_ZT_FIELDS> f;
 };
 
+// A line counts as a comment (to be skipped) if it is blank or its first
+// non-whitespace character is '#'.
 bool is_comment (const std::string& line) {
   const auto pos = line.find_first_not_of(" \t\r");
   return pos == std::string::npos || line[pos] == '#';
@@ -79,7 +98,14 @@ void read_surface_vars (const std::string& fname, InOutIC& ic) {
   std::vector<Real> vals;
   while (std::getline(in, line)) {
     if (is_comment(line)) continue;
-    vals.push_back(std::stod(line));
+    // Parse through a stringstream (with a fail check) so a malformed line
+    // gives the same clear message as read_zi_grid/read_zt_grid, instead of
+    // throwing a raw std::stod exception.
+    std::istringstream ss(line);
+    Real val;
+    ss >> val;
+    EKAT_REQUIRE_MSG(!ss.fail(), "shoc_in_and_out: bad value in " + fname);
+    vals.push_back(val);
   }
   EKAT_REQUIRE_MSG(vals.size() == 7,
     "shoc_in_and_out: expected 7 values in " + fname);
@@ -104,6 +130,8 @@ void read_zi_grid (const std::string& fname, InOutIC& ic) {
     int k; Real z, p;
     ss >> k >> z >> p;
     EKAT_REQUIRE_MSG(!ss.fail(), "shoc_in_and_out: bad row in " + fname);
+    // Rows must arrive in order (k = 0, 1, 2, ...); the running vector size is
+    // the index we expect next.
     EKAT_REQUIRE_MSG(k == (int)ic.zi.size(),
       "shoc_in_and_out: non-sequential k index in " + fname);
     ic.zi.push_back(z);
@@ -121,10 +149,15 @@ void read_zt_grid (const std::string& fname, InOutIC& ic) {
   std::ifstream in(fname);
   EKAT_REQUIRE_MSG(in, "shoc_in_and_out: cannot open " + fname);
   std::string line;
+  // Accumulate rows block by block. Each row is stored as {k, zt, value}.
   std::vector<std::vector<std::array<Real,3>>> blocks;
   while (std::getline(in, line)) {
     if (is_comment(line)) {
-      if (!blocks.empty() && blocks.back().empty()) continue; // consecutive comments
+      // A comment marks the start of a new block, but only open one if the
+      // current block already has data; this collapses runs of consecutive
+      // comment lines (the preamble and the per-block headers) into a single
+      // boundary.
+      if (!blocks.empty() && blocks.back().empty()) continue;
       blocks.emplace_back();
       continue;
     }
@@ -136,12 +169,14 @@ void read_zt_grid (const std::string& fname, InOutIC& ic) {
     EKAT_REQUIRE_MSG(!ss.fail(), "shoc_in_and_out: bad row in " + fname);
     blocks.back().push_back(row);
   }
-  // Drop empty blocks created by preamble comments.
+  // Drop any empty blocks left behind by the preamble comments.
   std::vector<std::vector<std::array<Real,3>>> data;
   for (auto& b : blocks) if (!b.empty()) data.push_back(std::move(b));
   EKAT_REQUIRE_MSG((int)data.size() == InOutIC::NUM_ZT_FIELDS,
     "shoc_in_and_out: expected 14 field blocks in " + fname + ", got " +
     std::to_string(data.size()));
+  // Copy each block into ic.f[b], validating that every block shares the same
+  // in-order zt column (block 0 defines zt; the rest must match it).
   for (int b = 0; b < InOutIC::NUM_ZT_FIELDS; ++b) {
     EKAT_REQUIRE_MSG((int)data[b].size() == ic.nz,
       "shoc_in_and_out: block " + std::to_string(b) + " in " + fname +
@@ -165,10 +200,12 @@ FortranData::Ptr make_fortran_data (const InOutIC& ic, Real dx, Real dy) {
   using C  = scream::physics::Constants<Real>;
   using SC = scream::shoc::Constants<Real>;
 
+  // Single column, one dummy tracer; nlevi = nlev + 1 interfaces.
   const Int shcol = 1, nlev = ic.nz, nlevi = ic.nz+1, num_qtracers = 1;
   auto dp = std::make_shared<FortranData>(shcol, nlev, nlevi, num_qtracers);
   auto& d = *dp;
 
+  // Column-only (scalar) inputs.
   d.host_dx(0) = dx;
   d.host_dy(0) = dy;
   d.wthl_sfc(0) = ic.wthl_sfc;
@@ -178,12 +215,14 @@ FortranData::Ptr make_fortran_data (const InOutIC& ic, Real dx, Real dy) {
   d.phis(0)     = 0;                      // flat ocean surface, as in the SCM runs
   d.wtracer_sfc(0,0) = 0;                 // shoc_intr sets tracer fluxes to zero
 
+  // Interface-grid (zi) profiles, flipped to top-first.
   for (Int k = 0; k < nlevi; ++k) {
     const int r = nlevi-1-k;              // flip: k=0 is model top
     d.zi_grid(0,k) = ic.zi[r];
     d.presi(0,k)   = ic.presi[r];
   }
 
+  // Midpoint-grid (zt) profiles, flipped to top-first.
   for (Int k = 0; k < nlev; ++k) {
     const int r = nlev-1-k;               // flip: k=0 is model top
     d.zt_grid(0,k)   = ic.zt[r];
@@ -218,11 +257,15 @@ FortranData::Ptr make_fortran_data (const InOutIC& ic, Real dx, Real dy) {
 
 // Per-substep text output, byte-compatible with the Fortran writer
 // (shoc.F90 fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10,3(1X,F12.4))').
-// The three Larson-length columns are diagnostics not computed by the C++
-// SHOC; they are written as zeros (the EAMxx-built Fortran also zeroes them).
+// One row per level. The three Larson-length columns are diagnostics not
+// computed by the C++ SHOC; they are written as zeros (the EAMxx-built
+// Fortran also zeroes them).
 void write_state (std::FILE* fp, int time_s, const FortranData& d) {
   using C = scream::physics::Constants<Real>;
   for (Int k = 0; k < d.nlev; ++k) {
+    // Recover the diagnostics the output file reports from the prognostics:
+    // vapor = total water - cloud liquid, and temperature back out of theta_l.
+    // inv_exner is a fixed input, so this reconstruction is valid every step.
     const Real qc = d.shoc_ql(0,k);
     const Real qv = d.qw(0,k) - qc;
     const Real T  = d.thetal(0,k)/d.inv_exner(0,k) + (C::LatVap/C::Cpair)*qc;
@@ -234,6 +277,7 @@ void write_state (std::FILE* fp, int time_s, const FortranData& d) {
   }
 }
 
+// Guard for options that consume a following value: make sure one exists.
 void expect_another_arg (int i, int argc) {
   EKAT_REQUIRE_MSG(i != argc-1, "Expected another cmd-line arg.");
 }
@@ -241,9 +285,11 @@ void expect_another_arg (int i, int argc) {
 } // namespace
 
 int main (int argc, char** argv) {
+  // [0] No options at all: print the usage message and exit with a non-zero
+  //     code (this is a "wrong usage" exit, not a successful run).
   if (argc == 1) {
     std::cout << argv[0] << " [options]\n"
-      "SHOC in-and-out driver: DYCOMS RF01 single-column SHOC-only run from\n"
+      "SHOC in-and-out driver: single-column SHOC-only run from\n"
       "ShocInOut_IC_*.txt files, mirroring EAM's turb_standalone mode.\n"
       "Options:\n"
       "  -d <dir>      Directory holding ShocInOut_IC_*.txt. Default: '.'\n"
@@ -258,52 +304,66 @@ int main (int argc, char** argv) {
     return 1;
   }
 
-  bool use_fortran = false;
-  int dt = 60, nsteps = 360;
-  Real dx = 100000.0;
+  // [1a] Defaults for every option; command-line flags below override them.
+  bool use_fortran = false;                 // false => C++ engine, true => Fortran
+  int dt = 60, nsteps = 360;                // timestep [s] and number of substeps
+  Real dx = 100000.0;                       // horizontal grid size [m]
   std::string icdir = ".", mode = "exp2", prefix = "shoc_in_and_out";
+
+  // [1b] Walk the arguments once. argv_matches does an exact match, so the
+  //      order of the branches does not matter. An option that takes a value
+  //      consumes the next token via ++i, so it is skipped by the loop and
+  //      never re-examined. Anything we do not recognize is a hard error, so
+  //      a typo (e.g. "-steps" instead of "-s") fails loudly instead of being
+  //      silently dropped and running with the default.
   for (int i = 1; i < argc; ++i) {
-    if (ekat::argv_matches(argv[i], "-f", "--fortran")) use_fortran = true;
-    if (ekat::argv_matches(argv[i], "-d", "--ic-dir")) {
+    if (ekat::argv_matches(argv[i], "-f", "--fortran")) {
+      use_fortran = true;
+    } else if (ekat::argv_matches(argv[i], "-d", "--ic-dir")) {
       expect_another_arg(i, argc); icdir = argv[++i];
-    }
-    if (ekat::argv_matches(argv[i], "-dt", "--dt")) {
+    } else if (ekat::argv_matches(argv[i], "-dt", "--dt")) {
       expect_another_arg(i, argc); dt = std::atoi(argv[++i]);
-    }
-    if (ekat::argv_matches(argv[i], "-s", "--steps")) {
+    } else if (ekat::argv_matches(argv[i], "-s", "--steps")) {
       expect_another_arg(i, argc); nsteps = std::atoi(argv[++i]);
-    }
-    if (ekat::argv_matches(argv[i], "-x", "--mode")) {
+    } else if (ekat::argv_matches(argv[i], "-x", "--mode")) {
       expect_another_arg(i, argc); mode = argv[++i];
-    }
-    if (ekat::argv_matches(argv[i], "-dx", "--dx")) {
+    } else if (ekat::argv_matches(argv[i], "-dx", "--dx")) {
       expect_another_arg(i, argc); dx = std::atof(argv[++i]);
-    }
-    if (ekat::argv_matches(argv[i], "-o", "--out-prefix")) {
+    } else if (ekat::argv_matches(argv[i], "-o", "--out-prefix")) {
       expect_another_arg(i, argc); prefix = argv[++i];
+    } else {
+      EKAT_REQUIRE_MSG(false, std::string("shoc_in_and_out: unknown option '")
+                              + argv[i] + "'");
     }
   }
   EKAT_REQUIRE_MSG(mode == "exp1" || mode == "exp2",
                    "shoc_in_and_out: -x must be exp1 or exp2");
   EKAT_REQUIRE_MSG(dt > 0 && nsteps > 0, "shoc_in_and_out: bad dt/steps");
 
+  // Start the EAMxx/Kokkos runtime; the matching finalize is at the end.
   scream::initialize_scream_session(argc, argv); {
 
+    // [1] READ the three IC text files into the staging struct.
     InOutIC ic;
     read_surface_vars(icdir + "/ShocInOut_IC_surface_vars.txt", ic);
     read_zi_grid     (icdir + "/ShocInOut_IC_zi_grid.txt", ic);
     read_zt_grid     (icdir + "/ShocInOut_IC_zt_grid.txt", ic);
 
+    // [2] PREPARE the FortranData shoc_main expects, and set the timestep.
     auto d = make_fortran_data(ic, dx, dx);
     d->dtime = static_cast<Real>(dt);
 
     // Same shoc_init the BFB tests use: EAM/EAMxx shared constants, npbl=nlev.
+    // Passing use_fortran here also tells the harness which engine to call.
     shoc_init(d->nlev, use_fortran);
 
+    // Open the output file, named after the engine and substepping mode, and
+    // write the column header line.
     const std::string engine = use_fortran ? "f90" : "cxx";
     const std::string outname = prefix + "_" + engine + "_" + mode + ".txt";
     std::FILE* fp = std::fopen(outname.c_str(), "w");
     EKAT_REQUIRE_MSG(fp, "shoc_in_and_out: cannot write " + outname);
+    // The last three columns (lscale*) are always zero here; see write_state.
     std::fprintf(fp, " time, k (0 = TOM, pver - 1 = sfc), u, v, tke, qv, qc,"
                      " T, P, lscale, lscale_up, lscale_down\n");
 
@@ -311,13 +371,19 @@ int main (int argc, char** argv) {
                 " dx=%g ic=%s\n", engine.c_str(), mode.c_str(), ic.nz, dt,
                 nsteps, dx, icdir.c_str());
 
+    // [3]+[4] RUN the engine and WRITE the state.
     if (mode == "exp2") {
+      // One shoc_main call per substep (nadv=1). "d" carries the state
+      // forward, so each call's output is the next call's input; the column
+      // state is written after every step.
       d->nadv = 1;
       for (int istep = 1; istep <= nsteps; ++istep) {
         shoc_main(*d, use_fortran);
         write_state(fp, istep*dt, *d);
       }
     } else { // exp1
+      // A single shoc_main call that advances nadv=nsteps substeps internally;
+      // only the final state is available to write.
       d->nadv = nsteps;
       shoc_main(*d, use_fortran);
       write_state(fp, nsteps*dt, *d);

@@ -1,10 +1,28 @@
 # SHOC "in-and-out" standalone driver and ERF integration notes
 
-`shoc_in_and_out.cpp` runs a single-column, SHOC-only DYCOMS RF01 simulation
-from the AMR team's ASCII initial-condition files, mirroring EAM's
-`turb_standalone` ("in-and-out") mode. It is the reference for making a host
+`shoc_in_and_out.cpp` runs a single-column, SHOC-only simulation
+from the AMR team's ASCII initial-condition files for any desired benchmark case (e.g., DYCOMS RF01), mirroring EAM's `turb_standalone` ("in-and-out") mode. It is the reference for making a host
 model that embeds the EAMxx C++ SHOC (e.g. ERF) reproduce the E3SM Fortran
 in-and-out runs.
+
+## Why "in-and-out"
+
+The framework was originally built to answer one question: do the operations
+that *wrap* SHOC's `nadv` substep loop feed back into the turbulence physics?
+Those wrappers are a pre-loop `shoc_energy_integrals`, and — after the loop —
+`update_host_dse`, `shoc_energy_integrals`, `shoc_energy_fixer`,
+`compute_shoc_vapor`, `shoc_diag_obklen` and `pblintd`. Calling `shoc_main`
+once with `nadv=N` keeps those wrappers *outside* the whole integration
+(`exp1`); calling it `N` times with `nadv=1` runs them *between every substep*
+(`exp2`). So the two modes differ only in how often the wrappers execute — if
+they perturbed the prognostics, `exp1` and `exp2` would diverge. They are
+bit-for-bit identical, which shows the wrappers only touch `host_dse` and the
+pblh/obklen/qv diagnostics, none of which re-enter SHOC's prognostic evolution.
+The exp1-vs-exp2 test is the reason the machinery was built in the first place.
+The framework also *surfaced* the thv-staleness bug: by integrating SHOC
+standalone with a frozen host state, it amplified the thv-staleness into a
+visible artifact — which is how the bug was identified. (The Fortran↔C++ port
+validation came later still.)
 
 ## Usage
 
