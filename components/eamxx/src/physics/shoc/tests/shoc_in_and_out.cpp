@@ -6,9 +6,16 @@
 //   ShocInOut_IC_surface_vars.txt
 //   ShocInOut_IC_zi_grid.txt
 //   ShocInOut_IC_zt_grid.txt
-// and looping shoc_main over a single column, writing the same per-substep
-// text output so E3SM (Fortran), EAMxx (C++) and ERF (which embeds the EAMxx
-// SHOC) can be compared line by line.
+// and looping shoc_main over a single column, writing a per-substep dump of
+// SHOC's prognostics and diagnostics so the C++ and Fortran engines can be
+// compared (BFB) and the dz/dt sensitivity of standalone SHOC studied.
+//
+// Output: two text tables per run (SHOC uses a staggered vertical grid) —
+//   <prefix>_<engine>_<mode>_zt.txt : midpoint (nlev) states/variances vs pres
+//   <prefix>_<engine>_<mode>_zi.txt : interface (nlev+1) fluxes/covariances vs presi
+// All fluxes are written RAW in native SHOC (kinematic) units; the W/m2
+// conversion (x rho x cp / x rho x Lv, matching EAM's shoc_intr history fields)
+// is done downstream in the plot script. Values are full double precision.
 //
 // Two engines are available through the shoc_main_wrap harness:
 //   default : the EAMxx C++ shoc_main (SHF::shoc_main via shoc_main_f)
@@ -33,7 +40,7 @@
 //   [2] PREPARE : convert InOutIC into a FortranData "d" that shoc_main reads,
 //                 and initialize the chosen engine (C++ or Fortran)
 //   [3] RUN     : loop shoc_main over the substeps, evolving "d" in time
-//   [4] WRITE   : after each step, append the column state to the output file
+//   [4] WRITE   : after each step, append the column state to the zt & zi tables
 
 #include "shoc_main_wrap.hpp"
 #include "shoc_f90.hpp"
@@ -255,25 +262,46 @@ FortranData::Ptr make_fortran_data (const InOutIC& ic, Real dx, Real dy) {
   return dp;
 }
 
-// Per-substep text output, byte-compatible with the Fortran writer
-// (shoc.F90 fmt = '(I5,1X,I4,5(1X,F17.14),1X,F16.12,1X,F17.10,3(1X,F12.4))').
-// One row per level. The three Larson-length columns are diagnostics not
-// computed by the C++ SHOC; they are written as zeros (the EAMxx-built
-// Fortran also zeroes them).
-void write_state (std::FILE* fp, int time_s, const FortranData& d) {
+// Per-substep comprehensive SHOC diagnostic dump, split by vertical grid.
+// SHOC's fluxes/covariances live on interfaces (nlev+1) while states and
+// variances live on midpoints (nlev), so each run writes two tables:
+// *_zt.txt (midpoint) and *_zi.txt (interface). All fluxes are written RAW in
+// native SHOC (kinematic) units; the W/m2 conversion that matches EAM/Hui is
+// applied downstream in the plot script (see README). Values are printed at
+// full double precision (%.17e) so the C++ vs Fortran BFB diff is exact and
+// Python parses cleanly. Both engines fill every field in `d`
+// (shoc_main_wrap.cpp), so these writers are engine-agnostic.
+
+// Midpoint (zt) table: nlev rows, coordinate = pres. Column order matches the
+// header written in main().
+void write_state_zt (std::FILE* fp, int time_s, const FortranData& d) {
   using C = scream::physics::Constants<Real>;
   for (Int k = 0; k < d.nlev; ++k) {
-    // Recover the diagnostics the output file reports from the prognostics:
-    // vapor = total water - cloud liquid, and temperature back out of theta_l.
-    // inv_exner is a fixed input, so this reconstruction is valid every step.
     const Real qc = d.shoc_ql(0,k);
-    const Real qv = d.qw(0,k) - qc;
+    const Real qv = d.qw(0,k) - qc;          // vapor = total water - cloud liquid
+    // Temperature back out of theta_l; inv_exner is a fixed input, valid each step.
     const Real T  = d.thetal(0,k)/d.inv_exner(0,k) + (C::LatVap/C::Cpair)*qc;
     std::fprintf(fp,
-      "%5d %4d %17.14f %17.14f %17.14f %17.14f %17.14f %16.12f %17.10f"
-      " %12.4f %12.4f %12.4f\n",
-      time_s, (int)k, d.u_wind(0,k), d.v_wind(0,k), d.tke(0,k),
-      qv, qc, T, d.pres(0,k), 0.0, 0.0, 0.0);
+      "%6d %4d %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e"
+      " %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e\n",
+      time_s, (int)k,
+      d.zt_grid(0,k), d.pres(0,k), d.u_wind(0,k), d.v_wind(0,k),
+      d.thetal(0,k), T, d.qw(0,k), qv, qc,
+      d.shoc_cldfrac(0,k), d.tke(0,k), d.shoc_mix(0,k), d.tk(0,k), d.tkh(0,k),
+      d.isotropy(0,k), d.brunt(0,k), d.w_sec(0,k), d.shoc_ql2(0,k),
+      d.wthv_sec(0,k), d.wqls_sec(0,k));
+  }
+}
+
+// Interface (zi) table: nlev+1 rows, coordinate = presi. Fluxes/covariances raw.
+void write_state_zi (std::FILE* fp, int time_s, const FortranData& d) {
+  for (Int k = 0; k < d.nlevi; ++k) {
+    std::fprintf(fp,
+      "%6d %4d %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e\n",
+      time_s, (int)k,
+      d.zi_grid(0,k), d.presi(0,k),
+      d.wthl_sec(0,k), d.wqw_sec(0,k), d.thl_sec(0,k), d.qw_sec(0,k),
+      d.qwthl_sec(0,k), d.uw_sec(0,k), d.vw_sec(0,k), d.w3(0,k), d.wtke_sec(0,k));
   }
 }
 
@@ -357,15 +385,21 @@ int main (int argc, char** argv) {
     // Passing use_fortran here also tells the harness which engine to call.
     shoc_init(d->nlev, use_fortran);
 
-    // Open the output file, named after the engine and substepping mode, and
-    // write the column header line.
+    // Open the two output tables (midpoint zt + interface zi), named after the
+    // engine and substepping mode, and write their column headers. k = 0 is the
+    // model top in both. All fluxes are raw/native units (convert in the plot).
     const std::string engine = use_fortran ? "f90" : "cxx";
-    const std::string outname = prefix + "_" + engine + "_" + mode + ".txt";
-    std::FILE* fp = std::fopen(outname.c_str(), "w");
-    EKAT_REQUIRE_MSG(fp, "shoc_in_and_out: cannot write " + outname);
-    // The last three columns (lscale*) are always zero here; see write_state.
-    std::fprintf(fp, " time, k (0 = TOM, pver - 1 = sfc), u, v, tke, qv, qc,"
-                     " T, P, lscale, lscale_up, lscale_down\n");
+    const std::string base = prefix + "_" + engine + "_" + mode;
+    const std::string zt_name = base + "_zt.txt";
+    const std::string zi_name = base + "_zi.txt";
+    std::FILE* fzt = std::fopen(zt_name.c_str(), "w");
+    EKAT_REQUIRE_MSG(fzt, "shoc_in_and_out: cannot write " + zt_name);
+    std::FILE* fzi = std::fopen(zi_name.c_str(), "w");
+    EKAT_REQUIRE_MSG(fzi, "shoc_in_and_out: cannot write " + zi_name);
+    std::fprintf(fzt, "time k zt P u v thetal T qw qv qc cldfrac tke shoc_mix"
+                      " tk tkh isotropy brunt w_sec ql2 wthv_sec wqls_sec\n");
+    std::fprintf(fzi, "time k zi Pi wthl_sec wqw_sec thl_sec qw_sec qwthl_sec"
+                      " uw_sec vw_sec w3 wtke_sec\n");
 
     std::printf("shoc_in_and_out: engine=%s mode=%s nz=%d dt=%d steps=%d"
                 " dx=%g ic=%s\n", engine.c_str(), mode.c_str(), ic.nz, dt,
@@ -379,19 +413,22 @@ int main (int argc, char** argv) {
       d->nadv = 1;
       for (int istep = 1; istep <= nsteps; ++istep) {
         shoc_main(*d, use_fortran);
-        write_state(fp, istep*dt, *d);
+        write_state_zt(fzt, istep*dt, *d);
+        write_state_zi(fzi, istep*dt, *d);
       }
     } else { // exp1
       // A single shoc_main call that advances nadv=nsteps substeps internally;
       // only the final state is available to write.
       d->nadv = nsteps;
       shoc_main(*d, use_fortran);
-      write_state(fp, nsteps*dt, *d);
+      write_state_zt(fzt, nsteps*dt, *d);
+      write_state_zi(fzi, nsteps*dt, *d);
     }
 
-    std::fclose(fp);
-    std::printf("shoc_in_and_out: wrote %s (pblh = %.4f m)\n",
-                outname.c_str(), d->pblh(0));
+    std::fclose(fzt);
+    std::fclose(fzi);
+    std::printf("shoc_in_and_out: wrote %s and %s (pblh = %.4f m)\n",
+                zt_name.c_str(), zi_name.c_str(), d->pblh(0));
 
   } scream::finalize_scream_session();
 
