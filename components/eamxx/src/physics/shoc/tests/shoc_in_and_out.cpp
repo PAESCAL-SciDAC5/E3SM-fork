@@ -13,9 +13,11 @@
 // Output: two text tables per run (SHOC uses a staggered vertical grid) —
 //   <prefix>_<engine>_<mode>_zt.txt : midpoint (nlev) states/variances vs pres
 //   <prefix>_<engine>_<mode>_zi.txt : interface (nlev+1) fluxes/covariances vs presi
-// All fluxes are written RAW in native SHOC (kinematic) units; the W/m2
-// conversion (x rho x cp / x rho x Lv, matching EAM's shoc_intr history fields)
-// is done downstream in the plot script. Values are full double precision.
+// Units follow the official E3SM SCM history output (shoc_intr.F90): the four
+// heat/moisture fluxes are converted to W/m2 in the driver (wthl/wqw x rho_i,
+// wthv/wql x rho, times cp or Lv, exactly as shoc_intr does before outfld);
+// everything else is already in EAM's history units natively. Values are full
+// double precision.
 //
 // Two engines are available through the shoc_main_wrap harness:
 //   default : the EAMxx C++ shoc_main (SHF::shoc_main via shoc_main_f)
@@ -265,16 +267,56 @@ FortranData::Ptr make_fortran_data (const InOutIC& ic, Real dx, Real dy) {
 // Per-substep comprehensive SHOC diagnostic dump, split by vertical grid.
 // SHOC's fluxes/covariances live on interfaces (nlev+1) while states and
 // variances live on midpoints (nlev), so each run writes two tables:
-// *_zt.txt (midpoint) and *_zi.txt (interface). All fluxes are written RAW in
-// native SHOC (kinematic) units; the W/m2 conversion that matches EAM/Hui is
-// applied downstream in the plot script (see README). Values are printed at
-// full double precision (%.17e) so the C++ vs Fortran BFB diff is exact and
-// Python parses cleanly. Both engines fill every field in `d`
-// (shoc_main_wrap.cpp), so these writers are engine-agnostic.
+// *_zt.txt (midpoint) and *_zi.txt (interface).
+//
+// UNITS follow the official E3SM SCM history output (shoc_intr.F90 addfld/
+// outfld). For most SHOC diagnostics EAM applies NO conversion before
+// outfld -- the history units ARE shoc_main's native units (variances,
+// momentum fluxes, w3, tke, lengths). The four heat/moisture fluxes are the one
+// case where EAM converts before writing (kinematic -> W/m2, x rho x cp
+// or x rho x Lv, shoc_intr.F90:1347-1355), so the driver applies the same
+// conversion:
+//   wthl_Wm2 = wthl_sec * rho_i * cpair     wqw_Wm2 = wqw_sec * rho_i * latvap
+//   wthv_Wm2 = wthv_sec * rho   * cpair     wql_Wm2 = wqls_sec * rho  * latvap
+// with rho/rho_i computed exactly as shoc_intr does (see compute_densities).
+// Values are printed at full double precision (%.17e) so the C++ vs Fortran
+// BFB diff is exact and Python parses cleanly. Both engines fill every field
+// in `d` (shoc_main_wrap.cpp), so these writers are engine-agnostic.
+
+// Air density on the fixed grid, mirroring EAM's shoc_intr.F90:
+//   rho(k)  = (1/g) * pdel(k)/dz(k)   on midpoints            (:925)
+//   rho_i   = rho linearly interpolated in height onto interfaces, with
+//             linear extrapolation at the two boundary interfaces and a
+//             clamp at 0                                       (:938 -> shoc.F90 linear_interp, minthresh=0)
+// All grid quantities are fixed inputs, so this is computed once per run.
+struct Densities { std::vector<Real> rho, rho_i; };
+
+Densities compute_densities (const FortranData& d) {
+  using C = scream::physics::Constants<Real>;
+  Densities D;
+  const Int nlev = d.nlev, nlevi = d.nlevi;
+  D.rho.resize(nlev); D.rho_i.resize(nlevi);
+  for (Int k = 0; k < nlev; ++k) {
+    const Real dz = d.zi_grid(0,k) - d.zi_grid(0,k+1);   // k=0 is model top
+    D.rho[k] = (1.0/C::gravit) * d.pdel(0,k) / dz;
+  }
+  for (Int k = 0; k < nlevi; ++k) {
+    // Bracketing midpoints (top-first): interior interface k sits between
+    // midpoints k-1 (above) and k (below); the two boundary interfaces reuse
+    // the nearest midpoint pair, giving linear extrapolation.
+    const Int kb = (k == 0) ? 1 : (k == nlevi-1 ? nlev-1 : (int)k);
+    const Real z1 = d.zt_grid(0,kb-1), z2 = d.zt_grid(0,kb);
+    const Real w  = (d.zi_grid(0,k) - z1) / (z2 - z1);
+    const Real r  = D.rho[kb-1] + w*(D.rho[kb] - D.rho[kb-1]);
+    D.rho_i[k] = r < 0 ? 0 : r;
+  }
+  return D;
+}
 
 // Midpoint (zt) table: nlev rows, coordinate = pres. Column order matches the
 // header written in main().
-void write_state_zt (std::FILE* fp, int time_s, const FortranData& d) {
+void write_state_zt (std::FILE* fp, int time_s, const FortranData& d,
+                     const Densities& dens) {
   using C = scream::physics::Constants<Real>;
   for (Int k = 0; k < d.nlev; ++k) {
     const Real qc = d.shoc_ql(0,k);
@@ -289,18 +331,24 @@ void write_state_zt (std::FILE* fp, int time_s, const FortranData& d) {
       d.thetal(0,k), T, d.qw(0,k), qv, qc,
       d.shoc_cldfrac(0,k), d.tke(0,k), d.shoc_mix(0,k), d.tk(0,k), d.tkh(0,k),
       d.isotropy(0,k), d.brunt(0,k), d.w_sec(0,k), d.shoc_ql2(0,k),
-      d.wthv_sec(0,k), d.wqls_sec(0,k));
+      d.wthv_sec(0,k)*dens.rho[k]*C::Cpair,        // wthv_Wm2 (EAM WTHV_SEC data)
+      d.wqls_sec(0,k)*dens.rho[k]*C::LatVap);      // wql_Wm2  (EAM WQL_SEC)
   }
 }
 
-// Interface (zi) table: nlev+1 rows, coordinate = presi. Fluxes/covariances raw.
-void write_state_zi (std::FILE* fp, int time_s, const FortranData& d) {
+// Interface (zi) table: nlev+1 rows, coordinate = presi. Heat/moisture fluxes
+// in W/m2 (EAM history convention); covariances/momentum fluxes raw (as EAM).
+void write_state_zi (std::FILE* fp, int time_s, const FortranData& d,
+                     const Densities& dens) {
+  using C = scream::physics::Constants<Real>;
   for (Int k = 0; k < d.nlevi; ++k) {
     std::fprintf(fp,
       "%6d %4d %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e\n",
       time_s, (int)k,
       d.zi_grid(0,k), d.presi(0,k),
-      d.wthl_sec(0,k), d.wqw_sec(0,k), d.thl_sec(0,k), d.qw_sec(0,k),
+      d.wthl_sec(0,k)*dens.rho_i[k]*C::Cpair,      // wthl_Wm2 (EAM WTHL_SEC)
+      d.wqw_sec(0,k)*dens.rho_i[k]*C::LatVap,      // wqw_Wm2  (EAM WQW_SEC)
+      d.thl_sec(0,k), d.qw_sec(0,k),
       d.qwthl_sec(0,k), d.uw_sec(0,k), d.vw_sec(0,k), d.w3(0,k), d.wtke_sec(0,k));
   }
 }
@@ -379,6 +427,9 @@ int main (int argc, char** argv) {
 
     // [2] PREPARE the FortranData shoc_main expects, and set the timestep.
     auto d = make_fortran_data(ic, dx, dx);
+    // Air density on the fixed grid (for the W/m2 flux columns) -- constant in
+    // time, computed once, same recipe as EAM's shoc_intr (see compute_densities).
+    const Densities dens = compute_densities(*d);
     d->dtime = static_cast<Real>(dt);
 
     // Same shoc_init the BFB tests use: EAM/EAMxx shared constants, npbl=nlev.
@@ -397,8 +448,8 @@ int main (int argc, char** argv) {
     std::FILE* fzi = std::fopen(zi_name.c_str(), "w");
     EKAT_REQUIRE_MSG(fzi, "shoc_in_and_out: cannot write " + zi_name);
     std::fprintf(fzt, "time k zt P u v thetal T qw qv qc cldfrac tke shoc_mix"
-                      " tk tkh isotropy brunt w_sec ql2 wthv_sec wqls_sec\n");
-    std::fprintf(fzi, "time k zi Pi wthl_sec wqw_sec thl_sec qw_sec qwthl_sec"
+                      " tk tkh isotropy brunt w_sec ql2 wthv_Wm2 wql_Wm2\n");
+    std::fprintf(fzi, "time k zi Pi wthl_Wm2 wqw_Wm2 thl_sec qw_sec qwthl_sec"
                       " uw_sec vw_sec w3 wtke_sec\n");
 
     std::printf("shoc_in_and_out: engine=%s mode=%s nz=%d dt=%d steps=%d"
@@ -413,16 +464,16 @@ int main (int argc, char** argv) {
       d->nadv = 1;
       for (int istep = 1; istep <= nsteps; ++istep) {
         shoc_main(*d, use_fortran);
-        write_state_zt(fzt, istep*dt, *d);
-        write_state_zi(fzi, istep*dt, *d);
+        write_state_zt(fzt, istep*dt, *d, dens);
+        write_state_zi(fzi, istep*dt, *d, dens);
       }
     } else { // exp1
       // A single shoc_main call that advances nadv=nsteps substeps internally;
       // only the final state is available to write.
       d->nadv = nsteps;
       shoc_main(*d, use_fortran);
-      write_state_zt(fzt, nsteps*dt, *d);
-      write_state_zi(fzi, nsteps*dt, *d);
+      write_state_zt(fzt, nsteps*dt, *d, dens);
+      write_state_zi(fzi, nsteps*dt, *d, dens);
     }
 
     std::fclose(fzt);
