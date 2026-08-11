@@ -151,10 +151,10 @@ void Functions<S,D>::shoc_main_internal(
 {
 
   // Define temporary variables
-  uview_1d<Pack> rho_zt, shoc_qv, shoc_tabs, dz_zt, dz_zi;
-  workspace.template take_many_and_reset<5>(
-    {"rho_zt", "shoc_qv", "shoc_tabs", "dz_zt", "dz_zi"},
-    {&rho_zt, &shoc_qv, &shoc_tabs, &dz_zt, &dz_zi});
+  uview_1d<Pack> rho_zt, shoc_qv, shoc_tabs, shoc_thv, dz_zt, dz_zi;
+  workspace.template take_many_and_reset<6>(
+    {"rho_zt", "shoc_qv", "shoc_tabs", "shoc_thv", "dz_zt", "dz_zi"},
+    {&rho_zt, &shoc_qv, &shoc_tabs, &shoc_thv, &dz_zt, &dz_zi});
 
   // Local scalars
   Scalar se_b{0},   ke_b{0},   wv_b{0}, wl_b{0},
@@ -172,6 +172,19 @@ void Functions<S,D>::shoc_main_internal(
   // conserves) and static energy (which E3SM conserves) are not exactly equal.
   shoc_energy_integrals(team,nlev,host_dse,pdel,qw,shoc_ql,u_wind,v_wind, // Input
                         se_b,ke_b,wv_b,wl_b);                             // Output
+
+  // The host-supplied thv is computed once per shoc_main call and held
+  // constant, while thetal and qw evolve each substep
+  // (update_prognostics_implicit) and shoc_ql is re-diagnosed each substep
+  // (shoc_assumed_pdf).  When nadv > 1, substeps beyond the first would
+  // otherwise use a stale thv in shoc_length (-> compute_brunt_shoc_length).
+  // shoc_thv equals thv on the first substep (bit-for-bit with the original
+  // behavior when nadv = 1) and is refreshed from SHOC's own diagnosed state
+  // on later substeps.
+  const Int nlev_pack = ekat::npack<Pack>(nlev);
+  Kokkos::parallel_for(Kokkos::TeamVectorRange(team, nlev_pack), [&] (const Int& k) {
+    shoc_thv(k) = thv(k);
+  });
 
   for (Int t=0; t<nadv; ++t) {
     // Check TKE to make sure values lie within acceptable
@@ -200,6 +213,23 @@ void Functions<S,D>::shoc_main_internal(
                              shoc_tabs);        // Output
 
     team.team_barrier();
+
+    // Refresh the virtual potential temperature from the current substep
+    // state so shoc_length does not see a stale thv when nadv > 1.  Built
+    // from SHOC's own diagnosed temperature (shoc_tabs) and vapor (shoc_qv)
+    // computed just above, mirroring the host-side formula:
+    //   thv = T * inv_exner * (1 + zvir*qv - ql).
+    // The first substep keeps the host-supplied thv so that nadv = 1
+    // configurations remain bit-for-bit.
+    if (t > 0) {
+      const auto zvir = C::ZVIR;
+      const auto one  = C::ONE;
+      Kokkos::parallel_for(Kokkos::TeamVectorRange(team, nlev_pack), [&] (const Int& k) {
+        shoc_thv(k) = shoc_tabs(k)*inv_exner(k)*(one + zvir*shoc_qv(k) - shoc_ql(k));
+      });
+      team.team_barrier();
+    }
+
     shoc_diag_obklen(uw_sfc,vw_sfc,     // Input
                      wthl_sfc, wqw_sfc, // Input
                      s_thetal(nlev-1),  // Input
@@ -215,12 +245,14 @@ void Functions<S,D>::shoc_main_internal(
             workspace,                // Workspace
             pblh);                    // Output
 
-    // Update the turbulent length scale
+    // Update the turbulent length scale.  Note: shoc_thv (refreshed each
+    // substep above) is used instead of the input thv so that
+    // compute_brunt_shoc_length sees the current substep state.
     shoc_length(team,nlev,nlevi,       // Input
                 length_fac,            // Runtime Options
                 dx,dy,                 // Input
                 zt_grid,zi_grid,dz_zt, // Input
-                tke,thv,               // Input
+                tke,shoc_thv,          // Input
                 workspace,             // Workspace
                 brunt,shoc_mix);       // Output
 
@@ -329,8 +361,8 @@ void Functions<S,D>::shoc_main_internal(
           pblh);                          // Output
 
   // Release temporary variables from the workspace
-  workspace.template release_many_contiguous<5>(
-    {&rho_zt, &shoc_qv, &shoc_tabs, &dz_zt, &dz_zi});
+  workspace.template release_many_contiguous<6>(
+    {&rho_zt, &shoc_qv, &shoc_tabs, &shoc_thv, &dz_zt, &dz_zi});
 }
 #else
 template<typename S, typename D>
@@ -430,6 +462,7 @@ void Functions<S,D>::shoc_main_internal(
   const view_2d<Pack>& rho_zt,
   const view_2d<Pack>& shoc_qv,
   const view_2d<Pack>& shoc_tabs,
+  const view_2d<Pack>& shoc_thv,
   const view_2d<Pack>& dz_zt,
   const view_2d<Pack>& dz_zi)
 {
@@ -444,6 +477,16 @@ void Functions<S,D>::shoc_main_internal(
   // conserves) and static energy (which E3SM conserves) are not exactly equal.
   shoc_energy_integrals_disp(shcol,nlev,host_dse,pdel,qw,shoc_ql,u_wind,v_wind,
                              se_b, ke_b, wv_b, wl_b); // Input
+
+  // The host-supplied thv is computed once per shoc_main call and held
+  // constant, while thetal and qw evolve each substep
+  // (update_prognostics_implicit) and shoc_ql is re-diagnosed each substep
+  // (shoc_assumed_pdf).  When nadv > 1, substeps beyond the first would
+  // otherwise use a stale thv in shoc_length (-> compute_brunt_shoc_length).
+  // shoc_thv equals thv on the first substep (bit-for-bit with the original
+  // behavior when nadv = 1) and is refreshed from SHOC's own diagnosed state
+  // on later substeps.
+  Kokkos::deep_copy(shoc_thv, thv);
 
   for (Int t=0; t<nadv; ++t) {
     // Check TKE to make sure values lie within acceptable
@@ -471,6 +514,26 @@ void Functions<S,D>::shoc_main_internal(
                                   shoc_ql,inv_exner, // Input
                                   shoc_tabs);        // Output
 
+    // Refresh the virtual potential temperature from the current substep
+    // state so shoc_length does not see a stale thv when nadv > 1.  Built
+    // from SHOC's own diagnosed temperature (shoc_tabs) and vapor (shoc_qv)
+    // computed just above, mirroring the host-side formula:
+    //   thv = T * inv_exner * (1 + zvir*qv - ql).
+    // The first substep keeps the host-supplied thv so that nadv = 1
+    // configurations remain bit-for-bit.
+    if (t > 0) {
+      const auto zvir = C::ZVIR;
+      const auto one  = C::ONE;
+      const Int nlev_packs = ekat::npack<Pack>(nlev);
+      Kokkos::parallel_for("shoc_main_refresh_thv",
+                           Kokkos::RangePolicy<typename KT::ExeSpace>(0, shcol*nlev_packs),
+                           KOKKOS_LAMBDA (const Int& idx) {
+        const Int i = idx / nlev_packs;
+        const Int k = idx % nlev_packs;
+        shoc_thv(i,k) = shoc_tabs(i,k)*inv_exner(i,k)*(one + zvir*shoc_qv(i,k) - shoc_ql(i,k));
+      });
+    }
+
     shoc_diag_obklen_disp(shcol, nlev,
                           uw_sfc,vw_sfc,     // Input
                           wthl_sfc, wqw_sfc, // Input
@@ -487,12 +550,14 @@ void Functions<S,D>::shoc_main_internal(
                  workspace_mgr,            // Workspace mgr
                  pblh);                    // Output
 
-    // Update the turbulent length scale
+    // Update the turbulent length scale.  Note: shoc_thv (refreshed each
+    // substep above) is used instead of the input thv so that
+    // compute_brunt_shoc_length sees the current substep state.
     shoc_length_disp(shcol,nlev,nlevi,      // Input
                      length_fac,            // Runtime Options
                      dx,dy,                 // Input
                      zt_grid,zi_grid,dz_zt, // Input
-                     tke,thv,               // Input
+                     tke,shoc_thv,          // Input
                      workspace_mgr,         // Workspace mgr
                      brunt,shoc_mix);       // Output
 
@@ -755,7 +820,8 @@ Int Functions<S,D>::shoc_main(
     shoc_temporaries.se_a, shoc_temporaries.ke_a, shoc_temporaries.wv_a, shoc_temporaries.wl_a,
     shoc_temporaries.kbfs, shoc_temporaries.ustar2,
     shoc_temporaries.wstar, shoc_temporaries.rho_zt, shoc_temporaries.shoc_qv,
-    shoc_temporaries.tabs, shoc_temporaries.dz_zt, shoc_temporaries.dz_zi);
+    shoc_temporaries.tabs, shoc_temporaries.shoc_thv, shoc_temporaries.dz_zt,
+    shoc_temporaries.dz_zi);
 #endif
 
   auto finish = std::chrono::steady_clock::now();

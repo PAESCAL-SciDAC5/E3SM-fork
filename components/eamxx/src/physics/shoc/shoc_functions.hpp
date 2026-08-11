@@ -218,6 +218,7 @@ template <typename ScalarT, typename DeviceT> struct Functions {
     view_2d<Pack> rho_zt;
     view_2d<Pack> shoc_qv;
     view_2d<Pack> tabs;
+    view_2d<Pack> shoc_thv;
     view_2d<Pack> dz_zt;
     view_2d<Pack> dz_zi;
     view_2d<Pack> tkh;
@@ -771,8 +772,8 @@ template <typename ScalarT, typename DeviceT> struct Functions {
       const view_1d<Scalar> &wl_b, const view_1d<Scalar> &se_a, const view_1d<Scalar> &ke_a,
       const view_1d<Scalar> &wv_a, const view_1d<Scalar> &wl_a, const view_1d<Scalar> &kbfs,
       const view_1d<Scalar> &ustar2, const view_1d<Scalar> &wstar, const view_2d<Pack> &rho_zt,
-      const view_2d<Pack> &shoc_qv, const view_2d<Pack> &tabs, const view_2d<Pack> &dz_zt,
-      const view_2d<Pack> &dz_zi);
+      const view_2d<Pack> &shoc_qv, const view_2d<Pack> &tabs, const view_2d<Pack> &shoc_thv,
+      const view_2d<Pack> &dz_zt, const view_2d<Pack> &dz_zi);
 #endif
 
   // Return microseconds elapsed

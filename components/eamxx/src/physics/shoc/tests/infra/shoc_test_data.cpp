@@ -2432,21 +2432,22 @@ Int shoc_main_host(Int shcol, Int nlev, Int nlevi, Real dtime, Int nadv, Int npb
     wstar  ("wstar", shcol);
 
   view_2d
-    rho_zt  ("rho_zt",  shcol, nlevi_packs),
-    shoc_qv ("shoc_qv", shcol, nlevi_packs),
-    tabs    ("shoc_tabs", shcol, nlev_packs),
-    dz_zt   ("dz_zt",   shcol, nlevi_packs),
-    dz_zi   ("dz_zi",   shcol, nlevi_packs);
+    rho_zt   ("rho_zt",  shcol, nlevi_packs),
+    shoc_qv  ("shoc_qv", shcol, nlevi_packs),
+    tabs     ("shoc_tabs", shcol, nlev_packs),
+    shoc_thv ("shoc_thv", shcol, nlev_packs),
+    dz_zt    ("dz_zt",   shcol, nlevi_packs),
+    dz_zi    ("dz_zi",   shcol, nlevi_packs);
 
   SHF::SHOCTemporaries shoc_temporaries{
     se_b, ke_b, wv_b, wl_b, se_a, ke_a, wv_a, wl_a, kbfs, ustar2, wstar,
-    rho_zt, shoc_qv, tabs, dz_zt, dz_zi};
+    rho_zt, shoc_qv, tabs, shoc_thv, dz_zt, dz_zi};
 #endif
 
   // Create local workspace
   const int n_wind_slots = ekat::npack<Pack>(2)*Pack::n;
   const int n_trac_slots = ekat::npack<Pack>(num_qtracers+3)*Pack::n;
-  ekat::WorkspaceManager<Pack, SHF::KT::Device> workspace_mgr(nlevi_packs, 14+(2*n_wind_slots+n_trac_slots), policy);
+  ekat::WorkspaceManager<Pack, SHF::KT::Device> workspace_mgr(nlevi_packs, 15+(2*n_wind_slots+n_trac_slots), policy);
 
   const auto elapsed_microsec = SHF::shoc_main(shcol, nlev, nlevi, npbl, nadv, num_qtracers, dtime,
                                                workspace_mgr, shoc_runtime_options,

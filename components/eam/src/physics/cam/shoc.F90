@@ -373,6 +373,15 @@ subroutine shoc_main ( &
   real(rtype) :: shoc_qv(shcol,nlev)
   ! SHOC temperature [K]
   real(rtype) :: shoc_tabs(shcol,nlev)
+  ! Virtual potential temperature seen by the current SHOC substep [K].
+  ! The intent(in) thv argument is computed once per shoc_main call by the
+  ! host model and then held constant, while thetal and qw evolve each
+  ! substep (update_prognostics_implicit) and shoc_ql is re-diagnosed
+  ! each substep (shoc_assumed_pdf).  When nadv > 1, substeps beyond the
+  ! first would otherwise use a stale thv in shoc_length
+  ! (-> compute_brunt_shoc_length).  shoc_thv equals thv on the first
+  ! substep and is refreshed from SHOC's own diagnosed state thereafter.
+  real(rtype) :: shoc_thv(shcol,nlev)
 
   ! Grid difference centereted on thermo grid [m]
   real(rtype) :: dz_zt(shcol,nlev)
@@ -409,6 +418,10 @@ subroutine shoc_main ( &
      qw,shoc_ql,u_wind,v_wind,&             ! Input
      se_b,ke_b,wv_b,wl_b)                   ! Input/Output
 
+  ! First substep uses the host-supplied thv unchanged (bit-for-bit with
+  ! the original behavior when nadv = 1); later substeps refresh it below.
+  shoc_thv(:,:) = thv(:,:)
+
   do t=1,nadv
 
     ! Check TKE to make sure values lie within acceptable
@@ -437,6 +450,18 @@ subroutine shoc_main ( &
        shcol,nlev,thetal,shoc_ql,inv_exner,& ! Input
        shoc_tabs)                            ! Output
 
+    ! Refresh the virtual potential temperature from the current substep
+    ! state so shoc_length does not see a stale thv when nadv > 1.  Built
+    ! from SHOC's own diagnosed temperature (shoc_tabs) and vapor (shoc_qv)
+    ! computed just above, mirroring the host-side formula (shoc_intr.F90):
+    !   thv = T * inv_exner * (1 + zvir*qv - ql),  with eps = zvir here.
+    ! The first substep keeps the host-supplied thv so that nadv = 1
+    ! configurations remain bit-for-bit.
+    if (t .gt. 1) then
+       shoc_thv(:,:) = shoc_tabs(:,:) * inv_exner(:,:) &
+                       * (1.0_rtype + eps * shoc_qv(:,:) - shoc_ql(:,:))
+    endif
+
     call shoc_diag_obklen(&
        shcol,uw_sfc,vw_sfc,&                          ! Input
        wthl_sfc,wqw_sfc,thetal(:shcol,nlev),&         ! Input
@@ -450,12 +475,14 @@ subroutine shoc_main ( &
        ustar,obklen,kbfs,shoc_cldfrac,&     ! Input
        pblh)                                ! Output
 
-    ! Update the turbulent length scale
+    ! Update the turbulent length scale.  Note: shoc_thv (refreshed each
+    ! substep above) is used instead of the intent(in) thv so that
+    ! compute_brunt_shoc_length sees the current substep state.
     call shoc_length(&
        shcol,nlev,nlevi,&                ! Input
        host_dx,host_dy,&                 ! Input
        zt_grid,zi_grid,dz_zt,&           ! Input
-       tke,thv,&                         ! Input
+       tke,shoc_thv,&                    ! Input
        brunt,shoc_mix)                   ! Output
 
     ! Advance the SGS TKE equation
