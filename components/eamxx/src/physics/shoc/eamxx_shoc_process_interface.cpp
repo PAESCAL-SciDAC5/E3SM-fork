@@ -169,7 +169,7 @@ size_t SHOCMacrophysics::requested_buffer_size_in_bytes() const
   const auto policy       = TPF::get_default_team_policy(m_num_cols, nlev_packs);
   const int n_wind_slots  = ekat::npack<Pack>(2)*Pack::n;
   const int n_trac_slots  = ekat::npack<Pack>(m_num_tracers+3)*Pack::n;
-  const size_t wsm_request= WSM::get_total_bytes_needed(nlevi_packs, 14+(2*n_wind_slots+n_trac_slots), policy);
+  const size_t wsm_request= WSM::get_total_bytes_needed(nlevi_packs, 15+(2*n_wind_slots+n_trac_slots), policy);
 
   return interface_request + wsm_request;
 }
@@ -216,7 +216,7 @@ void SHOCMacrophysics::init_buffers(const ATMBufferManager &buffer_manager)
     &m_buffer.shoc_ql2, &m_buffer.shoc_mix, &m_buffer.isotropy, &m_buffer.w_sec, &m_buffer.wqls_sec, &m_buffer.brunt,
     &m_buffer.um_pert, &m_buffer.vm_pert
 #ifdef SCREAM_SHOC_SMALL_KERNELS
-    , &m_buffer.rho_zt, &m_buffer.shoc_qv, &m_buffer.tabs, &m_buffer.dz_zt
+    , &m_buffer.rho_zt, &m_buffer.shoc_qv, &m_buffer.tabs, &m_buffer.shoc_thv, &m_buffer.dz_zt
 #endif
   };
 
@@ -249,7 +249,7 @@ void SHOCMacrophysics::init_buffers(const ATMBufferManager &buffer_manager)
   const auto policy      = TPF::get_default_team_policy(m_num_cols, nlev_packs);
   const int n_wind_slots = ekat::npack<Pack>(2)*Pack::n;
   const int n_trac_slots = ekat::npack<Pack>(m_num_tracers+3)*Pack::n;
-  const int wsm_size     = WSM::get_total_bytes_needed(nlevi_packs, 14+(2*n_wind_slots+n_trac_slots), policy)/sizeof(Pack);
+  const int wsm_size     = WSM::get_total_bytes_needed(nlevi_packs, 15+(2*n_wind_slots+n_trac_slots), policy)/sizeof(Pack);
   s_mem += wsm_size;
 
   size_t used_mem = (reinterpret_cast<Real*>(s_mem) - buffer_manager.get_memory())*sizeof(Real);
@@ -430,6 +430,7 @@ void SHOCMacrophysics::initialize_impl (const RunType run_type)
   temporaries.rho_zt = m_buffer.rho_zt;
   temporaries.shoc_qv = m_buffer.shoc_qv;
   temporaries.tabs = m_buffer.tabs;
+  temporaries.shoc_thv = m_buffer.shoc_thv;
   temporaries.dz_zt = m_buffer.dz_zt;
   temporaries.dz_zi = m_buffer.dz_zi;
 #endif
@@ -471,7 +472,7 @@ void SHOCMacrophysics::initialize_impl (const RunType run_type)
   const int n_wind_slots = ekat::npack<Pack>(2)*Pack::n;
   const int n_trac_slots = ekat::npack<Pack>(m_num_tracers+3)*Pack::n;
   const auto default_policy = TPF::get_default_team_policy(m_num_cols, nlev_packs);
-  workspace_mgr.setup(m_buffer.wsm_data, nlevi_packs, 14+(2*n_wind_slots+n_trac_slots), default_policy);
+  workspace_mgr.setup(m_buffer.wsm_data, nlevi_packs, 15+(2*n_wind_slots+n_trac_slots), default_policy);
 
   // Calculate pref_mid, and use that to calculate
   // maximum number of levels in pbl from surface

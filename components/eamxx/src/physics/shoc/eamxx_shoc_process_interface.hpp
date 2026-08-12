@@ -443,7 +443,7 @@ public:
     static constexpr int num_2d_vector_mid  = 21;
     static constexpr int num_2d_vector_int  = 12;
 #else
-    static constexpr int num_2d_vector_mid  = 25;
+    static constexpr int num_2d_vector_mid  = 26;
     static constexpr int num_2d_vector_int  = 13;
 #endif
     static constexpr int num_2d_vector_tr   = 1;
@@ -508,6 +508,7 @@ public:
     uview_2d<Pack> rho_zt;
     uview_2d<Pack> shoc_qv;
     uview_2d<Pack> tabs;
+    uview_2d<Pack> shoc_thv;
     uview_2d<Pack> dz_zt;
     uview_2d<Pack> dz_zi;
     uview_2d<Pack> tkh;
