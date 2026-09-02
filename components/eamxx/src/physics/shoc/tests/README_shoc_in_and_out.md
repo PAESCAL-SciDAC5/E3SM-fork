@@ -57,8 +57,14 @@ Larson length scale is an EAM-side diagnostic).
    (initialize to 0), `host_dse` (initialize as `cp*T + g*z` with
    `T = thetal/inv_exner + (Lv/cp)*shoc_ql`; it does not feed back into the
    prognostics — only the energy fixer adjusts it).
-5. **Runtime options:** EAM defaults, identical to what
-   `shoc_functions_f90.cpp::shoc_main_f` hardcodes:
+5. **Runtime options:** EAM defaults unless a tuning file is given with
+   `-p <file>` (C++ engine only; lines `<name> <value>`, `#` comments; names =
+   the 12 `SHOCRuntime` fields: lambda_low lambda_high lambda_slope lambda_thresh
+   thl2tune qw2tune qwthl2tune w2tune length_fac c_diag_3rd_mom Ckh Ckm; unknown
+   names abort; unlisted names keep the defaults). The values actually used are
+   written to `<prefix>_<engine>_<mode>.params` for every run. They live in
+   `shoc_functions_f90.cpp::shoc_main_runtime_options()`, which `shoc_main_f`
+   reads on every call; the defaults there are the ones it used to hardcode:
    `lambda_low=0.001, lambda_high=0.04, lambda_slope=2.65,
    lambda_thresh=0.02, thl2tune=qw2tune=qwthl2tune=w2tune=1.0,
    length_fac=0.5, c_diag_3rd_mom=7.0, Ckh=Ckm=0.1`. Physics constants in

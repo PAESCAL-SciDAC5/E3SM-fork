@@ -2735,6 +2735,16 @@ int shoc_init_f(Int nlev, Real *pref_mid, Int nbot_shoc, Int ntop_shoc)
   return SHF::shoc_init(nbot_shoc,ntop_shoc,pref_mid_d);
 }
 
+Functions<Real, DefaultDevice>::SHOCRuntime& shoc_main_runtime_options()
+{
+  // EAM defaults (namelist_defaults_eam.xml / shoc.F90):
+  //   lambda_low=0.001, lambda_high=0.04, lambda_slope=2.65, lambda_thresh=0.02,
+  //   thl2tune=qw2tune=qwthl2tune=w2tune=1.0, length_fac=0.5, c_diag_3rd_mom=7.0,
+  //   Ckh=Ckm=0.1
+  static Functions<Real, DefaultDevice>::SHOCRuntime opts{0.001,0.04,2.65,0.02,1.0,1.0,1.0,1.0,0.5,7.0,0.1,0.1};
+  return opts;
+}
+
 Int shoc_main_f(Int shcol, Int nlev, Int nlevi, Real dtime, Int nadv, Int npbl, Real* host_dx, Real* host_dy, Real* thv, Real* zt_grid,
                 Real* zi_grid, Real* pres, Real* presi, Real* pdel, Real* wthl_sfc, Real* wqw_sfc, Real* uw_sfc, Real* vw_sfc,
                 Real* wtracer_sfc, Int num_qtracers, Real* w_field, Real* inv_exner, Real* phis, Real* host_dse, Real* tke,
@@ -2885,7 +2895,8 @@ Int shoc_main_f(Int shcol, Int nlev, Int nlevi, Real dtime, Int nadv, Int npbl, 
                                              qwthl_sec_d, wthl_sec_d, wqw_sec_d, wtke_sec_d,
                                              uw_sec_d,    vw_sec_d,   w3_d,      wqls_sec_d,
                                              brunt_d,     isotropy_d};
-  SHF::SHOCRuntime shoc_runtime_options{0.001,0.04,2.65,0.02,1.0,1.0,1.0,1.0,0.5,7.0,0.1,0.1};
+  // Tunable options: EAM defaults unless overridden via shoc_main_runtime_options()
+  SHF::SHOCRuntime shoc_runtime_options = shoc_main_runtime_options();
 
   const auto nlevi_packs = ekat::npack<Spack>(nlevi);
 

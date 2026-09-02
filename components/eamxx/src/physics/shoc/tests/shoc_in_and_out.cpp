@@ -44,6 +44,7 @@
 
 #include "shoc_main_wrap.hpp"
 #include "shoc_f90.hpp"
+#include "shoc_functions_f90.hpp"   // shoc_main_runtime_options()
 #include "shoc_constants.hpp"
 #include "physics_constants.hpp"
 
@@ -57,6 +58,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -312,6 +314,68 @@ void expect_another_arg (int i, int argc) {
 
 } // namespace
 
+// ---------------------------------------------------------------------------
+// SHOC tuning parameters (C++ engine). The 12 runtime options SHOC exposes,
+// by their EAMxx names, mapped onto the SHOCRuntime struct shoc_main_f uses.
+// EAM namelist equivalents: shoc_<name> (e.g. shoc_c_diag_3rd_mom, shoc_Ckh).
+using RuntimeOpts = scream::shoc::Functions<Real, scream::DefaultDevice>::SHOCRuntime;
+static const std::vector<std::pair<std::string, Real RuntimeOpts::*>>& runtime_option_table () {
+  static const std::vector<std::pair<std::string, Real RuntimeOpts::*>> t = {
+    {"lambda_low",     &RuntimeOpts::lambda_low},
+    {"lambda_high",    &RuntimeOpts::lambda_high},
+    {"lambda_slope",   &RuntimeOpts::lambda_slope},
+    {"lambda_thresh",  &RuntimeOpts::lambda_thresh},
+    {"thl2tune",       &RuntimeOpts::thl2tune},
+    {"qw2tune",        &RuntimeOpts::qw2tune},
+    {"qwthl2tune",     &RuntimeOpts::qwthl2tune},
+    {"w2tune",         &RuntimeOpts::w2tune},
+    {"length_fac",     &RuntimeOpts::length_fac},
+    {"c_diag_3rd_mom", &RuntimeOpts::c_diag_3rd_mom},
+    {"Ckh",            &RuntimeOpts::Ckh},
+    {"Ckm",            &RuntimeOpts::Ckm},
+  };
+  return t;
+}
+
+// Read "<name> <value>" lines (blank lines and '#' comments ignored; a name may
+// appear once) and store them in the process-wide options that shoc_main_f
+// reads. Unknown names are an error, so a typo cannot silently keep a default.
+static void apply_params_file (const std::string& fname) {
+  std::ifstream in(fname);
+  EKAT_REQUIRE_MSG(in, "shoc_in_and_out: cannot open tuning file " + fname);
+  auto& opts = scream::shoc::shoc_main_runtime_options();
+  std::map<std::string,int> seen;
+  std::string line; int lineno = 0;
+  while (std::getline(in, line)) {
+    ++lineno;
+    const auto hash = line.find('#');
+    if (hash != std::string::npos) line.erase(hash);
+    std::istringstream iss(line);
+    std::string name, extra; double value;
+    if (!(iss >> name)) continue;                       // blank / comment-only line
+    EKAT_REQUIRE_MSG(iss >> value && !(iss >> extra),
+                     "shoc_in_and_out: bad line " + std::to_string(lineno) + " in " + fname + ": '" + line + "'");
+    bool found = false;
+    for (const auto& kv : runtime_option_table()) {
+      if (kv.first == name) { opts.*(kv.second) = static_cast<Real>(value); found = true; break; }
+    }
+    EKAT_REQUIRE_MSG(found, "shoc_in_and_out: unknown SHOC tuning parameter '" + name + "' in " + fname);
+    EKAT_REQUIRE_MSG(++seen[name] == 1, "shoc_in_and_out: '" + name + "' given twice in " + fname);
+  }
+}
+
+// Write the effective tuning parameters next to the output tables.
+static void write_params_sidecar (const std::string& fname, const std::string& pfile) {
+  std::FILE* fp = std::fopen(fname.c_str(), "w");
+  EKAT_REQUIRE_MSG(fp, "shoc_in_and_out: cannot write " + fname);
+  std::fprintf(fp, "# SHOC runtime (tuning) parameters used by this run (C++ engine)\n");
+  std::fprintf(fp, "# source: %s\n", pfile.empty() ? "EAM defaults (no -p file)" : pfile.c_str());
+  const auto& opts = scream::shoc::shoc_main_runtime_options();
+  for (const auto& kv : runtime_option_table())
+    std::fprintf(fp, "%-15s %.17g\n", kv.first.c_str(), static_cast<double>(opts.*(kv.second)));
+  std::fclose(fp);
+}
+
 int main (int argc, char** argv) {
   // [0] No options at all: print the usage message and exit with a non-zero
   //     code (this is a "wrong usage" exit, not a successful run).
@@ -328,7 +392,13 @@ int main (int argc, char** argv) {
       "                per-substep output. exp1: one call with nadv=<steps>,\n"
       "                final state only.\n"
       "  -dx <m>       host_dx = host_dy. Default: 100000.\n"
-      "  -o <prefix>   Output file prefix. Default: shoc_in_and_out.\n";
+      "  -o <prefix>   Output file prefix. Default: shoc_in_and_out.\n"
+      "  -p <file>     SHOC tuning-parameter file (C++ engine only): lines of\n"
+      "                '<name> <value>', # comments allowed. Names: lambda_low\n"
+      "                lambda_high lambda_slope lambda_thresh thl2tune qw2tune\n"
+      "                qwthl2tune w2tune length_fac c_diag_3rd_mom Ckh Ckm.\n"
+      "                Unlisted names keep the EAM defaults. The effective values\n"
+      "                are always written to <prefix>_<engine>_<mode>.params.\n";
     return 1;
   }
 
@@ -337,6 +407,7 @@ int main (int argc, char** argv) {
   int dt = 60, nsteps = 360;                // timestep [s] and number of substeps
   Real dx = 100000.0;                       // horizontal grid size [m]
   std::string icdir = ".", mode = "exp2", prefix = "shoc_in_and_out";
+  std::string pfile;                        // -p: tuning-parameter file (optional)
 
   // [1b] Walk the arguments once. argv_matches does an exact match, so the
   //      order of the branches does not matter. An option that takes a value
@@ -359,6 +430,8 @@ int main (int argc, char** argv) {
       expect_another_arg(i, argc); dx = std::atof(argv[++i]);
     } else if (ekat::argv_matches(argv[i], "-o", "--out-prefix")) {
       expect_another_arg(i, argc); prefix = argv[++i];
+    } else if (ekat::argv_matches(argv[i], "-p", "--params")) {
+      expect_another_arg(i, argc); pfile = argv[++i];
     } else {
       EKAT_REQUIRE_MSG(false, std::string("shoc_in_and_out: unknown option '")
                               + argv[i] + "'");
@@ -366,6 +439,8 @@ int main (int argc, char** argv) {
   }
   EKAT_REQUIRE_MSG(mode == "exp1" || mode == "exp2",
                    "shoc_in_and_out: -x must be exp1 or exp2");
+  EKAT_REQUIRE_MSG(pfile.empty() || !use_fortran,
+                   "shoc_in_and_out: -p (tuning file) is only plumbed to the C++ engine; not valid with -f");
   EKAT_REQUIRE_MSG(dt > 0 && nsteps > 0, "shoc_in_and_out: bad dt/steps");
 
   // Start the EAMxx/Kokkos runtime; the matching finalize is at the end.
@@ -385,6 +460,11 @@ int main (int argc, char** argv) {
     // Passing use_fortran here also tells the harness which engine to call.
     shoc_init(d->nlev, use_fortran);
 
+    // [2b] SHOC tuning parameters (C++ engine): override the EAM defaults from
+    // the -p file, if given. shoc_main_f copies these on every call, so setting
+    // them once here, before the first shoc_main, covers the whole run.
+    if (!pfile.empty()) apply_params_file(pfile);
+
     // Open the two output tables (midpoint zt + interface zi), named after the
     // engine and substepping mode, and write their column headers. k = 0 is the
     // model top in both. All fluxes are raw/native units (convert in the plot).
@@ -400,6 +480,9 @@ int main (int argc, char** argv) {
                       " tk tkh isotropy brunt w_sec ql2 wthv_sec wqls_sec\n");
     std::fprintf(fzi, "time k zi Pi wthl_sec wqw_sec thl_sec qw_sec qwthl_sec"
                       " uw_sec vw_sec w3 wtke_sec\n");
+
+    // Provenance: the tuning parameters this run actually used (defaults or -p).
+    write_params_sidecar(base + ".params", pfile);
 
     std::printf("shoc_in_and_out: engine=%s mode=%s nz=%d dt=%d steps=%d"
                 " dx=%g ic=%s\n", engine.c_str(), mode.c_str(), ic.nz, dt,

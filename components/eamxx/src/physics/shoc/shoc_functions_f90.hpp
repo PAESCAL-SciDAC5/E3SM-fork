@@ -1218,6 +1218,14 @@ void isotropic_ts_f(Int nlev, Int shcol, Real* brunt_int, Real* tke,
 void dp_inverse_f(Int nlev, Int shcol, Real *rho_zt, Real *dz_zt, Real *rdp_zt);
 
 int shoc_init_f(Int nlev, Real* pref_mid, Int nbot_shoc, Int ntop_shoc);
+// Runtime (tunable) SHOC options used by shoc_main_f, i.e. by the C++ engine
+// of the BFB tests and of the shoc_in_and_out driver. Initialized to the EAM
+// defaults (the values shoc_main_f used to hardcode). The driver overrides them
+// from a "-p <file>" parameter file before its first shoc_main call.
+// Field order: lambda_low, lambda_high, lambda_slope, lambda_thresh, thl2tune,
+// qw2tune, qwthl2tune, w2tune, length_fac, c_diag_3rd_mom, Ckh, Ckm.
+Functions<Real, DefaultDevice>::SHOCRuntime& shoc_main_runtime_options();
+
 Int shoc_main_f(Int shcol, Int nlev, Int nlevi, Real dtime, Int nadv, Int npbl, Real* host_dx, Real* host_dy, Real* thv,
                 Real* zt_grid, Real* zi_grid, Real* pres, Real* presi, Real* pdel, Real* wthl_sfc, Real* wqw_sfc,
                 Real* uw_sfc, Real* vw_sfc, Real* wtracer_sfc, Int num_qtracers, Real* w_field, Real* inv_exner,
