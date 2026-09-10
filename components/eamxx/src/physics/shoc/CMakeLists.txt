@@ -3,6 +3,12 @@ set(SHOC_SRCS
   shoc_ic_cases.cpp
   shoc_iso_c.f90
   shoc_iso_f.f90
+  # EAM-host stand-ins (wv_saturation, time_manager, shr_RandNum_mod) that the
+  # SHOC+MF shoc.F90 needs under SCREAM_CONFIG_IS_CMAKE, plus the KISS random
+  # generator it wraps (same sources EAM's shr_RandNum_mod uses).
+  shoc_eam_host_stubs.F90
+  ${SCREAM_BASE_DIR}/../../share/RandNum/src/kissvec/kissvec_mod.F90
+  ${SCREAM_BASE_DIR}/../../share/RandNum/src/kissvec/kissvec.c
   ${SCREAM_BASE_DIR}/../eam/src/physics/cam/shoc.F90
   eamxx_shoc_process_interface.cpp
 )

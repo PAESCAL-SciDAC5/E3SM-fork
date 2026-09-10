@@ -3435,6 +3435,137 @@ Coefficient for eddy diffusivity for momentum for stable boundary layers.
 Default: set by build-namelist
 </entry>
 
+<entry id="shoc_l_inf_const" type="real" category="pblrad"
+       group="shocpbl_diff_nl" valid_values="" >
+Asymptotic value of length scale L.
+Default: set by build-namelist
+</entry>
+
+<entry id="shoc_tscale_const" type="real" category="pblrad"
+       group="shocpbl_diff_nl" valid_values="" >
+Eddy turnover timescale.
+Default: set by build-namelist
+</entry>
+
+<entry id="shoc_Cee_const" type="real" category="pblrad"
+       group="shocpbl_diff_nl" valid_values="" >
+Turbulent constant of TKE dissipation.
+Default: set by build-namelist
+</entry>
+
+<!-- for SHOC+MF -->
+<entry id="edmf_mf_L0" type="real" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+Real: Entrainment length scale in meters for individual plumes
+Default: 50.0
+</entry>
+
+<entry id="edmf_mf_ent0" type="real" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+Real: Entrainment efficiency for individual plumes
+Default: 0.22
+</entry>
+
+<entry id="edmf_mf_nup" type="integer" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+Real: number of plumes in mass flux ensemble
+Default: 10
+</entry>
+
+<entry id="edmf_mf_a" type="real" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+Real: Constant used in the dynamic L0
+Default: 1
+</entry>
+
+<entry id="edmf_mf_b" type="real" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+Real: Constant used in the dynamic L0
+Default: 0.5
+</entry>
+
+<entry id="edmf_mf_c" type="real" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+Real: Constant used in the dynamic L0
+Default: 0.5
+</entry>
+
+<entry id="edmf_mf_a_wcp" type="real" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+Real: Constant used in the MF cold pool vertical velocity scale
+Default: 1.0
+</entry>
+
+<entry id="edmf_mf_tau_wcp" type="real" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+Real: Time scale in hours used in the MF cold pool vertical velocity scale
+Default: 4.0
+</entry>
+
+<entry id="edmf_do_edmf" type="logical" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+If TRUE runs subroutine integrate_mf that computes updrafts properties (Suselj et al 2013/2019)
+Default: FALSE
+</entry>
+
+<entry id="edmf_do_condensation" type="logical" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+If TRUE, the subroutine integrate_mf also computes moist updrafts properties (Suselj et al 2019)
+Default: FALSE
+</entry>
+
+<entry id="edmf_do_precipitation" type="logical" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+If TRUE, the subroutine integrate_mf allows for precipitating updrafts (Suselj et al 2019)
+Default: FALSE
+</entry>
+
+<entry id="edmf_do_mf_diag" type="logical" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+If TRUE adds the mass-flux contribution to the diffusion solver
+The coupling of MF with SHOC constitutes an eddy-diffusivity mass-flux approach. 
+Default: FALSE
+</entry>
+
+<entry id="edmf_do_wthv_mf" type="logical" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+If TRUE, the SGS TKE buoyancy production uses the total (ED+MF) buoyancy flux
+computed from the total heat, moisture and liquid-water fluxes via eq 7.15
+(subroutine buoyancy_total_fluxes), instead of the ED-only buoyancy flux from
+the SHOC PDF.
+Default: FALSE
+</entry>
+
+<entry id="edmf_do_dynamic_L" type="logical" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+If TRUE, L0 is calculated dynamically as proportional to the height of the CBL.
+Default: FALSE
+</entry>
+
+<entry id="edmf_do_entr_tke" type="logical" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+If TRUE, EDMF updraft properties are calculated using the TKE enhanced entrainment approximation.
+Default: FALSE
+</entry>
+
+<entry id="edmf_do_explicit" type="logical" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+If TRUE, do_entr_tke needs to be true and the updraft vertical velocity calculation follows an explicit solution (with a limiter).
+Default: FALSE
+</entry>
+
+<entry id="edmf_do_integral" type="logical" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+If TRUE, do_entr_tke needs to be true and the updraft vertical velocity calculation follows an integral solution.
+Default: FALSE
+</entry>
+
+<entry id="edmf_do_implicit" type="logical" category="conv"
+       group="shocpbl_diff_nl" valid_values="" >
+If TRUE, do_entr_tke needs to be true and the updraft vertical velocity calculation follows an inplicit Euler solution.
+Default: FALSE
+</entry>
+
 <entry id="clubb_cloudtop_cooling" type="logical"  category="pblrad"
        group="clubbpbl_diff_nl" valid_values="" >
 Apply cloud top radiative cooling parameterization

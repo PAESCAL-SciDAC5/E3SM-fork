@@ -842,6 +842,30 @@
 <shoc_Ckm                    > 0.1D0 </shoc_Ckm>
 <shoc_Ckh_s                  > 0.1D0 </shoc_Ckh_s>
 <shoc_Ckm_s                  > 0.1D0 </shoc_Ckm_s>
+<shoc_l_inf_const            > 150.0D0 </shoc_l_inf_const>
+<shoc_tscale_const           > 400.0D0 </shoc_tscale_const>
+<shoc_Cee_const              > 1.0D0 </shoc_Cee_const>
+
+<!-- SHOC+MF options -->
+<edmf_mf_L0                       > 50.0    </edmf_mf_L0>
+<edmf_mf_ent0                     > 0.22    </edmf_mf_ent0>
+<edmf_mf_nup                      > 10      </edmf_mf_nup>
+<edmf_mf_a                        > 1       </edmf_mf_a>
+<edmf_mf_b                        > 0.5     </edmf_mf_b>
+<edmf_mf_c                        > 0.5     </edmf_mf_c>
+<edmf_mf_a_wcp                    > 1.0     </edmf_mf_a_wcp>
+<edmf_mf_tau_wcp                  > 4.0     </edmf_mf_tau_wcp>
+
+<edmf_do_edmf                     > .false. </edmf_do_edmf>
+<edmf_do_condensation             > .false. </edmf_do_condensation>
+<edmf_do_precipitation            > .false. </edmf_do_precipitation>
+<edmf_do_mf_diag                  > .false. </edmf_do_mf_diag>
+<edmf_do_wthv_mf                  > .false. </edmf_do_wthv_mf>
+<edmf_do_dynamic_L                > .false. </edmf_do_dynamic_L>
+<edmf_do_entr_tke                 > .false. </edmf_do_entr_tke>
+<edmf_do_explicit                 > .false. </edmf_do_explicit>
+<edmf_do_integral                 > .false. </edmf_do_integral>
+<edmf_do_implicit                 > .false. </edmf_do_implicit>
 
 <!-- CLUBB options -->
 <clubb_rainevap_turb                              > .false. </clubb_rainevap_turb>

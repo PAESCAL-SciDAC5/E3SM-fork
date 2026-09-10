@@ -3816,6 +3816,29 @@ if ($shoc_sgs  =~ /$TRUE/io) {
    add_default($nl, 'shoc_Ckm');
    add_default($nl, 'shoc_Ckh_s');
    add_default($nl, 'shoc_Ckm_s');
+   add_default($nl, 'shoc_l_inf_const');
+   add_default($nl, 'shoc_tscale_const');
+   add_default($nl, 'shoc_Cee_const');
+
+   # SHOC+MF
+   add_default($nl, 'edmf_mf_L0');
+   add_default($nl, 'edmf_mf_ent0');
+   add_default($nl, 'edmf_mf_nup');
+   add_default($nl, 'edmf_mf_a');
+   add_default($nl, 'edmf_mf_b');
+   add_default($nl, 'edmf_mf_c');
+   add_default($nl, 'edmf_mf_a_wcp');
+   add_default($nl, 'edmf_mf_tau_wcp');
+   add_default($nl, 'edmf_do_edmf');
+   add_default($nl, 'edmf_do_condensation');
+   add_default($nl, 'edmf_do_precipitation');
+   add_default($nl, 'edmf_do_mf_diag');
+   add_default($nl, 'edmf_do_wthv_mf');
+   add_default($nl, 'edmf_do_dynamic_L');
+   add_default($nl, 'edmf_do_entr_tke');
+   add_default($nl, 'edmf_do_explicit');
+   add_default($nl, 'edmf_do_integral');
+   add_default($nl, 'edmf_do_implicit');
 }
 
 

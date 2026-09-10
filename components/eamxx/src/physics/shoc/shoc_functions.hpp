@@ -224,6 +224,7 @@ struct Functions
     view_2d<Spack> tabs;
     view_2d<Spack> dz_zt;
     view_2d<Spack> dz_zi;
+    view_2d<Spack> shoc_thv;
     view_2d<Spack> tkh;
   };
 #endif
@@ -1148,7 +1149,8 @@ struct Functions
     const view_2d<Spack>& shoc_qv,
     const view_2d<Spack>& tabs,
     const view_2d<Spack>& dz_zt,
-    const view_2d<Spack>& dz_zi);
+    const view_2d<Spack>& dz_zi,
+    const view_2d<Spack>& shoc_thv);
 #endif
 
   // Return microseconds elapsed

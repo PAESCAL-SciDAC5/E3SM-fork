@@ -2,6 +2,10 @@ module shoc_iso_c
   use iso_c_binding
   implicit none
 
+  ! Number of shoc_main_c calls so far = host time step seen by the SHOC+MF
+  ! cold-pool bookkeeping (EAM time_manager::get_nstep stand-in).
+  integer, save :: nstep_calls = 0
+
 #include "scream_config.f"
 #ifdef SCREAM_DOUBLE_PRECISION
 # define c_real c_double
@@ -81,7 +85,8 @@ contains
      qw, u_wind, v_wind, qtracers, wthv_sec, tkh, tk, shoc_ql, shoc_cldfrac, &
      pblh, shoc_mix, isotropy, w_sec, thl_sec, qw_sec, qwthl_sec, wthl_sec,  &
      wqw_sec, wtke_sec, uw_sec, vw_sec, w3, wqls_sec, brunt, shoc_ql2, elapsed_s) bind(C)
-    use shoc, only : shoc_main
+    use shoc, only : shoc_main_std
+    use shoc_eam_host_stubs, only: shoc_host_set_nstep
 
     integer(kind=c_int), value, intent(in) :: shcol, nlev, nlevi, num_qtracers, nadv
     real(kind=c_real), value, intent(in) :: dtime
@@ -111,13 +116,160 @@ contains
 
     real(kind=c_real), intent(out) :: elapsed_s
 
-    call shoc_main(shcol, nlev, nlevi, dtime, nadv, host_dx, host_dy, thv,   &
+    ! SHOC+MF: shoc_main_std has standard SHOC's argument list and keeps the
+    ! MF state in module arrays. The host step counter (EAM time_manager
+    ! stand-in) is advanced once per call, so the MF cold-pool bookkeeping
+    ! sees nstep = 0, 1, 2, ... exactly as in EAM.
+    call shoc_host_set_nstep(nstep_calls)
+    call shoc_main_std(shcol, nlev, nlevi, dtime, nadv, host_dx, host_dy, thv,   &
      zt_grid, zi_grid, pres, presi, pdel, wthl_sfc, wqw_sfc, uw_sfc, vw_sfc, &
      wtracer_sfc, num_qtracers, w_field, inv_exner, phis, host_dse, tke, thetal, &
      qw, u_wind, v_wind, qtracers, wthv_sec, tkh, tk, shoc_ql, shoc_cldfrac, &
      pblh, shoc_mix, isotropy, w_sec, thl_sec, qw_sec, qwthl_sec, wthl_sec,  &
      wqw_sec, wtke_sec, uw_sec, vw_sec, w3, wqls_sec, brunt,shoc_ql2,elapsed_s)
+    nstep_calls = nstep_calls + 1
   end subroutine shoc_main_c
+
+  ! Copy a NUL-terminated C string into a Fortran character variable
+  subroutine c_to_f_string(cstr, fstr)
+    character(kind=c_char), intent(in) :: cstr(*)
+    character(len=*), intent(out) :: fstr
+    integer :: i
+    fstr = ' '
+    do i = 1, len(fstr)
+      if (cstr(i) == C_NULL_CHAR) exit
+      fstr(i:i) = cstr(i)
+    end do
+  end subroutine c_to_f_string
+
+  ! Set one SHOC / SHOC+MF module parameter by name on the Fortran engine
+  ! (shoc_in_and_out "-p <file>" with -f). Names are the shoc.F90 module
+  ! variables: the 12 EAMxx-style SHOC tunables (lambda_low lambda_high
+  ! lambda_slope lambda_thresh thl2tune qw2tune qwthl2tune w2tune length_fac
+  ! c_diag_3rd_mom Ckh Ckm) plus Ckh_s Ckm_s l_inf_const tscale_const Cee_const,
+  ! and the MF constants/switches (mf_L0 mf_ent0 mf_nup mf_a mf_b mf_c mf_a_wcp
+  ! mf_tau_wcp do_edmf do_condensation do_precip do_mf_diag do_wthv_mf
+  ! do_dynamic_L do_entr_tke do_explicit do_integral do_implicit). Logicals are
+  ! set from value /= 0, mf_nup from nint(value). Returns 0 on success, 1 for
+  ! an unknown name (the caller must treat that as an error).
+  function shoc_set_param_c(name, value) result(ierr) bind(C)
+    use shoc, only: lambda_low, lambda_high, lambda_slope, lambda_thresh, &
+                    thl2tune, qw2tune, qwthl2tune, w2tune, length_fac, c_diag_3rd_mom, &
+                    Ckh, Ckm, Ckh_s, Ckm_s, l_inf_const, tscale_const, Cee_const, &
+                    mf_L0, mf_ent0, mf_nup, mf_a, mf_b, mf_c, mf_a_wcp, mf_tau_wcp, &
+                    do_edmf, do_condensation, do_precip, do_mf_diag, do_wthv_mf, &
+                    do_dynamic_L, do_entr_tke, do_explicit, do_integral, do_implicit
+    character(kind=c_char), intent(in) :: name(*)
+    real(kind=c_real), value, intent(in) :: value
+    integer(kind=c_int) :: ierr
+    character(len=64) :: fname
+    ! c_real is a preprocessor macro, so it cannot be used as the kind suffix of a literal
+    real(kind=c_real), parameter :: zero = 0, one = 1
+    logical :: lv
+
+    call c_to_f_string(name, fname)
+    lv = (value /= zero)
+    ierr = 0
+    select case (trim(fname))
+    case ('lambda_low');      lambda_low = value
+    case ('lambda_high');     lambda_high = value
+    case ('lambda_slope');    lambda_slope = value
+    case ('lambda_thresh');   lambda_thresh = value
+    case ('thl2tune');        thl2tune = value
+    case ('qw2tune');         qw2tune = value
+    case ('qwthl2tune');      qwthl2tune = value
+    case ('w2tune');          w2tune = value
+    case ('length_fac');      length_fac = value
+    case ('c_diag_3rd_mom');  c_diag_3rd_mom = value
+    case ('Ckh');             Ckh = value
+    case ('Ckm');             Ckm = value
+    case ('Ckh_s');           Ckh_s = value
+    case ('Ckm_s');           Ckm_s = value
+    case ('l_inf_const');     l_inf_const = value
+    case ('tscale_const');    tscale_const = value
+    case ('Cee_const');       Cee_const = value
+    case ('mf_L0');           mf_L0 = value
+    case ('mf_ent0');         mf_ent0 = value
+    case ('mf_nup');          mf_nup = nint(value)
+    case ('mf_a');            mf_a = value
+    case ('mf_b');            mf_b = value
+    case ('mf_c');            mf_c = value
+    case ('mf_a_wcp');        mf_a_wcp = value
+    case ('mf_tau_wcp');      mf_tau_wcp = value
+    case ('do_edmf');         do_edmf = lv
+    case ('do_condensation'); do_condensation = lv
+    case ('do_precip');       do_precip = lv
+    case ('do_mf_diag');      do_mf_diag = lv
+    case ('do_wthv_mf');      do_wthv_mf = lv
+    case ('do_dynamic_L');    do_dynamic_L = lv
+    case ('do_entr_tke');     do_entr_tke = lv
+    case ('do_explicit');     do_explicit = lv
+    case ('do_integral');     do_integral = lv
+    case ('do_implicit');     do_implicit = lv
+    case default
+      ierr = 1
+    end select
+  end function shoc_set_param_c
+
+  ! Read one SHOC / SHOC+MF module parameter by name (same names as
+  ! shoc_set_param_c; logicals return 1/0). Returns 0 on success, 1 if unknown.
+  function shoc_get_param_c(name, value) result(ierr) bind(C)
+    use shoc, only: lambda_low, lambda_high, lambda_slope, lambda_thresh, &
+                    thl2tune, qw2tune, qwthl2tune, w2tune, length_fac, c_diag_3rd_mom, &
+                    Ckh, Ckm, Ckh_s, Ckm_s, l_inf_const, tscale_const, Cee_const, &
+                    mf_L0, mf_ent0, mf_nup, mf_a, mf_b, mf_c, mf_a_wcp, mf_tau_wcp, &
+                    do_edmf, do_condensation, do_precip, do_mf_diag, do_wthv_mf, &
+                    do_dynamic_L, do_entr_tke, do_explicit, do_integral, do_implicit
+    character(kind=c_char), intent(in) :: name(*)
+    real(kind=c_real), intent(out) :: value
+    integer(kind=c_int) :: ierr
+    character(len=64) :: fname
+    ! c_real is a preprocessor macro, so it cannot be used as the kind suffix of a literal
+    real(kind=c_real), parameter :: zero = 0, one = 1
+
+    call c_to_f_string(name, fname)
+    ierr = 0
+    select case (trim(fname))
+    case ('lambda_low');      value = lambda_low
+    case ('lambda_high');     value = lambda_high
+    case ('lambda_slope');    value = lambda_slope
+    case ('lambda_thresh');   value = lambda_thresh
+    case ('thl2tune');        value = thl2tune
+    case ('qw2tune');         value = qw2tune
+    case ('qwthl2tune');      value = qwthl2tune
+    case ('w2tune');          value = w2tune
+    case ('length_fac');      value = length_fac
+    case ('c_diag_3rd_mom');  value = c_diag_3rd_mom
+    case ('Ckh');             value = Ckh
+    case ('Ckm');             value = Ckm
+    case ('Ckh_s');           value = Ckh_s
+    case ('Ckm_s');           value = Ckm_s
+    case ('l_inf_const');     value = l_inf_const
+    case ('tscale_const');    value = tscale_const
+    case ('Cee_const');       value = Cee_const
+    case ('mf_L0');           value = mf_L0
+    case ('mf_ent0');         value = mf_ent0
+    case ('mf_nup');          value = real(mf_nup, c_real)
+    case ('mf_a');            value = mf_a
+    case ('mf_b');            value = mf_b
+    case ('mf_c');            value = mf_c
+    case ('mf_a_wcp');        value = mf_a_wcp
+    case ('mf_tau_wcp');      value = mf_tau_wcp
+    case ('do_edmf');         value = merge(one, zero, do_edmf)
+    case ('do_condensation'); value = merge(one, zero, do_condensation)
+    case ('do_precip');       value = merge(one, zero, do_precip)
+    case ('do_mf_diag');      value = merge(one, zero, do_mf_diag)
+    case ('do_wthv_mf');      value = merge(one, zero, do_wthv_mf)
+    case ('do_dynamic_L');    value = merge(one, zero, do_dynamic_L)
+    case ('do_entr_tke');     value = merge(one, zero, do_entr_tke)
+    case ('do_explicit');     value = merge(one, zero, do_explicit)
+    case ('do_integral');     value = merge(one, zero, do_integral)
+    case ('do_implicit');     value = merge(one, zero, do_implicit)
+    case default
+      value = zero
+      ierr = 1
+    end select
+  end function shoc_get_param_c
 
   subroutine shoc_use_cxx_c(arg_use_cxx) bind(C)
     use shoc, only: use_cxx
@@ -319,10 +471,11 @@ contains
     real(kind=c_real), intent(inout) :: tk(shcol,nlev)
     real(kind=c_real), intent(inout) :: tkh(shcol,nlev)
     real(kind=c_real), intent(out) :: isotropy(shcol,nlev)
+    real(kind=c_real), dimension(shcol,nlev) :: a_diss, a_prod_bu, a_prod_sh ! SHOC+MF extra diagnostics (unused here)
 
     call shoc_tke(shcol, nlev, nlevi, dtime, wthv_sec, shoc_mix, dz_zi, &
          dz_zt, pres, tabs, u_wind, v_wind, brunt, zt_grid, &
-         zi_grid, pblh, tke, tk, tkh, isotropy)
+         zi_grid, pblh, tke, tk, tkh, isotropy, a_diss, a_prod_bu, a_prod_sh)
 
   end subroutine shoc_tke_c
 
@@ -388,9 +541,10 @@ contains
     real(kind=c_real), intent(inout) :: tke(shcol,nlev)
 
     real(kind=c_real), intent(out) :: a_diss(shcol,nlev)
+    real(kind=c_real) :: a_prod_bu(shcol,nlev), a_prod_sh(shcol,nlev) ! SHOC+MF extra diagnostics (unused here)
 
     call adv_sgs_tke(nlev, shcol, dtime, shoc_mix, wthv_sec, &
-                     sterm_zt, tk, tke, a_diss)
+                     sterm_zt, tk, tke, a_diss, a_prod_bu, a_prod_sh)
 
   end subroutine adv_sgs_tke_c
 
@@ -592,8 +746,15 @@ contains
     real(kind=c_real), intent(in) :: invar(shcol,nlev)
 
     real(kind=c_real), intent(inout) :: vertflux(shcol,nlevi)
+    ! SHOC+MF extras: no mass-flux contribution through this bridge (ae=1, aw=0,
+    ! do_total_fluxes=.false.); grids are only used for the MF interpolation.
+    real(kind=c_real) :: zt_grid(shcol,nlev), zi_grid(shcol,nlevi)
+    real(kind=c_real) :: mf_ae(shcol,nlevi), mf_aw(shcol,nlevi), mf_aw_invar(shcol,nlevi)
+    real(kind=c_real) :: vertflux_ed(shcol,nlevi), vertflux_mf(shcol,nlevi)
+    zt_grid = 0; zi_grid = 0; mf_ae = 1; mf_aw = 0; mf_aw_invar = 0
 
-    call calc_shoc_vertflux(shcol, nlev, nlevi, tkh_zi, dz_zi, invar, vertflux)
+    call calc_shoc_vertflux(shcol, nlev, nlevi, tkh_zi, dz_zi, invar, zt_grid, zi_grid, &
+                            mf_ae, mf_aw, mf_aw_invar, .false., vertflux, vertflux_ed, vertflux_mf)
 
   end subroutine calc_shoc_vertflux_c
 
@@ -615,10 +776,11 @@ contains
 
     real(kind=c_real), intent(out) :: brunt(shcol,nlev)
     real(kind=c_real), intent(out) :: shoc_mix(shcol,nlev)
+    real(kind=c_real) :: l_inf(shcol)  ! SHOC+MF extra diagnostic (unused here)
 
     call shoc_length(shcol, nlev, nlevi, host_dx, host_dy, &
                 zt_grid, zi_grid, dz_zt, tke, thv, &
-                brunt, shoc_mix)
+                brunt, l_inf, shoc_mix)
 
   end subroutine shoc_length_c
 
@@ -960,12 +1122,15 @@ contains
     real(kind=c_real), intent(out) :: wqls(shcol,nlev)
     real(kind=c_real), intent(out) :: wthv_sec(shcol,nlev)
     real(kind=c_real), intent(out) :: shoc_ql2(shcol,nlev)
+    ! SHOC+MF extras: no MF liquid-water flux through this bridge; PDF diagnostics unused
+    real(kind=c_real), dimension(shcol,nlev) :: mf_qlflx_zt, a1_out, C1_out, C2_out, ql1_out, ql2_out
+    mf_qlflx_zt = 0
 
     call shoc_assumed_pdf(shcol, nlev, nlevi, thetal, qw, &
                           w_field, thl_sec, qw_sec, wthl_sec, &
-                          w_sec, wqw_sec, qwthl_sec, w3, pres, &
+                          w_sec, wqw_sec, qwthl_sec, w3, pres, mf_qlflx_zt, &
                           zt_grid, zi_grid, shoc_cldfrac, &
-                          shoc_ql, wqls, wthv_sec, shoc_ql2)
+                          shoc_ql, wqls, wthv_sec, shoc_ql2, a1_out, C1_out, C2_out, ql1_out, ql2_out)
 
   end subroutine shoc_assumed_pdf_c
 
@@ -1229,9 +1394,10 @@ contains
     real(kind=c_real), intent(in), value :: wqls
 
     real(kind=c_real), intent(out) :: wthv_sec
+    real(kind=c_real), parameter :: mf_qlflx_zt = 0  ! SHOC+MF extra: no MF liquid-water flux here
 
     call shoc_assumed_pdf_compute_buoyancy_flux(&
-                                     wthlsec,epsterm,wqwsec,pval,wqls,&
+                                     wthlsec,epsterm,wqwsec,pval,wqls,mf_qlflx_zt,&
                                      wthv_sec)
 
   end subroutine shoc_assumed_pdf_compute_buoyancy_flux_c
@@ -1242,8 +1408,10 @@ contains
    ! argmens
    integer(kind=c_int), value, intent(in) :: shcol
    real(kind=c_real), intent(out)  :: thl_sec(shcol), qw_sec(shcol), qwthl_sec(shcol),wthl_sec(shcol),wqw_sec(shcol), uw_sec(shcol), vw_sec(shcol), wtke_sec(shcol)
+   ! SHOC+MF extra outputs (ED-only fluxes at the top boundary; zero like the totals)
+   real(kind=c_real), dimension(shcol) :: wthl_sec_ed, wqw_sec_ed
 
-   call diag_second_moments_ubycond(shcol, thl_sec, qw_sec, wthl_sec, wqw_sec, qwthl_sec, uw_sec, vw_sec, wtke_sec)
+   call diag_second_moments_ubycond(shcol, thl_sec, qw_sec, wthl_sec, wqw_sec, qwthl_sec, uw_sec, vw_sec, wtke_sec, wthl_sec_ed, wqw_sec_ed)
  end subroutine shoc_diag_second_moments_ubycond_c
 
  subroutine shoc_pblintd_init_pot_c(shcol, nlev, thl, ql, q, thv) bind(C)
@@ -1264,7 +1432,11 @@ contains
     real(kind=c_real) , intent(in), dimension(shcol) :: wthl_sfc, wqw_sfc, uw_sfc, vw_sfc, ustar2, wstar
     real(kind=c_real) , intent(out), dimension(shcol) :: wthl_sec, wqw_sec, uw_sec, vw_sec, wtke_sec, thl_sec, qw_sec, qwthl_sec
 
-    call diag_second_moments_lbycond(shcol, wthl_sfc, wqw_sfc, uw_sfc, vw_sfc, ustar2, wstar, wthl_sec, wqw_sec, uw_sec, vw_sec, wtke_sec, thl_sec, qw_sec, qwthl_sec)
+    ! SHOC+MF extra outputs (ED-only surface fluxes; equal to wthl_sec/wqw_sec here)
+    real(kind=c_real), dimension(shcol) :: wthl_sec_ed, wqw_sec_ed
+
+    call diag_second_moments_lbycond(shcol, wthl_sfc, wqw_sfc, uw_sfc, vw_sfc, ustar2, wstar, wthl_sec, wqw_sec, uw_sec, vw_sec, wtke_sec, thl_sec, qw_sec, qwthl_sec, &
+                                     wthl_sec_ed, wqw_sec_ed)
   end subroutine diag_second_moments_lbycond_c
 
   subroutine diag_second_moments_c(shcol, nlev, nlevi, thetal, qw, u_wind, v_wind, tke, isotropy, tkh, tk, dz_zi, zt_grid, zi_grid, shoc_mix, thl_sec, qw_sec, &
@@ -1276,9 +1448,15 @@ contains
     real(kind=c_real) , intent(in), dimension(shcol, nlevi) :: dz_zi, zi_grid
     real(kind=c_real) , intent(inout), dimension(shcol, nlevi) :: thl_sec, qw_sec, wthl_sec, wqw_sec, qwthl_sec, uw_sec, vw_sec, wtke_sec
     real(kind=c_real) , intent(out), dimension(shcol, nlev) :: w_sec
+    ! SHOC+MF extras: no mass flux through this bridge (do_mf=.false., ae=1, aw*=0)
+    real(kind=c_real), dimension(shcol, nlevi) :: ae, aw, awthl, awqt, mf_thlflx, mf_qtflx, &
+         wthl_sec_ed, wthl_sec_mf, wqw_sec_ed, wqw_sec_mf
+    ae = 1; aw = 0; awthl = 0; awqt = 0
 
-    call diag_second_moments(shcol, nlev, nlevi, thetal, qw, u_wind, v_wind, tke, isotropy, tkh, tk, dz_zi, zt_grid, zi_grid, shoc_mix, thl_sec, &
-                             qw_sec, wthl_sec, wqw_sec, qwthl_sec, uw_sec, vw_sec, wtke_sec, w_sec)
+    call diag_second_moments(shcol, nlev, nlevi, thetal, qw, u_wind, v_wind, tke, isotropy, tkh, tk, dz_zi, zt_grid, zi_grid, shoc_mix, &
+                             .false., ae, aw, awthl, awqt, thl_sec, &
+                             qw_sec, wthl_sec, wqw_sec, qwthl_sec, uw_sec, vw_sec, wtke_sec, w_sec, &
+                             mf_thlflx, mf_qtflx, wthl_sec_ed, wthl_sec_mf, wqw_sec_ed, wqw_sec_mf)
 
   end subroutine diag_second_moments_c
 
@@ -1293,10 +1471,16 @@ contains
     real(kind=c_real) , intent(in), dimension(shcol) :: wthl_sfc, wqw_sfc, uw_sfc, vw_sfc
     real(kind=c_real) , intent(out), dimension(shcol, nlevi) :: thl_sec, qw_sec, wthl_sec, wqw_sec, qwthl_sec, uw_sec, vw_sec, wtke_sec
     real(kind=c_real) , intent(out), dimension(shcol, nlev) :: w_sec
+    ! SHOC+MF extras: no mass flux through this bridge (do_mf=.false., ae=1, aw*=0)
+    real(kind=c_real), dimension(shcol, nlevi) :: ae, aw, awthl, awqt, mf_thlflx, mf_qtflx, &
+         wthl_sec_ed, wthl_sec_mf, wqw_sec_ed, wqw_sec_mf
+    ae = 1; aw = 0; awthl = 0; awqt = 0
 
     call diag_second_shoc_moments(shcol, nlev, nlevi, thetal, qw, u_wind, v_wind, tke, isotropy, tkh, tk, dz_zi, zt_grid, &
-                                  zi_grid, shoc_mix, wthl_sfc, wqw_sfc, uw_sfc, vw_sfc, thl_sec, qw_sec, wthl_sec, wqw_sec, &
-                                  qwthl_sec, uw_sec, vw_sec, wtke_sec, w_sec)
+                                  zi_grid, shoc_mix, wthl_sfc, wqw_sfc, uw_sfc, vw_sfc, .false., ae, aw, awthl, awqt, &
+                                  thl_sec, qw_sec, wthl_sec, wqw_sec, &
+                                  qwthl_sec, uw_sec, vw_sec, wtke_sec, w_sec, &
+                                  mf_thlflx, mf_qtflx, wthl_sec_ed, wthl_sec_mf, wqw_sec_ed, wqw_sec_mf)
   end subroutine diag_second_shoc_moments_c
 
   subroutine shoc_pblintd_cldcheck_c(shcol, nlev, nlevi, zi, cldn, pblh) bind(C)
@@ -1331,7 +1515,12 @@ contains
     real(kind=c_real) , intent(inout), dimension(shcol, nlev) :: thetal, qw, tke, u_wind, v_wind
     real(kind=c_real) , intent(inout), dimension(shcol, nlev, num_tracer) :: tracer
 
-    call update_prognostics_implicit(shcol, nlev, nlevi, num_tracer, dtime, dz_zt, dz_zi, rho_zt, zt_grid, zi_grid, tk, tkh, uw_sfc, vw_sfc, wthl_sfc, wqw_sfc, wtracer_sfc, thetal, qw, tracer, tke, u_wind, v_wind)
+    ! SHOC+MF extras: no mass flux through this bridge (do_mf=.false., ae=1, aw*=0)
+    real(kind=c_real), dimension(shcol, nlevi) :: mf_ae, mf_aw, mf_awu, mf_awv, mf_awthl, mf_awqt
+    mf_ae = 1; mf_aw = 0; mf_awu = 0; mf_awv = 0; mf_awthl = 0; mf_awqt = 0
+
+    call update_prognostics_implicit(shcol, nlev, nlevi, num_tracer, dtime, dz_zt, dz_zi, rho_zt, zt_grid, zi_grid, tk, tkh, uw_sfc, vw_sfc, wthl_sfc, wqw_sfc, wtracer_sfc, &
+                                     .false., mf_ae, mf_aw, mf_awu, mf_awv, mf_awthl, mf_awqt, thetal, qw, tracer, tke, u_wind, v_wind)
   end subroutine update_prognostics_implicit_c
 
   subroutine pblintd_height_c(shcol, nlev, npbl_in, z, u, v, ustar, thv, thv_ref, pblh, rino, check) bind(C)
@@ -1350,7 +1539,7 @@ contains
   end subroutine pblintd_height_c
 
   subroutine vd_shoc_decomp_c(shcol, nlev, nlevi, kv_term, tmpi, rdp_zt, dtime, flux, du, dl, d) bind(C)
-    use shoc, only : vd_shoc_decomp
+    use scream_abortutils, only: endscreamrun
 
     integer(kind=c_int) , value, intent(in) :: shcol, nlev, nlevi
     real(kind=c_real) , intent(in), dimension(shcol, nlevi) :: kv_term, tmpi
@@ -1359,17 +1548,21 @@ contains
     real(kind=c_real) , intent(in), dimension(shcol) :: flux
     real(kind=c_real) , intent(out), dimension(shcol, nlev) :: du, dl, d
 
-    call vd_shoc_decomp(shcol, nlev, nlevi, kv_term, tmpi, rdp_zt, dtime, flux, du, dl, d)
+    ! SHOC+MF: vd_shoc_decomp now returns (ca, cc, denom, ze) for its own solver
+    ! form; the (du, dl, d) test interface of standard SHOC cannot be mapped to it.
+    du = 0; dl = 0; d = 0
+    call endscreamrun('vd_shoc_decomp_c: unit-test bridge not available with the SHOC+MF shoc.F90')
   end subroutine vd_shoc_decomp_c
 
   subroutine vd_shoc_solve_c(shcol, nlev, du, dl, d, var) bind(C)
-    use shoc, only : vd_shoc_solve
+    use scream_abortutils, only: endscreamrun
 
     integer(kind=c_int) , value, intent(in) :: shcol, nlev
     real(kind=c_real) , intent(in), dimension(shcol, nlev) :: du, dl, d
     real(kind=c_real) , intent(inout), dimension(shcol, nlev) :: var
 
-    call vd_shoc_solve(shcol, nlev, du, dl, d, var)
+    ! SHOC+MF: see vd_shoc_decomp_c
+    call endscreamrun('vd_shoc_solve_c: unit-test bridge not available with the SHOC+MF shoc.F90')
   end subroutine vd_shoc_solve_c
 
   subroutine pblintd_surf_temp_c(shcol, nlev, nlevi, z, ustar, obklen, kbfs, thv, tlv, pblh, check, rino) bind(C)

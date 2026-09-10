@@ -12,8 +12,18 @@
 
 module shoc
 
-  use physics_utils, only: rtype, rtype8, itype, btype
+  use physics_utils,     only: rtype, rtype8, itype, btype
   use scream_abortutils, only: endscreamrun
+  ! EAM host modules used by the MF code (condensation, cold-pool bookkeeping).
+  ! The EAMxx CMake build of this file (libshoc: shoc_in_and_out driver, BFB
+  ! tests) has no EAM host, so it uses equivalent stand-ins from
+  ! eamxx/src/physics/shoc/shoc_eam_host_stubs.F90 instead.
+#ifdef SCREAM_CONFIG_IS_CMAKE
+  use shoc_eam_host_stubs, only: qsat, no_ip_hltalt, is_first_step, is_first_restart_step, get_nstep
+#else
+  use wv_saturation,     only : qsat, no_ip_hltalt
+  use time_manager,      only: is_first_step, is_first_restart_step, get_nstep
+#endif
 
 ! Bit-for-bit math functions.
 #ifdef SCREAM_CONFIG_IS_CMAKE
@@ -24,7 +34,7 @@ module shoc
 implicit none
 save ! for module variables
 
-public  :: shoc_init, shoc_main
+public  :: shoc_init, shoc_main, shoc_main_std
 
 logical :: use_cxx = .true.
 
@@ -69,6 +79,72 @@ real(rtype) :: Ckm = 0.1_rtype ! Eddy diffusivity coefficient for momentum
 real(rtype) :: Ckh_s = 0.1_rtype ! Stable PBL diffusivity for heat
 real(rtype) :: Ckm_s = 0.1_rtype ! Stable PBL diffusivity for momentum
 
+! MJC: extra tunable parameters
+real(rtype) :: l_inf_const = 150.0_rtype  ! [m] Asymptotic value of length scale L
+real(rtype) :: tscale_const = 400.0_rtype ! [s] Eddy turnover timescale 
+real(rtype) :: Cee_const = 1.0_rtype      ! Turbulent constant of TKE dissipation
+
+! For EDMF:
+real(rtype) :: mf_L0   = 50._rtype   ! Default in namelist_defaults_eam.xml: 50 m
+real(rtype) :: mf_ent0 = 0.22_rtype  ! Default in namelist_defaults_eam.xml: 0.22
+integer     :: mf_nup  = 10          ! Default in namelist_defaults_eam.xml: 10 plumes
+real(rtype) :: mf_a = 1._rtype       ! Default in namelist_defaults_eam.xml: 1
+real(rtype) :: mf_b = 0.5_rtype      ! Default in namelist_defaults_eam.xml: 0.5
+real(rtype) :: mf_c = 0.5_rtype      ! Default in namelist_defaults_eam.xml: 0.5
+real(rtype) :: mf_a_wcp = 1._rtype   ! Default in namelist_defaults_eam.xml: 1.0
+real(rtype) :: mf_tau_wcp = 4._rtype ! Default in namelist_defaults_eam.xml: 4 h
+
+logical :: do_edmf = .false.
+logical :: do_condensation = .false.
+logical :: do_precip = .false.
+logical :: do_mf_diag = .false.
+logical :: do_wthv_mf = .false.
+logical :: do_dynamic_L = .false.
+logical :: do_entr_tke = .false.
+logical :: do_explicit = .false.
+logical :: do_integral = .false.
+logical :: do_implicit = .false.
+
+! Persistent MF state for shoc_main_std (stands in for EAM's pbuf-carried
+! intent(inout) MF fields; see shoc_main_std below)
+real(rtype), allocatable, save, private :: mfp_mf_dry_a(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_moist_a(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_dry_w(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_moist_w(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_dry_qt(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_moist_qt(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_dry_thl(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_moist_thl(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_dry_u(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_moist_u(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_dry_v(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_moist_v(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_moist_qc(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_thlflx(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_qtflx(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_thvflx(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_qlflx(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_ae(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_aw(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_awthv(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_awthl(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_awqt(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_awql(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_awqi(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_awu(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_awv(:,:)
+real(rtype), allocatable, save, private :: mfp_cfl_mf(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_auSthl(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_auSqt(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_auRR(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_thvflx_zt(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_qlflx_zt(:,:)
+real(rtype), allocatable, save, private :: mfp_mf_dry_freq(:)
+real(rtype), allocatable, save, private :: mfp_mf_moist_freq(:)
+real(rtype), allocatable, save, private :: mfp_plumeheight(:)
+real(rtype), allocatable, save, private :: mfp_plume_dry_height(:)
+real(rtype), allocatable, save, private :: mfp_mf_w_cp(:)
+
 !=========================================================
 ! Private module parameters
 !=========================================================
@@ -80,6 +156,7 @@ real(rtype) :: Ckm_s = 0.1_rtype ! Stable PBL diffusivity for momentum
 !  variance
 logical(btype), parameter :: dothetal_skew = .false.
 
+! 
 ! ========
 ! Below define some parameters for SHOC
 
@@ -131,7 +208,15 @@ subroutine shoc_init( &
          thl2tune_in, qw2tune_in, qwthl2tune_in, &
          w2tune_in, length_fac_in, c_diag_3rd_mom_in, &
          lambda_low_in, lambda_high_in, lambda_slope_in, &
-         lambda_thresh_in, Ckh_in, Ckm_in, Ckh_s_in, Ckm_s_in)
+         lambda_thresh_in, Ckh_in, Ckm_in, Ckh_s_in, Ckm_s_in, &
+         l_inf_const_in, tscale_const_in, Cee_const_in, &
+         mf_L0_in, mf_ent0_in, mf_nup_in, mf_a_in, mf_b_in, mf_c_in, &
+         mf_a_wcp_in, mf_tau_wcp_in, &
+         do_edmf_in, do_condensation_in, do_precip_in, do_mf_diag_in, &
+         do_wthv_mf_in, do_dynamic_L_in, do_entr_tke_in, &
+         do_explicit_in, do_integral_in, do_implicit_in )
+
+
 
   implicit none
 
@@ -172,6 +257,32 @@ subroutine shoc_init( &
   real(rtype), intent(in), optional :: Ckh_s_in ! Stable PBL diffusivity for heat
   real(rtype), intent(in), optional :: Ckm_s_in ! Stable PBL diffusivity for momentum
 
+  ! MJC: extra tunable parameters
+  real(rtype), intent(in), optional :: l_inf_const_in  ! Asymptotic value of length scale
+  real(rtype), intent(in), optional :: tscale_const_in ! Eddy turnover timescale 
+  real(rtype), intent(in), optional :: Cee_const_in    ! Turbulent const of TKE dissipation 
+
+  ! MJC: EDMF parameters and tunable constants
+  real(rtype), intent(in), optional :: mf_L0_in 
+  real(rtype), intent(in), optional :: mf_ent0_in 
+  integer,     intent(in), optional :: mf_nup_in 
+  real(rtype), intent(in), optional :: mf_a_in 
+  real(rtype), intent(in), optional :: mf_b_in 
+  real(rtype), intent(in), optional :: mf_c_in
+  real(rtype), intent(in), optional :: mf_a_wcp_in
+  real(rtype), intent(in), optional :: mf_tau_wcp_in
+   
+  logical, intent(in), optional :: do_edmf_in
+  logical, intent(in), optional :: do_condensation_in
+  logical, intent(in), optional :: do_precip_in
+  logical, intent(in), optional :: do_mf_diag_in
+  logical, intent(in), optional :: do_wthv_mf_in
+  logical, intent(in), optional :: do_dynamic_L_in
+  logical, intent(in), optional :: do_entr_tke_in
+  logical, intent(in), optional :: do_explicit_in
+  logical, intent(in), optional :: do_integral_in
+  logical, intent(in), optional :: do_implicit_in
+
   integer :: k
 
   ggr = gravit   ! [m/s2]
@@ -201,6 +312,31 @@ subroutine shoc_init( &
   if (present(Ckh_s_in)) Ckh_s=Ckh_s_in
   if (present(Ckm_s_in)) Ckm_s=Ckm_s_in
 
+  if (present(l_inf_const_in)) l_inf_const = l_inf_const_in
+  if (present(tscale_const_in)) tscale_const = tscale_const_in
+  if (present(Cee_const_in)) Cee_const = Cee_const_in
+
+  if (present(mf_L0_in)) mf_L0 = mf_L0_in
+  if (present(mf_ent0_in)) mf_ent0 = mf_ent0_in
+  if (present(mf_nup_in)) mf_nup = mf_nup_in
+  if (present(mf_a_in)) mf_a = mf_a_in
+  if (present(mf_b_in)) mf_b = mf_b_in
+  if (present(mf_c_in)) mf_c = mf_c_in
+  if (present(mf_a_wcp_in)) mf_a_wcp = mf_a_wcp_in
+  if (present(mf_tau_wcp_in)) mf_tau_wcp = mf_tau_wcp_in
+  
+  if (present(do_edmf_in)) do_edmf = do_edmf_in
+  if (present(do_condensation_in)) do_condensation = do_condensation_in
+  if (present(do_precip_in)) do_precip = do_precip_in
+  if (present(do_mf_diag_in)) do_mf_diag = do_mf_diag_in
+  if (present(do_wthv_mf_in)) do_wthv_mf = do_wthv_mf_in
+  if (present(do_dynamic_L_in)) do_dynamic_L = do_dynamic_L_in
+  if (present(do_entr_tke_in)) do_entr_tke = do_entr_tke_in
+  if (present(do_explicit_in)) do_explicit = do_explicit_in
+  if (present(do_integral_in)) do_integral = do_integral_in
+  if (present(do_implicit_in)) do_implicit = do_implicit_in
+
+  
    ! Limit pbl height to regions below 400 mb
    ! npbl = max number of levels (from bottom) in pbl
 
@@ -226,17 +362,43 @@ subroutine shoc_main ( &
      zt_grid,zi_grid,pres,presi,pdel,&    ! Input
      wthl_sfc, wqw_sfc, uw_sfc, vw_sfc, & ! Input
      wtracer_sfc,num_qtracers,w_field, &  ! Input
-     inv_exner,phis, &                        ! Input
+     inv_exner,phis, &                    ! Input
      host_dse, tke, thetal, qw, &         ! Input/Output
      u_wind, v_wind,qtracers,&            ! Input/Output
      wthv_sec,tkh,tk,&                    ! Input/Output
      shoc_ql,shoc_cldfrac,&               ! Input/Output
-     pblh,&                               ! Output
-     shoc_mix, isotropy,&                 ! Output (diagnostic)
+     shoc_ql_orig,shoc_cldfrac_orig,mf_ql,& ! Output
+     mf_moist_a_zt,mf_moist_qc_zt,&       ! Output (EDMF diagnostic)
+     pblh,pblh_wthl,pblh_tke,&            ! Output
+     shoc_mix, l_inf, isotropy,&          ! Output (diagnostic)
+     a_diss, a_prod_bu, a_prod_sh,&       ! Output (diagnostic)
      w_sec, thl_sec, qw_sec, qwthl_sec,&  ! Output (diagnostic)
      wthl_sec, wqw_sec, wtke_sec,&        ! Output (diagnostic)
      uw_sec, vw_sec, w3,&                 ! Output (diagnostic)
-     wqls_sec, brunt, shoc_ql2 &          ! Output (diagnostic)
+     wqls_sec, brunt, shoc_ql2,&          ! Output (diagnostic)
+     a1_out,C1_out,C2_out,ql1_out,ql2_out,& ! Output
+     wthv_sec_ed, &                       ! Output (EDMF diagnostic: ED-only PDF buoyancy flux)
+     mf_dry_a,   mf_moist_a,&             ! Output (EDMF diagnostic)
+     mf_dry_w,   mf_moist_w,&             ! Output (EDMF diagnostic)
+     mf_dry_qt,  mf_moist_qt,&            ! Output (EDMF diagnostic)
+     mf_dry_thl, mf_moist_thl,&           ! Output (EDMF diagnostic)
+     mf_dry_u,   mf_moist_u,&             ! Output (EDMF diagnostic)
+     mf_dry_v,   mf_moist_v,&             ! Output (EDMF diagnostic)
+                 mf_moist_qc,&            ! Output (EDMF diagnostic)
+     mf_thlflx,  mf_qtflx,&               ! Output (EDMF diagnostic)
+     mf_thvflx,  mf_thvflx_zt, &          ! Output (EDMF diagnostic)
+     mf_qlflx,   mf_qlflx_zt, &           ! Output (EDMF diagnostic)
+     mf_ae, mf_aw, &                      ! Output (EDMF diagnostic)
+     mf_awthv, mf_awthl, mf_awqt,&        ! Output (EDMF diagnostic)
+     mf_awql, mf_awqi, &                  ! Output (EDMF diagnostic)
+     mf_awu, mf_awv, cfl_mf, &            ! Output (EDMF diagnostic)
+     mf_auSthl,  mf_auSqt,  mf_auRR, &    ! Output (EDMF micrphysics source terms)
+     mf_dry_freq, mf_moist_freq, &        ! Output (EDMF diagnostic)
+     plumeheight, plume_dry_height, &     ! Output (EDMF diagnostic)
+     ztop, dynamic_L0, ent_ensemble_mean,&! Output (EDMF diagnostic) 
+     wstar, qstar, thstar, mf_w_cp, &
+     wthl_sec_ed, wthl_sec_mf, &          ! Output (EDMF diagnostic) 
+     wqw_sec_ed, wqw_sec_mf &             ! Output - EDMF)              
 #ifdef SCREAM_CONFIG_IS_CMAKE
      , elapsed_s &
 #endif
@@ -310,25 +472,50 @@ subroutine shoc_main ( &
   real(rtype), intent(inout) :: u_wind(shcol,nlev)
   ! v wind component [m/s]
   real(rtype), intent(inout) :: v_wind(shcol,nlev)
-  ! buoyancy flux [K m/s]
+  ! buoyancy flux [K m/s] (pbuf-carried; holds the total ED+MF flux that drives
+  ! TKE when do_edmf .and. do_wthv_mf, otherwise the ED-only PDF flux)
   real(rtype), intent(inout) :: wthv_sec(shcol,nlev)
+  ! ED-only (SHOC PDF) buoyancy flux, snapshot before wthv_sec is overwritten
+  ! with the total; diagnostic only [K m/s]
+  real(rtype), intent(out) :: wthv_sec_ed(shcol,nlev)
   ! tracers [varies]
   real(rtype), intent(inout) :: qtracers(shcol,nlev,num_qtracers)
   ! eddy coefficient for momentum [m2/s]
   real(rtype), intent(inout) :: tk(shcol,nlev)
   ! eddy coefficent for heat [m2/s]
   real(rtype), intent(inout) :: tkh(shcol,nlev)
+   ! [MJC [10/30/24]: If do_edmf = true, shoc_cldfrac and shoc_ql include MF contributions (see update_cldfrac_ql)
   ! Cloud fraction [-]
   real(rtype), intent(inout) :: shoc_cldfrac(shcol,nlev)
-  ! cloud liquid mixing ratio [kg/kg]
+  ! Grid-mean cloud liquid mixing ratio [kg/kg]
   real(rtype), intent(inout) :: shoc_ql(shcol,nlev)
+  ! [MJC [10/30/24]:
+  ! SHOC's cloud fraction for postprocessing purposes [-]
+  real(rtype), intent(out) :: shoc_cldfrac_orig(shcol,nlev) 
+  ! SHOC's grid-mean cloud liquid mixing ratio for postprocessing purposes [kg/kg]
+  real(rtype), intent(out) :: shoc_ql_orig(shcol,nlev) 
+  ! [MJC [5/20/25]: MF's cloud liquid
+  real(rtype), intent(out) :: mf_ql(shcol,nlev)
+  ! MF moist updraft area fraction interpolated to ZT grid [fraction]
+  real(rtype), intent(out) :: mf_moist_a_zt(shcol,nlev)
+  ! MF moist updraft condensate interpolated to ZT grid [kg/kg]
+  real(rtype), intent(out) :: mf_moist_qc_zt(shcol,nlev)
 
   ! OUTPUT VARIABLES
 
   ! planetary boundary layer depth [m]
   real(rtype), intent(out) :: pblh(shcol)
+  real(rtype), intent(out) :: pblh_wthl(shcol)  ! MJC: Calculated in edmf_pblh function
+  real(rtype), intent(out) :: pblh_tke(shcol)   ! MJC: Calculated in edmf_pblh function
+    
   ! cloud liquid mixing ratio variance [kg^2/kg^2]
   real(rtype), intent(out) :: shoc_ql2(shcol, nlev)
+  ! MJC [11/03/24]: PDF-related output variables for diagnostic purposes
+  real(rtype), intent(out) :: a1_out(shcol, nlev)
+  real(rtype), intent(out) :: C1_out(shcol, nlev)
+  real(rtype), intent(out) :: C2_out(shcol, nlev)
+  real(rtype), intent(out) :: ql1_out(shcol, nlev)
+  real(rtype), intent(out) :: ql2_out(shcol, nlev)
 
   ! also output variables, but part of the SHOC diagnostics
   !  to be output to history file by host model (if desired)
@@ -342,11 +529,19 @@ subroutine shoc_main ( &
   ! moisture variance [kg2/kg2]
   real(rtype), intent(out) :: qw_sec(shcol,nlevi)
   ! temp moisture covariance [K kg/kg]
-  real(rtype), intent(out) :: qwthl_sec(shcol,nlevi)
+  real(rtype), intent(out) :: qwthl_sec(shcol,nlevi) 
   ! vertical heat flux [K m/s]
   real(rtype), intent(out) :: wthl_sec(shcol,nlevi)
+  ! MJC: Extra output variables
+  real(rtype), intent(out) :: wthl_sec_ed(shcol,nlevi)
+  real(rtype), intent(out) :: wthl_sec_mf(shcol,nlevi)
+  
   ! vertical moisture flux [K m/s]
   real(rtype), intent(out) :: wqw_sec(shcol,nlevi)
+  ! MJC: Extra output variables
+  real(rtype), intent(out) :: wqw_sec_ed(shcol,nlevi)
+  real(rtype), intent(out) :: wqw_sec_mf(shcol,nlevi)
+  
   ! vertical tke flux [m3/s3]
   real(rtype), intent(out) :: wtke_sec(shcol,nlevi)
   ! vertical zonal momentum flux [m2/s2]
@@ -361,6 +556,51 @@ subroutine shoc_main ( &
   real(rtype), intent(out) :: brunt(shcol,nlev)
   ! return to isotropic timescale [s]
   real(rtype), intent(out) :: isotropy(shcol,nlev)
+  ! MJC: Extra output variables
+  real(rtype), intent(out) :: a_diss(shcol,nlev)
+  real(rtype), intent(out) :: a_prod_bu(shcol,nlev)
+  real(rtype), intent(out) :: a_prod_sh(shcol,nlev)
+  real(rtype), intent(out) :: l_inf(shcol)
+  
+  !! MJC: EDMF VARIABLES
+  ! mf_* are diagnostic variables
+  real(rtype), intent(inout), dimension(shcol,nlevi) :: &
+      mf_dry_a,   mf_moist_a,   & ! dry and moist plume area, respectively [-]
+      mf_dry_w,   mf_moist_w,   & ! dry and moist plume mean vertical velocity, respectively [m/s]
+      mf_dry_qt,  mf_moist_qt,  & ! dry and moist plume mean qt, respectively [kg/kg]
+      mf_dry_thl, mf_moist_thl, & ! dry and moist plume mean thl, respectively [K]
+      mf_dry_u,   mf_moist_u,   & ! dry and moist plume mean u, respectively [m/s]
+      mf_dry_v,   mf_moist_v,   & ! dry and moist plume mean v, respectively [m/s]
+                  mf_moist_qc,  & ! moist plume mean qc [kg/kg]
+      mf_thlflx,  mf_qtflx,     & ! total MF turbulent flux of theta_l [K m/s], q_t [(kg/kg) m/s]
+      mf_thvflx,  mf_qlflx,     & ! vertical flux of buoyancy (wthv) from mass flux plumes [K m/s]
+      mf_ae,    & ! environmental area; by default ae=1 (set constant for now) [-]
+      mf_aw,    & ! sum(a_i * w_i) [m/s]
+      mf_awthv, & ! sum(a_i * w_i * thv_i) [K m/s]
+      mf_awthl, & ! sum(a_i * w_i * thl_i) [K m/s]
+      mf_awqt,  & ! sum(a_i * w_i * qt_i)  [(kg/kg) m/s]
+      mf_awql,  & ! sum(a_i * w_i * ql_i) [(kg/kg) m/s]
+      mf_awqi,  & ! sum(a_i * w_i * qi_i) [(kg/kg) m/s]
+      mf_awu,   & ! sum(a_i * w_i * u_i) [m^2/s^2]
+      mf_awv,   & ! sum(a_i * w_i * v_i) [m^2/s^2]
+      cfl_mf,   &
+      mf_auSthl,  mf_auSqt, mf_auRR 
+
+  ! MF buoyancy (thv) flux interpolated to the zt grid [K m/s]
+  real(rtype), intent(inout) :: mf_thvflx_zt(shcol,nlev)
+  real(rtype), intent(inout) :: mf_qlflx_zt(shcol,nlev)
+
+  ! 2D statistics of plume activation frequency, one for dry and one for moist plumes
+  real(rtype), intent(inout) :: mf_dry_freq(shcol), mf_moist_freq(shcol)
+  real(rtype), intent(inout) :: plumeheight(shcol), plume_dry_height(shcol)
+  real(rtype), intent(inout) :: mf_w_cp(shcol)
+
+  real(rtype), intent(out) :: wstar(shcol), qstar(shcol), thstar(shcol)
+
+  real(rtype), intent(out) :: ztop(shcol), dynamic_L0(shcol)
+  real(rtype), intent(out) :: ent_ensemble_mean(shcol,nlev)  
+  !! MJC: end of EDMF VARIABLES
+
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
   real(rtype), optional, intent(out) :: elapsed_s ! duration of main loop in seconds
@@ -385,6 +625,20 @@ subroutine shoc_main ( &
   ! Grid difference centereted on interface grid [m]
   real(rtype) :: dz_zi(shcol,nlevi)
 
+  ! Virtual potential temperature recomputed each nadv iteration from the
+  ! current substep state (thv-staleness fix, PAESCAL E3SM-fork maint-3.0-scm
+  ! commits faf05abdc9 / a80a2140b9). The intent(in) `thv` is computed once per
+  ! host call and held constant; inside the nadv loop thetal/qw evolve and
+  ! shoc_ql is re-diagnosed, so `thv` goes stale. shoc_thv is rebuilt from
+  ! SHOC's own diagnosed temperature (shoc_tabs) and vapor (shoc_qv) with the
+  ! same formula as shoc_intr's host-side thv, and is used in place of `thv`
+  ! by shoc_length (-> compute_brunt_shoc_length) and by the MF plume model
+  ! (integrate_mf and its thv_zi interpolation). With nadv = 1 per host call
+  ! (the shoc_in_and_out driver) this is what keeps the plume environment
+  ! current over a long integration; in EAM (host refreshes thv each step)
+  ! it only matters for nadv > 1.
+  real(rtype) :: shoc_thv(shcol,nlev)
+
   ! Surface friction velocity [m/s]
   real(rtype) :: ustar(shcol)
   ! Monin Obukhov length [m]
@@ -397,6 +651,15 @@ subroutine shoc_main ( &
               wv_b(shcol),wl_b(shcol),&
               se_a(shcol),ke_a(shcol),&
               wv_a(shcol),wl_a(shcol)
+              
+  ! MJC: Extra local variables
+  ! air density on interface grid [kg/m3]
+  real(rtype) :: rho_zi_mf(shcol,nlevi)
+  real(rtype) :: thv_zi(shcol,nlevi)
+  real(rtype) :: shoc_ql_zi(shcol,nlevi)
+  real(rtype) :: mf_auSthl_zt(shcol,nlev), mf_auSqt_zt(shcol,nlev)
+
+  real(rtype) :: nstep_mf, nstep_help 
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
   integer :: clock_count1, clock_count_rate, clock_count_max, clock_count2, clock_count_diff
@@ -437,6 +700,11 @@ subroutine shoc_main ( &
      qw,shoc_ql,u_wind,v_wind,&             ! Input
      se_b,ke_b,wv_b,wl_b)                   ! Input/Output
 
+  ! wthv_sec (pbuf-carried buoyancy flux) is consumed by shoc_tke at the top of
+  ! the loop and overwritten with the total ED+MF flux after shoc_assumed_pdf
+  ! (loop end). On the first sub-iteration shoc_tke uses the value carried over
+  ! from the previous timestep, the same convention as tk/tkh.
+
   do t=1,nadv
 
     ! Check TKE to make sure values lie within acceptable
@@ -465,6 +733,11 @@ subroutine shoc_main ( &
        shcol,nlev,thetal,shoc_ql,inv_exner,& ! Input
        shoc_tabs)                            ! Output
 
+    ! Refresh virtual potential temperature for this substep:
+    !   thv = T * inv_exner * (1 + eps*qv - qc)   (as shoc_intr's host-side thv)
+    shoc_thv(:,:) = shoc_tabs(:,:) * inv_exner(:,:) &
+                    * ( 1.0_rtype + eps * shoc_qv(:,:) - shoc_ql(:,:) )
+
     call shoc_diag_obklen(&
        shcol,uw_sfc,vw_sfc,&                          ! Input
        wthl_sfc,wqw_sfc,thetal(:shcol,nlev),&         ! Input
@@ -478,34 +751,147 @@ subroutine shoc_main ( &
        ustar,obklen,kbfs,shoc_cldfrac,&     ! Input
        pblh)                                ! Output
 
+    ! MJC: PBL height for integrate_mf subroutine
+    call edmf_pblh(&
+       shcol,nlev,nlevi,&           ! Input
+       zt_grid,zi_grid,&            ! Input
+       wthl_sec,tke,&       ! Input
+       pblh_wthl,pblh_tke)          ! Output  
+        
+    ! MJC: If using EDMF plumes, diagnose plume properties here
+    call linear_interp(zt_grid,zi_grid,shoc_thv,thv_zi,nlev,nlevi,shcol,0._rtype)
+    call linear_interp(zt_grid,zi_grid,rho_zt,rho_zi_mf,nlev,nlevi,shcol,0._rtype)
+    
+    !! MJC: 
+    nstep_mf = get_nstep()
+    nstep_help = nstep_mf
+    if ( nstep_help .eq. 0 ) then
+      mf_w_cp(:) = 0._rtype
+    endif
+
+    if (do_edmf) then
+       call integrate_mf(&
+               shcol, nlev, nlevi, dtime,&               ! Input
+               rho_zt, rho_zi_mf,&					          	 ! Input
+               zt_grid, zi_grid, dz_zt, presi,thv_zi,&   ! Input
+               u_wind, v_wind, thetal, shoc_thv, qw,&    ! Input (shoc_thv: refreshed each substep)
+               ustar, wthl_sfc, wqw_sfc, shoc_ql, &      ! Input
+               pblh, pblh_tke, pblh_wthl, tke, &       	 ! Input
+               mf_dry_a,   mf_moist_a, &                 ! Output - updraft diagnostics
+               mf_dry_w,   mf_moist_w, &                 ! Output - updraft diagnostics
+               mf_dry_qt,  mf_moist_qt, &                ! Output - updraft diagnostics
+               mf_dry_thl, mf_moist_thl, &               ! Output - updraft diagnostics
+               mf_dry_u,   mf_moist_u,  &                ! Output - updraft diagnostics
+               mf_dry_v,   mf_moist_v, &                 ! Output - updraft diagnostics
+                           mf_moist_qc, &                ! Output - updraft diagnostics
+               mf_ae,      mf_aw, &                      ! Output - for diffusion solver
+               mf_awthv, &                               ! Output for total wthv
+               mf_awthl,   mf_awqt, &                    ! Output - for diffusion solver
+               mf_awql,    mf_awqi, &                    ! Output - for diffusion solver/PDF closure but not coupled yet
+               mf_awu,     mf_awv,  &                    ! Output - for diffusion solver/PDF closure but not coupled yet
+               mf_w_cp, &
+               mf_auSthl,  mf_auSqt, mf_auRR, &          ! Output - source terms from microphysics
+               mf_dry_freq,mf_moist_freq, plumeheight, & ! Output
+               plume_dry_height, cfl_mf,               & ! Output
+               ent_ensemble_mean, ztop, dynamic_L0, &
+               wstar,     qstar,   thstar     ) ! Output - 2D statistics of plume activation frequency
+    else
+       mf_dry_a = 0._rtype
+       mf_dry_w = 0._rtype
+       mf_dry_qt = 0._rtype
+       mf_dry_thl = 0._rtype
+       mf_dry_u = 0._rtype
+       mf_dry_v = 0._rtype
+
+       mf_moist_a = 0._rtype
+       mf_moist_w = 0._rtype
+       mf_moist_qt = 0._rtype
+       mf_moist_thl = 0._rtype
+       mf_moist_u = 0._rtype
+       mf_moist_v = 0._rtype
+       mf_moist_qc = 0._rtype
+
+       mf_ae = 1._rtype
+       mf_aw = 0._rtype
+       mf_awthv = 0._rtype
+       mf_awthl = 0._rtype
+       mf_awqt = 0._rtype
+       mf_awql = 0._rtype
+       mf_awqi = 0._rtype
+       mf_awu = 0._rtype
+       mf_awv = 0._rtype
+       mf_auSthl = 0._rtype
+       mf_auSqt  = 0._rtype
+       mf_auRR  = 0._rtype
+       mf_dry_freq = 0._rtype
+       mf_moist_freq = 0._rtype
+    endif
+    mf_ae = 1._rtype
+     
+    ! MF buoyancy (thv) flux diagnostic: kinematic MF flux on the interface grid
+    ! (calc_mf_vertflux), then interpolated to the zt grid.
+    if (do_edmf) then
+       call calc_mf_vertflux(shcol,nlev,nlevi,mf_aw,mf_awthv,thv,thv_zi,mf_thvflx)
+       call linear_interp(zi_grid,zt_grid,mf_thvflx,mf_thvflx_zt,nlevi,nlev,shcol,0._rtype)
+    else
+       mf_thvflx    = 0._rtype
+       mf_thvflx_zt = 0._rtype
+    endif
+    
+    !!! Calculate mf_qlflx_zm
+    call linear_interp(zt_grid,zi_grid,shoc_ql,shoc_ql_zi,nlev,nlevi,shcol,0._rtype)    
+    call calc_mf_vertflux(shcol,nlev,nlevi,mf_aw,mf_awql,shoc_ql,shoc_ql_zi,mf_qlflx)
+    call linear_interp(zi_grid,zt_grid,mf_qlflx,mf_qlflx_zt,nlevi,nlev,shcol,0._rtype)
+
+    ! MJC: The buoyancy flux that drives TKE is wthv_sec. When
+    ! do_edmf .and. do_wthv_mf, wthv_sec is overwritten after shoc_assumed_pdf
+    ! (end of this loop) with the total (ED+MF) eq-7.15 flux; otherwise it stays
+    ! the ED-only PDF flux. shoc_tke below consumes the value from the previous
+    ! sub-iteration / timestep (pbuf-carried, same convention as tk/tkh).
+
     ! Update the turbulent length scale
     call shoc_length(&
-       shcol,nlev,nlevi,&                ! Input
-       host_dx,host_dy,&                 ! Input
-       zt_grid,zi_grid,dz_zt,&           ! Input
-       tke,thv,&                         ! Input
-       brunt,shoc_mix)                   ! Output
+       	shcol,nlev,nlevi,&                ! Input
+       	host_dx,host_dy,&                 ! Input
+       	zt_grid,zi_grid,dz_zt,&           ! Input
+       	tke,shoc_thv,&                         ! Input
+       	brunt,l_inf,shoc_mix)             ! Output
 
-    ! Advance the SGS TKE equation
+    ! Advance the SGS TKE equation using wthv_sec (total ED+MF buoyancy flux
+    ! when do_edmf .and. do_wthv_mf, else the ED-only PDF flux).
     call shoc_tke(&
-       shcol,nlev,nlevi,dtime,&             ! Input
-       wthv_sec,shoc_mix,&                  ! Input
-       dz_zi,dz_zt,pres,shoc_tabs,&         ! Input
-       u_wind,v_wind,brunt,&                ! Input
-       zt_grid,zi_grid,pblh,&               ! Input
-       tke,tk,tkh,&                         ! Input/Output
-       isotropy)                            ! Output
+       shcol,nlev,nlevi,dtime,&                ! Input
+       wthv_sec,shoc_mix,&                     ! Input
+       dz_zi,dz_zt,pres,shoc_tabs,&            ! Input
+       u_wind,v_wind,brunt,&                   ! Input
+       zt_grid,zi_grid,pblh,&                  ! Input
+       tke,tk,tkh,&                            ! Input/Output
+       isotropy, a_diss, a_prod_bu, a_prod_sh) ! Output
 
     ! Update SHOC prognostic variables here
     !   via implicit diffusion solver
-    call update_prognostics_implicit(&      ! Input
-       shcol,nlev,nlevi,num_qtracers,&      ! Input
-       dtime,dz_zt,dz_zi,rho_zt,&           ! Input
-       zt_grid,zi_grid,tk,tkh,&             ! Input
-       uw_sfc,vw_sfc,wthl_sfc,wqw_sfc,&     ! Input
-       wtracer_sfc,&                        ! Input
-       thetal,qw,qtracers,tke,&             ! Input/Output
-       u_wind,v_wind)                       ! Input/Output
+    call update_prognostics_implicit(&         ! Input
+       shcol,nlev,nlevi,num_qtracers,&         ! Input
+       dtime,dz_zt,dz_zi,rho_zt,&              ! Input
+       zt_grid,zi_grid,tk,tkh,&                ! Input
+       uw_sfc,vw_sfc,wthl_sfc,wqw_sfc,&        ! Input
+       wtracer_sfc,&                           ! Input
+       do_mf_diag,mf_ae,mf_aw,mf_awu,mf_awv,&  ! EDMF Input
+       mf_awthl,mf_awqt,&                      ! EDMF Input       
+       thetal,qw,qtracers,tke,&                ! Input/Output
+       u_wind,v_wind)                          ! Input/Output
+     
+    ! Update thetal and qw by adding the contribution from the 
+    ! MF microphysics source terms (eq 5, 20 and 21 of Suselj 2019)
+    if (do_edmf) then
+      ! Interpolate source terms to midpoints grid
+      call linear_interp(zi_grid,zt_grid,mf_auSthl,mf_auSthl_zt,nlevi,nlev,shcol,0._rtype)
+      call linear_interp(zi_grid,zt_grid,mf_auSqt,mf_auSqt_zt,nlevi,nlev,shcol,0._rtype)
+  
+      call update_thermody_mf_source(&
+      shcol,nlev,mf_auSthl_zt,mf_auSqt_zt,&  ! Input
+      thetal,qw)                             ! Input/Output 
+    endif
 
     ! Diagnose the second order moments
     call diag_second_shoc_moments(&
@@ -514,10 +900,16 @@ subroutine shoc_main ( &
        isotropy,tkh,tk,&                      ! Input
        dz_zi,zt_grid,zi_grid,shoc_mix, &      ! Input
        wthl_sfc, wqw_sfc, uw_sfc, vw_sfc, &   ! Input
+       do_mf_diag, mf_ae,  mf_aw, &           ! EDMF Input
+       mf_awthl,    mf_awqt, &                ! EDMF Input       
        thl_sec, qw_sec,wthl_sec,wqw_sec,&     ! Output
        qwthl_sec, uw_sec, vw_sec, wtke_sec, & ! Output
-       w_sec)                                 ! Output
-
+       w_sec, &                               ! Output
+	     mf_thlflx, mf_qtflx, &			        	  ! Output - EDMF)
+       wthl_sec_ed,wthl_sec_mf, &             ! Output - EDMF)
+       wqw_sec_ed, wqw_sec_mf)                ! Output - EDMF)                  
+       
+       
     ! Diagnose the third moment of vertical velocity,
     !  needed for the PDF closure
     call diag_third_shoc_moments(&
@@ -529,18 +921,74 @@ subroutine shoc_main ( &
        w3)                                  ! Output
 
     ! Call the PDF to close on SGS cloud and turbulence
-    call shoc_assumed_pdf(&
+ 	if (do_edmf) then
+       call shoc_assumed_pdf(&
+       shcol,nlev,nlevi,&                   ! Input
+       thetal,qw,w_field,thl_sec,qw_sec,&   ! Input
+       !wthl_sec,w_sec,&                    ! Input
+       wthl_sec_ed,w_sec,&                  ! Input
+       !wqw_sec,qwthl_sec,w3,pres,&         ! Input
+       wqw_sec_ed,qwthl_sec,w3,pres,&       ! Input
+       mf_qlflx_zt, &					            	! Input ??
+       zt_grid,zi_grid,&                    ! Input
+       shoc_cldfrac,shoc_ql,&               ! Output
+       wqls_sec,wthv_sec,shoc_ql2,&          ! Output
+       a1_out,C1_out,C2_out,ql1_out,ql2_out)              ! Output
+    else
+       call shoc_assumed_pdf(&
        shcol,nlev,nlevi,&                   ! Input
        thetal,qw,w_field,thl_sec,qw_sec,&   ! Input
        wthl_sec,w_sec,&                     ! Input
        wqw_sec,qwthl_sec,w3,pres,&          ! Input
+       mf_qlflx_zt, &					            	! Input ??
        zt_grid,zi_grid,&                    ! Input
        shoc_cldfrac,shoc_ql,&               ! Output
-       wqls_sec,wthv_sec,shoc_ql2)          ! Output
+       wqls_sec,wthv_sec,shoc_ql2,&          ! Output
+       a1_out,C1_out,C2_out,ql1_out,ql2_out)              ! Output
+    endif
+
+    ! Snapshot the ED-only PDF buoyancy flux for diagnostics (mirrors
+    ! wthl_sec_ed / wqw_sec_ed), before wthv_sec is optionally overwritten below.
+    wthv_sec_ed = wthv_sec
+
+    ! MJC: Overwrite wthv_sec with the total (ED+MF) buoyancy flux via eq 7.15.
+    ! Placed here, after shoc_assumed_pdf, so all inputs are from the current
+    ! sub-iteration: total wthl_sec/wqw_sec, the PDF liquid flux wqls_sec, and
+    ! mf_qlflx_zt. wthv_sec is pbuf-carried, so shoc_tke consumes this value at
+    ! the top of the next sub-iteration / timestep (one-step lag, same convention
+    ! as tk/tkh). Requires do_edmf: without it the MF fluxes are all zero.
+    if (do_edmf .and. do_wthv_mf) then
+       call buoyancy_total_fluxes(&
+           shcol,nlev,nlevi,&                ! Input
+           zt_grid,zi_grid,&                 ! Input
+           pres,&                            ! Input
+           wthl_sec,wqw_sec,&                ! Input
+           wqls_sec,mf_qlflx_zt,&            ! Input
+           wthv_sec)                         ! Output (overwrites wthv_sec with the total)
+    endif
 
     ! Check TKE to make sure values lie within acceptable
     !  bounds after vertical advection, etc.
     call check_tke(shcol,nlev,tke)
+   
+    ! MJC [08/02/24]: Update shoc_cldfrac and shoc_ql to include MF contribution
+    ! and save the SHOC cloud fraction and SHOC liquid water in shoc_cldfrac_orig and shoc_ql_orig
+    if (do_edmf) then
+      call update_cldfrac_ql(&
+       shcol,nlev,nlevi,&                    ! Input
+       zt_grid,zi_grid,&                     ! Input
+       mf_moist_a,mf_moist_qc,&              ! Input
+       shoc_cldfrac,shoc_ql,&                ! Input/Output
+       shoc_cldfrac_orig,shoc_ql_orig,mf_ql,& ! Output
+       mf_moist_a_zt,mf_moist_qc_zt)         ! Output
+    else
+    ! Lets keep a backup of shoc_cldfrac and shoc_ql for postprocessing analysis
+      shoc_cldfrac_orig = shoc_cldfrac
+      shoc_ql_orig = shoc_ql
+      mf_ql = 0._rtype
+      mf_moist_a_zt = 0._rtype
+      mf_moist_qc_zt = 0._rtype
+    endif
 
   enddo ! end time loop
 
@@ -603,6 +1051,1739 @@ subroutine shoc_main ( &
   return
 
 end subroutine shoc_main
+
+!==============================================================================
+! shoc_main_std: SHOC+MF entry point with standard SHOC's argument list.
+!
+! The SHOC+MF shoc_main takes ~65 extra, non-optional MF arguments (in EAM they
+! are pbuf/history fields owned by shoc_intr). Hosts that only know standard
+! SHOC's interface -- the EAMxx C bridge shoc_iso_c::shoc_main_c used by the
+! shoc_in_and_out driver and the Fortran BFB tests -- call this wrapper instead.
+!  * intent(out) MF/PDF diagnostics of shoc_main go to per-call locals.
+!  * intent(inout) MF fields go to module-level arrays (mfp_*) that persist
+!    between calls, mimicking pbuf persistence: plume_dry_height is read at the
+!    top of the next step to size the plume ensemble (integrate_mf).
+!  * Cold-pool velocity scale mfp_mf_w_cp starts at 0 and is only advanced by
+!    shoc_main when do_precip = .true. (off for the BOMEX standalone runs).
+! All MF switches/constants come from the module variables set by shoc_init or
+! shoc_iso_c::shoc_set_param_c; with do_edmf = .false. this is standard SHOC.
+!==============================================================================
+subroutine shoc_main_std ( &
+     shcol, nlev, nlevi, dtime, nadv, &   ! Input
+     host_dx, host_dy,thv, &              ! Input
+     zt_grid,zi_grid,pres,presi,pdel,&    ! Input
+     wthl_sfc, wqw_sfc, uw_sfc, vw_sfc, & ! Input
+     wtracer_sfc,num_qtracers,w_field, &  ! Input
+     inv_exner,phis, &                    ! Input
+     host_dse, tke, thetal, qw, &         ! Input/Output
+     u_wind, v_wind,qtracers,&            ! Input/Output
+     wthv_sec,tkh,tk,&                    ! Input/Output
+     shoc_ql,shoc_cldfrac,&               ! Input/Output
+     pblh,&                               ! Output
+     shoc_mix, isotropy,&                 ! Output (diagnostic)
+     w_sec, thl_sec, qw_sec, qwthl_sec,&  ! Output (diagnostic)
+     wthl_sec, wqw_sec, wtke_sec,&        ! Output (diagnostic)
+     uw_sec, vw_sec, w3,&                 ! Output (diagnostic)
+     wqls_sec, brunt, shoc_ql2 &          ! Output (diagnostic)
+#ifdef SCREAM_CONFIG_IS_CMAKE
+     , elapsed_s &
+#endif
+     )
+
+  implicit none
+
+  integer, intent(in) :: shcol, nlev, nlevi, num_qtracers, nadv
+  real(rtype), intent(in) :: dtime
+  real(rtype), intent(in) :: host_dx(shcol), host_dy(shcol)
+  real(rtype), intent(in) :: zt_grid(shcol,nlev), zi_grid(shcol,nlevi)
+  real(rtype), intent(in) :: pres(shcol,nlev), presi(shcol,nlevi), pdel(shcol,nlev)
+  real(rtype), intent(in) :: thv(shcol,nlev), w_field(shcol,nlev)
+  real(rtype), intent(in) :: wthl_sfc(shcol), wqw_sfc(shcol), uw_sfc(shcol), vw_sfc(shcol)
+  real(rtype), intent(in) :: wtracer_sfc(shcol,num_qtracers)
+  real(rtype), intent(in) :: inv_exner(shcol,nlev), phis(shcol)
+  real(rtype), intent(inout) :: host_dse(shcol,nlev), tke(shcol,nlev), thetal(shcol,nlev), qw(shcol,nlev)
+  real(rtype), intent(inout) :: u_wind(shcol,nlev), v_wind(shcol,nlev), wthv_sec(shcol,nlev)
+  real(rtype), intent(inout) :: qtracers(shcol,nlev,num_qtracers)
+  real(rtype), intent(inout) :: tk(shcol,nlev), tkh(shcol,nlev)
+  real(rtype), intent(inout) :: shoc_cldfrac(shcol,nlev), shoc_ql(shcol,nlev)
+  real(rtype), intent(out) :: pblh(shcol)
+  real(rtype), intent(out) :: shoc_ql2(shcol,nlev), shoc_mix(shcol,nlev), w_sec(shcol,nlev)
+  real(rtype), intent(out) :: thl_sec(shcol,nlevi), qw_sec(shcol,nlevi), qwthl_sec(shcol,nlevi)
+  real(rtype), intent(out) :: wthl_sec(shcol,nlevi), wqw_sec(shcol,nlevi), wtke_sec(shcol,nlevi)
+  real(rtype), intent(out) :: uw_sec(shcol,nlevi), vw_sec(shcol,nlevi), w3(shcol,nlevi)
+  real(rtype), intent(out) :: wqls_sec(shcol,nlev), brunt(shcol,nlev), isotropy(shcol,nlev)
+#ifdef SCREAM_CONFIG_IS_CMAKE
+  real(rtype), optional, intent(out) :: elapsed_s ! duration of main loop in seconds
+#endif
+
+  ! Per-call intent(out) diagnostics of shoc_main (discarded)
+  real(rtype), dimension(shcol,nlev) :: shoc_ql_orig
+  real(rtype), dimension(shcol,nlev) :: shoc_cldfrac_orig
+  real(rtype), dimension(shcol,nlev) :: mf_ql
+  real(rtype), dimension(shcol,nlev) :: mf_moist_a_zt
+  real(rtype), dimension(shcol,nlev) :: mf_moist_qc_zt
+  real(rtype), dimension(shcol,nlev) :: a_diss
+  real(rtype), dimension(shcol,nlev) :: a_prod_bu
+  real(rtype), dimension(shcol,nlev) :: a_prod_sh
+  real(rtype), dimension(shcol,nlev) :: a1_out
+  real(rtype), dimension(shcol,nlev) :: C1_out
+  real(rtype), dimension(shcol,nlev) :: C2_out
+  real(rtype), dimension(shcol,nlev) :: ql1_out
+  real(rtype), dimension(shcol,nlev) :: ql2_out
+  real(rtype), dimension(shcol,nlev) :: wthv_sec_ed
+  real(rtype), dimension(shcol,nlev) :: ent_ensemble_mean
+  real(rtype), dimension(shcol,nlevi) :: wthl_sec_ed
+  real(rtype), dimension(shcol,nlevi) :: wthl_sec_mf
+  real(rtype), dimension(shcol,nlevi) :: wqw_sec_ed
+  real(rtype), dimension(shcol,nlevi) :: wqw_sec_mf
+  real(rtype), dimension(shcol) :: pblh_wthl
+  real(rtype), dimension(shcol) :: pblh_tke
+  real(rtype), dimension(shcol) :: l_inf
+  real(rtype), dimension(shcol) :: wstar
+  real(rtype), dimension(shcol) :: qstar
+  real(rtype), dimension(shcol) :: thstar
+  real(rtype), dimension(shcol) :: ztop
+  real(rtype), dimension(shcol) :: dynamic_L0
+
+  ! (Re)allocate the persistent MF state on the first call or on a size change
+  if (.not. allocated(mfp_mf_dry_a)) then
+    call shoc_main_std_alloc(shcol, nlev, nlevi)
+  else if (size(mfp_mf_dry_a,1) /= shcol .or. size(mfp_mf_dry_a,2) /= nlevi) then
+    call shoc_main_std_alloc(shcol, nlev, nlevi)
+  end if
+
+  call shoc_main( &
+     shcol=shcol, &
+     nlev=nlev, &
+     nlevi=nlevi, &
+     dtime=dtime, &
+     nadv=nadv, &
+     host_dx=host_dx, &
+     host_dy=host_dy, &
+     thv=thv, &
+     zt_grid=zt_grid, &
+     zi_grid=zi_grid, &
+     pres=pres, &
+     presi=presi, &
+     pdel=pdel, &
+     wthl_sfc=wthl_sfc, &
+     wqw_sfc=wqw_sfc, &
+     uw_sfc=uw_sfc, &
+     vw_sfc=vw_sfc, &
+     wtracer_sfc=wtracer_sfc, &
+     num_qtracers=num_qtracers, &
+     w_field=w_field, &
+     inv_exner=inv_exner, &
+     phis=phis, &
+     host_dse=host_dse, &
+     tke=tke, &
+     thetal=thetal, &
+     qw=qw, &
+     u_wind=u_wind, &
+     v_wind=v_wind, &
+     qtracers=qtracers, &
+     wthv_sec=wthv_sec, &
+     tkh=tkh, &
+     tk=tk, &
+     shoc_ql=shoc_ql, &
+     shoc_cldfrac=shoc_cldfrac, &
+     pblh=pblh, &
+     shoc_mix=shoc_mix, &
+     isotropy=isotropy, &
+     w_sec=w_sec, &
+     thl_sec=thl_sec, &
+     qw_sec=qw_sec, &
+     qwthl_sec=qwthl_sec, &
+     wthl_sec=wthl_sec, &
+     wqw_sec=wqw_sec, &
+     wtke_sec=wtke_sec, &
+     uw_sec=uw_sec, &
+     vw_sec=vw_sec, &
+     w3=w3, &
+     wqls_sec=wqls_sec, &
+     brunt=brunt, &
+     shoc_ql2=shoc_ql2, &
+     shoc_ql_orig=shoc_ql_orig, &
+     shoc_cldfrac_orig=shoc_cldfrac_orig, &
+     mf_ql=mf_ql, &
+     mf_moist_a_zt=mf_moist_a_zt, &
+     mf_moist_qc_zt=mf_moist_qc_zt, &
+     a_diss=a_diss, &
+     a_prod_bu=a_prod_bu, &
+     a_prod_sh=a_prod_sh, &
+     a1_out=a1_out, &
+     C1_out=C1_out, &
+     C2_out=C2_out, &
+     ql1_out=ql1_out, &
+     ql2_out=ql2_out, &
+     wthv_sec_ed=wthv_sec_ed, &
+     ent_ensemble_mean=ent_ensemble_mean, &
+     wthl_sec_ed=wthl_sec_ed, &
+     wthl_sec_mf=wthl_sec_mf, &
+     wqw_sec_ed=wqw_sec_ed, &
+     wqw_sec_mf=wqw_sec_mf, &
+     pblh_wthl=pblh_wthl, &
+     pblh_tke=pblh_tke, &
+     l_inf=l_inf, &
+     wstar=wstar, &
+     qstar=qstar, &
+     thstar=thstar, &
+     ztop=ztop, &
+     dynamic_L0=dynamic_L0, &
+     mf_dry_a=mfp_mf_dry_a, &
+     mf_moist_a=mfp_mf_moist_a, &
+     mf_dry_w=mfp_mf_dry_w, &
+     mf_moist_w=mfp_mf_moist_w, &
+     mf_dry_qt=mfp_mf_dry_qt, &
+     mf_moist_qt=mfp_mf_moist_qt, &
+     mf_dry_thl=mfp_mf_dry_thl, &
+     mf_moist_thl=mfp_mf_moist_thl, &
+     mf_dry_u=mfp_mf_dry_u, &
+     mf_moist_u=mfp_mf_moist_u, &
+     mf_dry_v=mfp_mf_dry_v, &
+     mf_moist_v=mfp_mf_moist_v, &
+     mf_moist_qc=mfp_mf_moist_qc, &
+     mf_thlflx=mfp_mf_thlflx, &
+     mf_qtflx=mfp_mf_qtflx, &
+     mf_thvflx=mfp_mf_thvflx, &
+     mf_qlflx=mfp_mf_qlflx, &
+     mf_ae=mfp_mf_ae, &
+     mf_aw=mfp_mf_aw, &
+     mf_awthv=mfp_mf_awthv, &
+     mf_awthl=mfp_mf_awthl, &
+     mf_awqt=mfp_mf_awqt, &
+     mf_awql=mfp_mf_awql, &
+     mf_awqi=mfp_mf_awqi, &
+     mf_awu=mfp_mf_awu, &
+     mf_awv=mfp_mf_awv, &
+     cfl_mf=mfp_cfl_mf, &
+     mf_auSthl=mfp_mf_auSthl, &
+     mf_auSqt=mfp_mf_auSqt, &
+     mf_auRR=mfp_mf_auRR, &
+     mf_thvflx_zt=mfp_mf_thvflx_zt, &
+     mf_qlflx_zt=mfp_mf_qlflx_zt, &
+     mf_dry_freq=mfp_mf_dry_freq, &
+     mf_moist_freq=mfp_mf_moist_freq, &
+     plumeheight=mfp_plumeheight, &
+     plume_dry_height=mfp_plume_dry_height, &
+     mf_w_cp=mfp_mf_w_cp &
+#ifdef SCREAM_CONFIG_IS_CMAKE
+     , elapsed_s=elapsed_s &
+#endif
+     )
+
+end subroutine shoc_main_std
+
+subroutine shoc_main_std_alloc(shcol, nlev, nlevi)
+  ! Allocate and zero the persistent MF state used by shoc_main_std
+  implicit none
+  integer, intent(in) :: shcol, nlev, nlevi
+    if (allocated(mfp_mf_dry_a)) deallocate(mfp_mf_dry_a)
+    allocate(mfp_mf_dry_a(shcol,nlevi)); mfp_mf_dry_a = 0._rtype
+    if (allocated(mfp_mf_moist_a)) deallocate(mfp_mf_moist_a)
+    allocate(mfp_mf_moist_a(shcol,nlevi)); mfp_mf_moist_a = 0._rtype
+    if (allocated(mfp_mf_dry_w)) deallocate(mfp_mf_dry_w)
+    allocate(mfp_mf_dry_w(shcol,nlevi)); mfp_mf_dry_w = 0._rtype
+    if (allocated(mfp_mf_moist_w)) deallocate(mfp_mf_moist_w)
+    allocate(mfp_mf_moist_w(shcol,nlevi)); mfp_mf_moist_w = 0._rtype
+    if (allocated(mfp_mf_dry_qt)) deallocate(mfp_mf_dry_qt)
+    allocate(mfp_mf_dry_qt(shcol,nlevi)); mfp_mf_dry_qt = 0._rtype
+    if (allocated(mfp_mf_moist_qt)) deallocate(mfp_mf_moist_qt)
+    allocate(mfp_mf_moist_qt(shcol,nlevi)); mfp_mf_moist_qt = 0._rtype
+    if (allocated(mfp_mf_dry_thl)) deallocate(mfp_mf_dry_thl)
+    allocate(mfp_mf_dry_thl(shcol,nlevi)); mfp_mf_dry_thl = 0._rtype
+    if (allocated(mfp_mf_moist_thl)) deallocate(mfp_mf_moist_thl)
+    allocate(mfp_mf_moist_thl(shcol,nlevi)); mfp_mf_moist_thl = 0._rtype
+    if (allocated(mfp_mf_dry_u)) deallocate(mfp_mf_dry_u)
+    allocate(mfp_mf_dry_u(shcol,nlevi)); mfp_mf_dry_u = 0._rtype
+    if (allocated(mfp_mf_moist_u)) deallocate(mfp_mf_moist_u)
+    allocate(mfp_mf_moist_u(shcol,nlevi)); mfp_mf_moist_u = 0._rtype
+    if (allocated(mfp_mf_dry_v)) deallocate(mfp_mf_dry_v)
+    allocate(mfp_mf_dry_v(shcol,nlevi)); mfp_mf_dry_v = 0._rtype
+    if (allocated(mfp_mf_moist_v)) deallocate(mfp_mf_moist_v)
+    allocate(mfp_mf_moist_v(shcol,nlevi)); mfp_mf_moist_v = 0._rtype
+    if (allocated(mfp_mf_moist_qc)) deallocate(mfp_mf_moist_qc)
+    allocate(mfp_mf_moist_qc(shcol,nlevi)); mfp_mf_moist_qc = 0._rtype
+    if (allocated(mfp_mf_thlflx)) deallocate(mfp_mf_thlflx)
+    allocate(mfp_mf_thlflx(shcol,nlevi)); mfp_mf_thlflx = 0._rtype
+    if (allocated(mfp_mf_qtflx)) deallocate(mfp_mf_qtflx)
+    allocate(mfp_mf_qtflx(shcol,nlevi)); mfp_mf_qtflx = 0._rtype
+    if (allocated(mfp_mf_thvflx)) deallocate(mfp_mf_thvflx)
+    allocate(mfp_mf_thvflx(shcol,nlevi)); mfp_mf_thvflx = 0._rtype
+    if (allocated(mfp_mf_qlflx)) deallocate(mfp_mf_qlflx)
+    allocate(mfp_mf_qlflx(shcol,nlevi)); mfp_mf_qlflx = 0._rtype
+    if (allocated(mfp_mf_ae)) deallocate(mfp_mf_ae)
+    allocate(mfp_mf_ae(shcol,nlevi)); mfp_mf_ae = 0._rtype
+    if (allocated(mfp_mf_aw)) deallocate(mfp_mf_aw)
+    allocate(mfp_mf_aw(shcol,nlevi)); mfp_mf_aw = 0._rtype
+    if (allocated(mfp_mf_awthv)) deallocate(mfp_mf_awthv)
+    allocate(mfp_mf_awthv(shcol,nlevi)); mfp_mf_awthv = 0._rtype
+    if (allocated(mfp_mf_awthl)) deallocate(mfp_mf_awthl)
+    allocate(mfp_mf_awthl(shcol,nlevi)); mfp_mf_awthl = 0._rtype
+    if (allocated(mfp_mf_awqt)) deallocate(mfp_mf_awqt)
+    allocate(mfp_mf_awqt(shcol,nlevi)); mfp_mf_awqt = 0._rtype
+    if (allocated(mfp_mf_awql)) deallocate(mfp_mf_awql)
+    allocate(mfp_mf_awql(shcol,nlevi)); mfp_mf_awql = 0._rtype
+    if (allocated(mfp_mf_awqi)) deallocate(mfp_mf_awqi)
+    allocate(mfp_mf_awqi(shcol,nlevi)); mfp_mf_awqi = 0._rtype
+    if (allocated(mfp_mf_awu)) deallocate(mfp_mf_awu)
+    allocate(mfp_mf_awu(shcol,nlevi)); mfp_mf_awu = 0._rtype
+    if (allocated(mfp_mf_awv)) deallocate(mfp_mf_awv)
+    allocate(mfp_mf_awv(shcol,nlevi)); mfp_mf_awv = 0._rtype
+    if (allocated(mfp_cfl_mf)) deallocate(mfp_cfl_mf)
+    allocate(mfp_cfl_mf(shcol,nlevi)); mfp_cfl_mf = 0._rtype
+    if (allocated(mfp_mf_auSthl)) deallocate(mfp_mf_auSthl)
+    allocate(mfp_mf_auSthl(shcol,nlevi)); mfp_mf_auSthl = 0._rtype
+    if (allocated(mfp_mf_auSqt)) deallocate(mfp_mf_auSqt)
+    allocate(mfp_mf_auSqt(shcol,nlevi)); mfp_mf_auSqt = 0._rtype
+    if (allocated(mfp_mf_auRR)) deallocate(mfp_mf_auRR)
+    allocate(mfp_mf_auRR(shcol,nlevi)); mfp_mf_auRR = 0._rtype
+    if (allocated(mfp_mf_thvflx_zt)) deallocate(mfp_mf_thvflx_zt)
+    allocate(mfp_mf_thvflx_zt(shcol,nlev)); mfp_mf_thvflx_zt = 0._rtype
+    if (allocated(mfp_mf_qlflx_zt)) deallocate(mfp_mf_qlflx_zt)
+    allocate(mfp_mf_qlflx_zt(shcol,nlev)); mfp_mf_qlflx_zt = 0._rtype
+    if (allocated(mfp_mf_dry_freq)) deallocate(mfp_mf_dry_freq)
+    allocate(mfp_mf_dry_freq(shcol)); mfp_mf_dry_freq = 0._rtype
+    if (allocated(mfp_mf_moist_freq)) deallocate(mfp_mf_moist_freq)
+    allocate(mfp_mf_moist_freq(shcol)); mfp_mf_moist_freq = 0._rtype
+    if (allocated(mfp_plumeheight)) deallocate(mfp_plumeheight)
+    allocate(mfp_plumeheight(shcol)); mfp_plumeheight = 0._rtype
+    if (allocated(mfp_plume_dry_height)) deallocate(mfp_plume_dry_height)
+    allocate(mfp_plume_dry_height(shcol)); mfp_plume_dry_height = 0._rtype
+    if (allocated(mfp_mf_w_cp)) deallocate(mfp_mf_w_cp)
+    allocate(mfp_mf_w_cp(shcol)); mfp_mf_w_cp = 0._rtype
+end subroutine shoc_main_std_alloc
+
+
+!==============================================================
+! MJC [08/02/24]: Update shoc_ql and shoc_cldfrac to include MF contribution
+subroutine update_cldfrac_ql(&
+        shcol,nlev,nlevi,&                     ! Input
+        zt_grid,zi_grid, &                     ! Input
+        mf_moist_a,mf_moist_qc,&               ! Input
+        shoc_cldfrac,shoc_ql,&                 ! Input/Output
+        shoc_cldfrac_orig,shoc_ql_orig,mf_ql,& ! Output
+        mf_moist_a_zt,mf_moist_qc_zt)          ! Output
+        
+        implicit none
+   
+        ! INPUT VARIABLES
+         ! number of columns [-]
+         integer, intent(in) :: shcol
+         ! number of mid-point levels [-]
+         integer, intent(in) :: nlev
+         ! number of interface levels [-]
+         integer, intent(in) :: nlevi
+         ! mid-point grid heights [m]
+         real(rtype), intent(in) :: zt_grid(shcol,nlev)
+         ! mid-point grid heights [m]
+         real(rtype), intent(in) :: zi_grid(shcol,nlevi)
+         ! MF cloud fraction interpolated to zt grid
+         real(rtype), intent(in) :: mf_moist_a(shcol,nlevi)
+         ! MF cloud liquid interpolated to zt grid
+         real(rtype), intent(in) :: mf_moist_qc(shcol,nlevi)
+         ! SHOC cloud fraction [-]
+         real(rtype), intent(inout) :: shoc_cldfrac(shcol,nlev)
+         ! SHOC cloud liquid 
+         real(rtype), intent(inout) :: shoc_ql(shcol,nlev)
+         ! SHOC+MF cloud fraction [-]
+         real(rtype), intent(out) :: shoc_cldfrac_orig(shcol,nlev)
+         ! SHOC+MF cloud liquid 
+         real(rtype), intent(out) :: shoc_ql_orig(shcol,nlev)
+         ! MF cloud liquid
+         real(rtype), intent(out) :: mf_ql(shcol,nlev)
+         
+         ! MF moist updraft area fraction interpolated to ZT grid [fraction]
+         real(rtype), intent(out) :: mf_moist_a_zt(shcol,nlev)
+         ! MF moist updraft condensate interpolated to ZT grid [kg/kg]
+         real(rtype), intent(out) :: mf_moist_qc_zt(shcol,nlev)
+
+         ! Local variables
+         integer :: i, k
+    
+         mf_ql = 0._rtype
+         
+         call linear_interp(zi_grid,zt_grid,mf_moist_a,mf_moist_a_zt,nlevi,nlev,shcol,largeneg)
+         call linear_interp(zi_grid,zt_grid,mf_moist_qc,mf_moist_qc_zt,nlevi,nlev,shcol,largeneg)
+         
+         ! Lets keep a backup of shoc_cldfrac and shoc_ql for postprocessing analysis
+         do k=1,nlev
+          do i=1,shcol
+            shoc_cldfrac_orig(i,k) = shoc_cldfrac(i,k)
+            shoc_ql_orig(i,k) = shoc_ql(i,k)
+          enddo
+         enddo
+         
+         ! Here we update shoc_cldfrac and shoc_ql to include the MF contributions
+         do k=1,nlev
+          do i=1,shcol
+            shoc_cldfrac(i,k) = min(1._rtype, shoc_cldfrac(i,k) + mf_moist_a_zt(i,k) )
+            shoc_ql(i,k) = shoc_ql(i,k) + mf_moist_a_zt(i,k)*mf_moist_qc_zt(i,k)
+            mf_ql(i,k) = mf_moist_a_zt(i,k)*mf_moist_qc_zt(i,k)
+          enddo
+         enddo
+    
+end subroutine update_cldfrac_ql
+    
+
+!==============================================================
+! MJC [08/01/24]: Calculates the buoyancy flux from the total (ED+MF) fluxes,
+! using the SAME linearization as shoc_assumed_pdf_compute_buoyancy_flux so the
+! only difference from the PDF's ED-only wthv_sec is the use of total fluxes:
+!   wthv = wthl + ((1-eps_term)/eps_term)*T0*wqt
+!        + ((Lv/cp)*Pi^-1 - T0/eps_term) * (wqls + mf_qlflx)
+! where Pi^-1 = (p0/p)^(R/cp) is the inverse Exner function and T0 = basetemp.
+! The liquid water flux term follows eq 7.15 of the SHOC tech doc and includes
+! both the PDF-derived liquid water flux (wqls_sec) and the MF liquid water
+! flux (mf_qlflx_zt).
+
+subroutine buoyancy_total_fluxes(&
+        shcol,nlev,nlevi, &       ! Input
+        zt_grid,zi_grid, &        ! Input
+        pres,&                    ! Input
+        wthl_sec,wqw_sec,&        ! Input
+        wqls_sec,mf_qlflx_zt,&   ! Input
+        wthv_out)                 ! Output
+
+     implicit none
+
+    ! INPUT VARIABLES
+     ! number of columns [-]
+     integer, intent(in) :: shcol
+     ! number of mid-point levels [-]
+     integer, intent(in) :: nlev
+     ! number of interface levels [-]
+     integer, intent(in) :: nlevi
+     ! mid-point grid heights [m]
+     real(rtype), intent(in) :: zt_grid(shcol,nlev)
+     ! interface grid heights [m]
+     real(rtype), intent(in) :: zi_grid(shcol,nlevi)
+     ! pressure on midpoint grid [Pa]
+     real(rtype), intent(in) :: pres(shcol,nlev)
+     ! vertical heat flux (total: ED+MF) on interface grid [K m/s]
+     real(rtype), intent(in) :: wthl_sec(shcol,nlevi)
+     ! vertical moisture flux (total: ED+MF) on interface grid [kg/kg m/s]
+     real(rtype), intent(in) :: wqw_sec(shcol,nlevi)
+     ! liquid water flux from PDF on midpoint grid [kg/kg m/s]
+     real(rtype), intent(in) :: wqls_sec(shcol,nlev)
+     ! MF liquid water flux on midpoint grid [kg/kg m/s]
+     real(rtype), intent(in) :: mf_qlflx_zt(shcol,nlev)
+
+     ! buoyancy flux on midpoint grid [K m/s]
+     real(rtype), intent(out) :: wthv_out(shcol,nlev)
+
+     ! Local variables
+     integer :: i, k
+     real(rtype) :: wthl_sec_zt(shcol,nlev)
+     real(rtype) :: wqw_sec_zt(shcol,nlev)
+     real(rtype) :: epsterm
+     real(rtype) :: exner_inv  ! inverse Exner function: (p0/p)^(R/cp)
+     real(rtype) :: wql_total  ! total liquid water flux (PDF + MF)
+     real(rtype) :: liq_coeff  ! coefficient for liquid water flux term
+
+     epsterm = rgas/rv
+
+     ! Interpolate fluxes from interface grid to midpoint grid
+     call linear_interp(zi_grid,zt_grid,wthl_sec,wthl_sec_zt,nlevi,nlev,shcol,largeneg)
+     call linear_interp(zi_grid,zt_grid,wqw_sec,wqw_sec_zt,nlevi,nlev,shcol,largeneg)
+
+     do k=1,nlev
+        do i=1,shcol
+           ! Total liquid water flux: PDF environment + MF updrafts
+           wql_total = wqls_sec(i,k) + mf_qlflx_zt(i,k)
+
+           ! Inverse Exner function
+           exner_inv = bfb_pow(basepres/pres(i,k),(rgas/cp))
+
+           ! Coefficient for liquid water flux term (from eq 7.15)
+           liq_coeff = (lcond/cp)*exner_inv - (1._rtype/epsterm)*basetemp
+
+           ! Buoyancy flux: same linearization as the PDF (constant reference
+           ! state T0 = basetemp), applied to the total (ED+MF) fluxes
+           wthv_out(i,k) = wthl_sec_zt(i,k) &
+              + ((1._rtype-epsterm)/epsterm)*basetemp*wqw_sec_zt(i,k) &
+              + liq_coeff * wql_total
+        enddo
+     enddo
+
+   end subroutine buoyancy_total_fluxes
+
+!==============================================================
+! Calculates the PBL height: TKE and wthl method (criterium: TKE and wthl vanishes)
+
+subroutine edmf_pblh(&
+       shcol,nlev,nlevi, &     ! Input
+       zt_grid,zi_grid,  &     ! Input
+       wthl_sec,tke,     &     ! Input
+       pblh_wthl, pblh_tke)    ! Output
+
+  implicit none
+
+! INPUT VARIABLES
+  ! number of columns [-]
+  integer, intent(in) :: shcol
+  ! number of mid-point levels [-]
+  integer, intent(in) :: nlev
+  ! number of interface levels [-]
+  integer, intent(in) :: nlevi
+  ! mid-point grid heights [m]
+  real(rtype), intent(in) :: zt_grid(shcol,nlev)
+  ! mid-point grid heights [m]
+  real(rtype), intent(in) :: zi_grid(shcol,nlevi)
+  ! vertical heat flux [K m/s]
+  real(rtype), intent(in) :: wthl_sec(shcol,nlevi)
+  ! TKE [m2/s2]
+  real(rtype), intent(in) :: tke(shcol,nlev)
+
+  
+  ! Output = PBL height using wthl
+  real(rtype), intent(out) :: pblh_wthl(shcol)
+  ! Output = PBL height using TKE
+  real(rtype), intent(out) :: pblh_tke(shcol)
+  
+  ! local variables
+  integer :: i, k, imax, kstart
+  real(rtype) :: tke_threshold
+  logical :: check
+
+  ! Scan ceiling for PBL detection: start below this height to skip the stratosphere
+  ! and upper troposphere. 20 km covers the tallest tropical convective towers.
+  real(rtype), parameter :: pblh_scan_top = 20000._rtype  ! [m]
+
+  ! PBL height: wthl method
+  do i=1,shcol
+    pblh_wthl(i) = 0._rtype
+    check  = .true.
+    ! Find first level at or below pblh_scan_top (k=1 is model top, heights decrease with k)
+    ! Fallback kstart=1 means scan whole column if threshold somehow not found
+    kstart = 1
+    do k = 1, nlev
+      if (zt_grid(i,k) <= pblh_scan_top) then
+        kstart = k
+        exit
+      end if
+    end do
+    do k = kstart,nlev  ! from scan ceiling to surface
+        if (check .and. abs(abs(wthl_sec(i,k)) - abs(wthl_sec(i,k+1))) > 0.001_rtype) then
+         pblh_wthl(i) = zi_grid(i,k)
+         check = .false.
+       endif
+    enddo
+  enddo
+         
+  ! PBL height: TKE method
+  do i=1,shcol
+    if (tke(i,nlev) .NE. 0._rtype ) then
+      tke_threshold = mintke*1.1_rtype
+      check  = .true.
+      do k = nlev,3,-1    
+          if (zt_grid(i,k) < 100._rtype) cycle
+          if (check .and. tke(i,k) < tke_threshold .and. tke(i,k-1) < tke_threshold) then
+            pblh_tke(i) = zt_grid(i,k)
+            check = .false.
+          endif
+      enddo  
+    else
+      pblh_tke(i) = 0._rtype
+    endif
+  enddo
+  
+end subroutine edmf_pblh
+
+!==============================================================
+                         
+subroutine update_thermody_mf_source(&
+  shcol,nlev,mf_auSthl_zt,mf_auSqt_zt, & ! Input
+  thetal,qw)
+ 
+   implicit none
+ 
+ ! INPUT VARIABLES
+   ! number of columns [-]
+   integer, intent(in) :: shcol
+   ! number of mid-point levels [-]
+   integer, intent(in) :: nlev
+   ! mid-point MF thl microphysics source term [K/s]
+   real(rtype), intent(in) :: mf_auSthl_zt(shcol,nlev)
+   ! mid-point MF qt microphysics source term [1/s]
+   real(rtype), intent(in) :: mf_auSqt_zt(shcol,nlev)
+
+   real(rtype), intent(inout) :: thetal(shcol,nlev)
+   real(rtype), intent(inout) :: qw(shcol,nlev)
+
+   ! local variables
+   integer :: i
+ 
+   do i=1,shcol
+    thetal(i,:) = thetal(i,:) + mf_auSthl_zt(i,:)
+    qw(i,:) = qw(i,:) + mf_auSqt_zt(i,:)
+   enddo
+      
+ end subroutine update_thermody_mf_source
+
+
+!==============================================================
+! MJC: This function needs to be tested. For now, this is just a place holder
+subroutine integrate_mf(shcol, nz, nzi, dt,                        & ! input
+                 rho_zt_in, rho_zi_in,                             & ! input
+                 zt_in, zi_in, dz_zt_in, p_in, thv_zi_in,          & ! input - MKW 20200804 removed iex and dz_zi_in
+                 u_in,   v_in,   thl_in,   thv_in, qt_in,          & ! input
+                 ust,    wthl,   wqt,   qc_in,                     & ! input
+                 pblh, pblh_tke, pblh_wthl, tke_in,                & ! input
+                 dry_a_out,   moist_a_out,                         & ! output: updraft properties for diagnostics
+                 dry_w_out,   moist_w_out,                         & ! output: updraft properties for diagnostics
+                 dry_qt_out,  moist_qt_out,                        & ! output: updraft properties for diagnostics
+                 dry_thl_out, moist_thl_out,                       & ! output: updraft properties for diagnostics
+                 dry_u_out,   moist_u_out,                         & ! output: updraft properties for diagnostics
+                 dry_v_out,   moist_v_out,                         & ! output: updraft properties for diagnostics
+                              moist_qc_out,                        & ! output: updraft properties for diagnostics
+                 ae_out, aw_out,                                   & ! output: variables needed for  diffusion solver
+                 awthv_out,                                        & ! output: variable needed for total wthv
+                 awthl_out, awqt_out,                              & ! output: variables needed for  diffusion solver
+                 awql_out, awqi_out,                               & ! output: variables needed for  diffusion solver
+                 awu_out, awv_out,                                 & ! output: variables needed for  diffusion solver
+                 mf_w_cp, &
+                 auSthl_out, auSqt_out, auRRun_out,                    & ! output: sources terms microphysics
+                 freq_dry, freq_moist, plumeheight,                & ! output
+                 plume_dry_height, cfl,                            & ! output: frequency of plume activation (2D)
+                 ent_ensemble_mean, ztop, dynamic_L0, &
+                 wstar,     qstar,   thstar ) 
+  ! ================================================================================= !
+  ! Original author: Marcin Kurowski, JPL
+  ! Modified heavily by Mikael Witte and Maria Chinita, UCLA/JPL for implementation in E3SM
+  !
+  !
+  ! Variables needed for solver:
+  ! ae = sum_i (1-a_i)
+  ! aw = sum (a_i w_i)
+  ! awthl = sum(a_i w_i*thl_i)
+  ! awqt  = sum(a_i w_i*qt_i)
+  ! awql,awqi,awu,awv similar to above except for different variables - not currently coupled to SHOC diffusion solver
+  !
+  !
+  ! - mass flux variables are computed on edges (i.e. momentum grid):
+  !  upa,upw,upqt,... 1:nzi
+  !  dry_a,moist_a,dry_w,moist_w, ... 1:nzi
+  ! ================================================================================= !
+  
+     ! ============================================================================== ! 
+     ! INPUTS   
+     ! physics controls
+     integer, intent(in) :: shcol,nz,nzi
+     real(rtype), dimension(shcol,nz),  intent(in) :: zt_in,   dz_zt_in, rho_zt_in
+
+     ! MKW TODO: remove zi_in as an argument, was only needed for linear_interp calls that were removed on 2020/09/01
+     real(rtype), dimension(shcol,nzi), intent(in) :: zi_in, p_in, thv_zi_in, rho_zi_in
+     real(rtype), dimension(shcol,nz),  intent(in) :: u_in,v_in,thl_in,qt_in,qc_in,thv_in, tke_in  ! all on thermodynamic/midpoint levels
+
+     real(rtype), dimension(shcol), intent(in) :: ust,   wthl,   wqt
+     real(rtype), dimension(shcol), intent(in) :: pblh, pblh_tke, pblh_wthl
+     !time step [s]   
+     real(rtype), intent(in) :: dt
+     ! ============================================================================== !
+     ! OUTPUTS
+     ! updraft properties
+     real(rtype),dimension(shcol,nzi), intent(out) :: dry_a_out,  &  !moist_a_out,     &
+                                                      dry_w_out,    moist_w_out,     &
+                                                      dry_qt_out,   moist_qt_out,    &
+                                                      dry_thl_out,  moist_thl_out,   &
+                                                      dry_u_out,    moist_u_out,     &
+                                                      dry_v_out,    moist_v_out,     &
+                                                      moist_qc_out
+    
+     real(rtype),dimension(shcol,nzi), intent(inout) :: moist_a_out  
+     
+     real(rtype),dimension(shcol), intent(inout) :: mf_w_cp
+
+
+     ! variables needed for diffusion solver
+     real(rtype),dimension(shcol,nzi), intent(out) :: ae_out,       aw_out,          &
+                                                      awthv_out,    awthl_out,       &
+                                                      awqt_out,     awql_out,        &
+                                                      awqi_out,     awu_out,         &
+                                                      awv_out,      cfl,             &
+                                                      auSthl_out,  auSqt_out,        &
+                                                      auRRun_out
+
+     real(rtype),dimension(shcol,nz), intent(out) :: ent_ensemble_mean
+      
+     ! plume activation frequency
+     real(rtype),dimension(shcol),     intent(out) :: freq_dry,     freq_moist
+     
+     ! plume height from one plume test
+     real(rtype), dimension(shcol), intent(out) :: plumeheight, plume_dry_height
+     ! ztop and L0
+     real(rtype), dimension(shcol), intent(out) :: ztop, dynamic_L0
+
+     real(rtype), dimension(shcol), intent(out) :: wstar,     qstar,   thstar
+                                                        
+     ! Entrainment variables
+     !real(rtype),dimension(nz,mf_nup), intent(out) :: ent
+     !integer,    dimension(nz,mf_nup), intent(out) :: enti             
+                                      
+     !! Flux diagnostics - currently diagnosed elsewhere
+     !real(rtype),dimension(shcol,nzi), intent(out) :: thlflx_out, qtflx_out
+     
+     ! ============================================================================== !
+     ! INTERNAL VARIABLES
+
+     ! flipped variables (i.e. here index 1 is at surface)
+     real(rtype), dimension(shcol,nz)  :: zt, dz_zt, rho_zt
+     real(rtype), dimension(shcol,nzi) :: zi, p, thv_zi, rho_zi
+     real(rtype), dimension(shcol,nz)  :: u, v, thl, qt, qc, thv, tke
+     ! Auxiliar variable for cloud depth calculation needed for autoconversion time scale
+     real(rtype), dimension(shcol,nzi) :: moist_a_aux
+     
+     ! flipped updraft properties (i.e. index 1 is at surface)
+     real(rtype), dimension(shcol,nzi) :: dry_a,     moist_a,      &
+                                          dry_w,     moist_w,      &
+                                          dry_qt,    moist_qt,     &
+                                          dry_thl,   moist_thl,    &
+                                          dry_u,     moist_u,      &
+                                          dry_v,     moist_v,      &
+                                                     moist_qc,     &
+                                          dry_th,    moist_th,     &           
+                                          ae,        aw,           &
+                                          awu,       awv,          &
+                                          awthv,     awthl,        &
+                                          awqt,      awql,         &
+                                          awqv,      awth,         & 
+                                          awqi,      awqc,         &
+                                          auSthl,    auSqt, auRRun                    
+                                                     
+                                          
+     !real(rtype), dimension(shcol,nzi) :: thlflx, qtflx
+
+     ! sums over all plumes
+     !real(rtype), dimension(shcol,nzi) :: moist_th, dry_th, awqv, awth
+     
+
+     ! updraft properties
+     real(rtype), dimension(nzi,mf_nup) :: upw,      upa,      &
+                                           upthl,    upthv,    &
+                                                     upth,     &
+                                           upqt,     upqc,     &
+                                           upql,     upqv,     &
+                                           upqi,     ups,      &
+                                           upu,      upv,      &
+                                           upqs, upLtot, RRun, &
+                                           Sac, Sev, Smel,     & ! Sac actually needs to be an ouput so this is wrong, fix it in a bit
+                                           Sthl, Sqt
+
+     ! entrainment variables
+     real(rtype), dimension(nz,mf_nup) :: entf, ent 
+     integer,     dimension(nz,mf_nup) :: enti
+     real(rtype), dimension(nz) :: ent_oneplume
+     !real(rtype), dimension(mf_nup) :: tau_prec ! autoconversion time-scale following eq 16 of Suselj et al 2019 
+     
+     
+     ! other variables
+     integer     :: k,j,i,index_top
+     real        :: cfl_zt
+     
+     
+     real(rtype) :: wthv, & !      wstar,     qstar,   thstar,    &
+                    sigmaw,   sigmaqt,   sigmath,       z0,    &
+                    wmin,        wmax,       wlv,      wtv,    &
+                    wp, wp_integral, wstar_aux, thstar_help, mf_a_wcp_local
+                    
+                    
+     real(rtype) :: pbj,            B,       qtn,     thln,    &
+                    thvn,         thn,       qcn,      qln,    &
+                    qin,           un,        vn,      wn2,    &
+                    entexp,   entexpu,      entw,      iexh,   &
+                    eturb,  enturb, qsn 
+                    
+     real(rtype) :: Ltot, entexpqt, cldepth, inv_tau_prec, mf_w_cp_old
+     integer :: first_ind_cld, last_ind_cld
+
+     
+     real(rtype) :: plumeheight_aux !, plume_dry_height_aux
+     real(rtype), dimension(shcol) :: plume_top_height
+     ! internal surface cont
+     real(rtype) :: dzt(nz) !, dzi(nzi)
+  
+     ! w parameters
+     ! virtual mass coefficients for w-eqn after Suselj etal 2019
+     real(rtype),parameter :: wa = 1._rtype,     &
+                              wb = 1.5_rtype
+
+
+     ! parameters defining initial conditions for updrafts
+     real(rtype),parameter :: pwmin = 1.5_rtype, &
+                              pwmax = 3._rtype
+
+     ! min values to avoid singularities
+     real(rtype),parameter :: wstarmin = 1.e-3_rtype,  &
+                              pblhmin  = 100._rtype
+                              
+    ! fixed entrainment rate 
+     real(rtype),parameter :: fixent = 1.e-3_rtype
+     
+     ! threshold value for precipitation formation due to accretion (q0 in eq 15 in Suselj et al 2019)  
+     real(rtype),parameter :: acc_thres = 1.25e-3_rtype, &
+                              tau_ref   = 15._rtype,     &
+                              cldep_min = 1500._rtype,   &
+                              cldep_max = 5000._rtype,   &
+                              kev       = 2.5e-4_rtype,  & 
+                              frain_det = 0._rtype
+
+     logical ::check
+     
+     integer  :: nstep_mff , nstep_mff_help                           ! current timestep number
+    
+     integer, parameter :: nmax = 3000
+     real(rtype) :: mf_w_cp_help(nmax)
+
+     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     !!!!!!!!!!!!!!!!!!!!!! BEGIN CODE !!!!!!!!!!!!!!!!!!!!!!!
+     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+     nstep_mff = get_nstep()
+     nstep_mff_help = nstep_mff
+     
+     if (nstep_mff_help .eq. 0) then
+       mf_w_cp_help = 0._rtype
+      !print*,'nstep_mff_help = ',nstep_mff_help
+     endif
+
+     ! Flip vertical coordinates and all input variables
+     do k=1,nz
+       ! thermodynamic grid variables
+       zt(:,k)    =  zt_in(:,nz-k+1)
+       dz_zt(:,k) =  dz_zt_in(:,nz-k+1)
+
+       u(:,k)     =  u_in(:,nz-k+1)
+       v(:,k)     =  v_in(:,nz-k+1)
+       
+       thl(:,k)   =  thl_in(:,nz-k+1)
+       thv(:,k)   =  thv_in(:,nz-k+1)
+       
+       qt(:,k)    =  qt_in(:,nz-k+1)
+       qc(:,k)    =  qc_in(:,nz-k+1)
+
+       tke(:,k)  =  tke_in(:,nz-k+1)
+
+       rho_zt(:,k) =  rho_zt_in(:,nz-k+1)
+
+       ! Interface grid nzi variables
+       zi(:,k)    = zi_in(:,nzi-k+1)
+       p(:,k)     =  p_in(:,nzi-k+1)
+       rho_zi(:,k) =  rho_zi_in(:,nzi-k+1)
+       thv_zi(:,k)   =  thv_zi_in(:,nzi-k+1)
+
+       ! auxiliar var for cloud depth calculation
+       moist_a_aux(:,k) = moist_a_out(:,nzi-k+1)
+     enddo
+     zi(:,nzi) = zi_in(:,1)
+     p(:,nzi)  =  p_in(:,1)
+     rho_zi(:,nzi) = rho_zi_in(:,1)
+     thv_zi(:,nzi)   = thv_zi_in(:,1)     
+
+     moist_a_aux(:,nzi) = moist_a_out(:,1)
+
+     ! INITIALIZE OUTPUT VARIABLES
+     ! set updraft properties to zero
+     dry_a     = 0._rtype
+     moist_a   = 0._rtype
+     dry_w     = 0._rtype
+     moist_w   = 0._rtype
+     dry_qt    = 0._rtype
+     moist_qt  = 0._rtype
+     dry_thl   = 0._rtype
+     moist_thl = 0._rtype
+     dry_u     = 0._rtype
+     moist_u   = 0._rtype
+     dry_v     = 0._rtype
+     moist_v   = 0._rtype
+     moist_qc  = 0._rtype
+     moist_th  = 0._rtype
+     dry_th    = 0._rtype
+     ! outputs - variables needed for solver
+     aw        = 0._rtype
+     awthv     = 0._rtype
+     awthl     = 0._rtype
+     awqt      = 0._rtype
+     awqc      = 0._rtype
+     awqv      = 0._rtype
+     awql      = 0._rtype
+     awqi      = 0._rtype
+     awu       = 0._rtype
+     awv       = 0._rtype
+     awth      = 0._rtype
+     auSthl   = 0._rtype 
+     auSqt    = 0._rtype
+     auRRun   = 0._rtype
+
+     ! autoconversion timescale
+     inv_tau_prec  = 0._rtype
+     entexpqt  = 0._rtype
+     ! outputs - diagnostics
+     !thlflx    = 0._rtype
+     !qtflx     = 0._rtype
+     
+     ! this is the environmental area - by default 1.
+     ae = 1._rtype
+     ! CFL number
+     cfl = 0._rtype
+
+     ! START MAIN COMPUTATION
+     ! NOTE: SHOC does not invert the vertical coordinate, which by default is ordered from lowest to highest pressure
+     ! (i.e. top of atmosphere to bottom) so surface-based do loops are performed in reverse (i.e. from nz to 1)
+     do j=1,shcol
+       ! zero out plume properties
+       upw   = 0._rtype
+       upthl = 0._rtype
+       upthv = 0._rtype
+       upqt  = 0._rtype
+       upa   = 0._rtype
+       upu   = 0._rtype
+       upv   = 0._rtype
+       upqc  = 0._rtype
+       ent   = 0._rtype
+       upth  = 0._rtype
+       upql  = 0._rtype
+       upqi  = 0._rtype
+       upqs  = 0._rtype
+       upLtot = 0._rtype
+       upqv  = 0._rtype
+       Sac   = 0._rtype
+       Sev   = 0._rtype
+       Smel  = 0._rtype
+       RRun  = 0._rtype 
+       Sthl  = 0._rtype
+       Sqt   = 0._rtype
+       
+       ! MJC: 
+       mf_w_cp_old = mf_w_cp(j)
+
+       !wthv = wthl(j)+eps*thl(j,1)*wqt(j)
+       ! From Kay SCM code (GetSurfaceFluxes.m)
+       wthv = wthl(j)*(1._rtype+eps*qt(j,1)) + wqt(j)*eps*thl(j,1)
+       
+       ! If surface buoyancy is positive then do mass-flux, otherwise not
+       if (wthv>0.0) then
+         dzt = dz_zt(j,:)
+                                 
+         if (plume_dry_height(j) > 0._rtype .and. plume_dry_height(j) > pblhmin) then
+            pbj = plume_dry_height(j)
+         else
+            ! For the first time step we don't have a plume_dry_height value
+            pbj = pblhmin
+         endif
+         
+         wstar(j)  = max( wstarmin, (ggr/thv(j,1)*wthv*pbj)**(1._rtype/3._rtype) )
+         qstar(j)  = wqt(j) / wstar(j)
+         thstar(j) = wthv/ wstar(j)
+        
+         sigmaw  = 0.572_rtype * wstar(j)    
+         sigmaqt = 2.89_rtype * abs(qstar(j)) 
+         sigmath = 2.89_rtype * abs(thstar(j))
+         
+         wmin = sigmaw * pwmin
+         wmax = sigmaw * pwmax
+              
+         ! One plume test (height reached by a single plume with a fixed entrainment rate = 1.e-3)  
+         ! At the moment, we are not using this as the ztop for dynamic L0    
+         ent_oneplume = fixent    
+         plumeheight_aux = 0._rtype        
+         call oneplume( nz, nzi, zi(j,:), dzt, ent_oneplume, p(j,:), qt(j,:), thl(j,:), thv(j,:),  &
+                       thv_zi(j,:), wmax, wmin, sigmaw, sigmaqt, sigmath, wa, wb, &
+                       do_condensation, plumeheight_aux)
+         
+         plumeheight(j) = plumeheight_aux      
+         
+         ! Compute entrainment coefficient
+         ! get dz/L0
+         ztop(j) = max(pblh_wthl(j),pbj,pblhmin)
+         
+         ! MJC: if do_precip = true, change entrainment lenght scale with w_d
+         !if (do_precip) then
+         ! !dynamic_L0(j) = mf_a*(ztop(j)**mf_b)*max(mf_w_cp_old/wstar(j),1._rtype)
+         ! if ( mf_w_cp_help(nstep_mff_help)*mf_a_wcp/wstar(j) > 1.1_rtype ) then 
+         !   dynamic_L0(j) = mf_a*(ztop(j)**mf_b)*1.1_rtype !max(10.0_rtype/wstar(j),1._rtype)
+         ! else
+         !   dynamic_L0(j) = mf_a*(ztop(j)**mf_b)*max(mf_w_cp_help(nstep_mff_help)*mf_a_wcp/wstar(j),1._rtype) 
+         ! endif          
+         !else
+         ! dynamic_L0(j) = mf_a*(ztop(j)**mf_b)
+         !endif
+         dynamic_L0(j) = mf_a*(ztop(j)**mf_b)
+
+         ! Entf is the Poisson argument 
+         do i=1,mf_nup
+           do k=1,nz
+             if (do_dynamic_L) then
+               entf(k,i) = dzt(k) / dynamic_L0(j)
+             else
+               entf(k,i) = dzt(k) / mf_L0
+             end if
+           enddo
+         enddo
+        
+         ! Enti is the Poisson random number drawn from the Poisson distribution that represents the
+         !number of entrainment events for a given average event frequency equal to L0
+         call poisson( nz, mf_nup, entf, enti, u(j,2:5))
+          
+         ! entrainment: Ent=Ent0/dz*P(dz/L0), Ent0 = mf_ent0 = namelist constant (ent_0 = 0.2)
+         do i=1,mf_nup
+           do k=1,nz
+             ent(k,i) = real( enti(k,i))*mf_ent0/dzt(k)
+           enddo
+         enddo
+         
+         do k=1,nz
+            ent_ensemble_mean(j,k) = sum(ent(k,:))/mf_nup
+         enddo
+         
+        ! Calculate the autoconversion time scale (eq 16 from Suselj et al 2019)
+        ! Here inv_tau_prec = 1/tau_u, i.e. we are calculating 1/tau instead of tau_u
+        first_ind_cld = -1
+        last_ind_cld = -1
+        if (do_precip) then
+          ! Calculate cloud depth from previous time step
+          do k=2,nzi
+            if (moist_a_aux(j,k) > 0._rtype) then
+              if (first_ind_cld == -1) then
+                first_ind_cld = k
+              end if
+              last_ind_cld = k
+            end if
+          enddo
+          ! Check if clouds are detected
+          if (first_ind_cld == -1) then
+            cldepth = 0._rtype
+          else
+            cldepth = zt(j,last_ind_cld) - zt(j,first_ind_cld-1)
+          endif
+  
+          ! Calculate inv_tau_prec
+          if (cldepth < cldep_min ) then
+            inv_tau_prec =  0._rtype
+          else if (cldepth .ge. cldep_min .and. cldepth .le. cldep_max ) then
+            inv_tau_prec = ( (cldepth - cldep_min )/(cldep_max - cldep_min) ) / tau_ref
+            !print*,'inv_tau_prec = ',inv_tau_prec,', cldepth = ',cldepth
+          else if (cldepth > cldep_max ) then
+            inv_tau_prec = 1._rtype / tau_ref 
+          end if  
+ 
+          ! If cldepth depends on updraft:
+          !do i=1,mf_nup
+          !  ! If cloud depth (cldepth) < cldep_min (1500 m), tau_prec = 0
+          !  if (cldepth(i) < cldep_min ) then
+          !    tau_prec(i) = 0._rtype
+          !  else if (cldepth(i) .ge. cldep_min .and. cldepth(i) .le. cldep_max ) then
+          !    tau_prec(i) = ( (cldepth(i) - cldep_min )/(cldep_max - cldep_min) ) / tau_ref
+          !    print*,'tau_prec = ',tau_prec,', cldepth = ',cldepth(i)
+          !  else if (cldepth(i) > cldep_max ) then
+          !    tau_prec(i) = 1._rtype / tau_ref 
+          !  end if
+          !enddo
+        end if !do_precip
+
+        ! Loop through number of updrafts mf_nup
+         do i=1,mf_nup
+           ! wlv = w_min_i
+           wlv = wmin + (wmax-wmin) / (real(mf_nup)) * (real(i)-1._rtype)
+           ! wtv = w_max_i
+           wtv = wmin + (wmax-wmin) / (real(mf_nup)) * real(i)
+
+           ! Surface vertical velocity of updraft i: w_i
+           upw(1,i) = 0.5_rtype * (wlv+wtv)
+           ! Surface area of updraft i: a_i
+           upa(1,i) = 0.5_rtype * erf( wtv/(sqrt(2._rtype)*sigmaw) ) &
+                      - 0.5_rtype * erf( wlv/(sqrt(2._rtype)*sigmaw) )
+
+           upu(1, i) = u(j,1)
+           upv(1, i) = v(j,1)
+
+           upqt(1,i)  = qt(j,1)  + 0.32_rtype * upw(1,i) * sigmaqt/sigmaw
+           upthv(1,i) = thv(j,1) + 0.58_rtype * upw(1,i) * sigmath/sigmaw
+           upthl(1,i) = upthv(1,i) / (1._rtype+eps*upqt(1,i))
+           
+           upqv(1,i)  = upqt(1,i)
+           
+           if (do_condensation) then
+                iexh = (1.e5_rtype / p(j,1))**(rgas/cp)
+                call condensation_mf(upqt(1,i), upthl(1,i), p(j,1), iexh, &
+                                     thvn, qcn, thn, qln, qin, qsn, Ltot)
+                upthv(1,i) = thvn
+                upqc(1,i) = qcn
+                upql(1,i) = qln
+                upqi(1,i) = qin
+                upqs(1,i) = qsn
+                upth(1,i) = thn
+                upLtot(1,i) = Ltot
+           else
+                upqc(1,i) = 0._rtype
+                upql(1,i) = 0._rtype
+                upqi(1,i) = 0._rtype
+                upqs(1,i) = 0._rtype
+                upth(1,i)  = upthl(1,i)
+                ! even if there is no condensation Ltot was calculated as a function of T instead of being equal just to lcond 
+                upLtot(1,i) = lcond  
+           end if
+
+         enddo
+                    
+         ! Integrate updrafts
+         do i=1,mf_nup
+           do k=2,nzi
+
+            ! Inverse of Exner function
+            ! We should be using the Exner function from SHOC (one calculated in shoc_intr.F). Fix this soon
+            iexh = (1.e5_rtype / p(j,k))**(rgas/cp)
+
+             if (tke(j,k-1) == 0.0004_rtype) then
+                tke(j,k-1) = 0._rtype
+             endif                                       
+             ! Original
+             if (do_entr_tke) then
+                ! New entrainment approximation
+                eturb = 1._rtype + mf_c*sqrt(tke(j,k-1))/upw(k-1,i)
+                !print*,'real(mf_nup)*upa(k-1,i) = ',real(mf_nup)*upa(k-1,i)
+                !eturb = sqrt(1._rtype + 2._rtype*tke(j,k-1)/(real(mf_nup)*upa(k-1,i)*(upw(k-1,i)**2._rtype)))
+                entexp = exp(-ent(k-1,i)*eturb*dzt(k-1))
+             else
+                entexp = exp(-ent(k-1,i)*dzt(k-1))
+             end if
+             
+             entexpu  = exp( -ent(k-1,i)*dzt(k-1)/3._rtype)
+             un   = u(j,k-1)  *(1._rtype-entexpu) + upu  (k-1,i)*entexpu
+             vn   = v(j,k-1)  *(1._rtype-entexpu) + upv  (k-1,i)*entexpu
+
+             ! If do_precip == true, then include autoconversion in qt and thetal  
+             ! following Suselj et al 2019. Equations 15, B8 and B9. 
+             if (do_precip) then
+               entexpqt = exp( -dzt(k-1)*inv_tau_prec/upw(k-1,i) ) 
+
+               ! Check if H(qc-q0)>0 -> 1 or H(qc-q0) <= 0 -> 0
+               if ( (upqc(k-1,i) - acc_thres) > 0._rtype ) then
+                 ! Autoconversion occurs
+                 qtn  = qt(j,k-1) *(1._rtype-entexp ) + upqt (k-1,i)*entexp &
+                        - (upqc(k-1,i) - acc_thres)*(1._rtype - entexpqt) 
+                 thln = thl(j,k-1)*(1._rtype-entexp ) + upthl(k-1,i)*entexp &
+                        + (upLtot(k-1,i)*iexh/cp)*(upqc(k-1,i) - acc_thres)*(1._rtype - entexpqt)  
+                 ! Autoconversion term (eq 15) which will be needed for Rain rate term (eq 18)
+                 ! Calculating it here for efficiency (one less loop/if block). Note that Sac(nzi)=0
+                 Sac(k-1,i) = - (upqc(k-1,i) - acc_thres)*inv_tau_prec          
+               else
+                 ! Only entrainment process
+                 qtn  = qt(j,k-1) *(1._rtype-entexp ) + upqt (k-1,i)*entexp
+                 thln = thl(j,k-1)*(1._rtype-entexp ) + upthl(k-1,i)*entexp
+                 Sac(k-1,i) = 0._rtype
+                end if
+             else
+               ! There is no autoconversion, thus only process is entrainment
+               qtn  = qt(j,k-1) *(1._rtype-entexp ) + upqt (k-1,i)*entexp
+               thln = thl(j,k-1)*(1._rtype-entexp ) + upthl(k-1,i)*entexp
+               Sac(k-1,i) = 0._rtype
+             endif
+
+
+             !qtn  = qt(j,k-1) *(1._rtype-entexp ) + upqt (k-1,i)*entexp
+             !thln = thl(j,k-1)*(1._rtype-entexp ) + upthl(k-1,i)*entexp
+              
+             ! Condensation within updrafts, input/output at full levels:
+             if (do_condensation) then
+                call condensation_mf(qtn, thln, p(j,k), iexh, &
+                                    thvn, qcn, thn, qln, qin, qsn, Ltot)
+             else
+                thvn = thln*(1._rtype+eps*qtn)
+                ! MJC (05/16/24) thn is theta, this seems incorrect, as thln is thetal and theta != thetal
+                thn = thln                    ! THIS NEEEDS TO BE FIXED!! CALCULATED CORRECTLY
+                qcn = 0._rtype
+                qin = 0._rtype
+                qln = 0._rtype
+                qsn = 0._rtype
+                Ltot = lcond
+             end if
+
+             ! To avoid singularities w equation has to be computed diferently if wp==0
+             B=ggr*(0.5_rtype*(thvn+upthv(k-1,i))/thv(j,k-1)-1._rtype)
+
+             if (do_entr_tke) then
+             
+                if (do_explicit) then
+                   
+                   enturb = 2._rtype*wb*ent(k-1,i)*dzt(k-1)
+                   
+                   ! Limiter
+                   if (enturb > 1._rtype) then
+                      ! we force enturb = 1
+                      wn2 = -mf_c*upw(k-1,i)*sqrt(tke(j,k-1))+ 2._rtype*wa*B*dzt(k-1)
+                   else
+                      wn2 = (upw(k-1,i)**2._rtype)*(1._rtype - enturb)&
+                         - enturb*mf_c*upw(k-1,i)*sqrt(tke(j,k-1))+ 2._rtype*wa*B*dzt(k-1)
+                   end if
+                   
+                elseif (do_integral) then
+                   wp_integral = wb*ent(k-1,i)*eturb !eturb = (1 + mf_c*sqrt(tke(j,k-1))/upw(k-1,i))
+                   
+                   if (wp_integral==0._rtype) then
+                      wn2 = upw(k-1,i)**2._rtype+2._rtype*wa*B*dzt(k-1)
+                   else
+                      entw = exp(-2._rtype*wp_integral*dzt(k-1))
+                      wn2 = entw*upw(k-1,i)**2._rtype+(wa*B/wp_integral)*(1._rtype-entw)
+                   end if 
+                
+                elseif (do_implicit) then
+                   call endscreamrun('integrate_mf: do_implicit=.true. but the implicit w^2 scheme is not implemented. Set edmf_do_implicit=.false. in the namelist.')
+                end if
+                   
+             else
+                ! Original code
+                wp = wb*ent(k-1,i)
+                if (wp==0._rtype) then
+                   wn2 = upw(k-1,i)**2._rtype+2._rtype*wa*B*dzt(k-1)
+                else
+                   entw = exp(-2._rtype*wp*dzt(k-1))
+                   wn2 = entw*upw(k-1,i)**2._rtype+wa*B/(wb*ent(k-1,i))*(1._rtype-entw)
+                end if   
+             end if
+    
+             if (wn2>0._rtype) then
+               upw(k,i)   = sqrt(wn2)
+               upthv(k,i) = thvn
+               upthl(k,i) = thln
+               upqt(k,i)  = qtn
+               upqc(k,i)  = qcn
+               upu(k,i)   = un
+               upv(k,i)   = vn
+               upa(k,i)   = upa(k-1,i)
+               upth(k,i)  = thn
+               upql(k,i)  = qln
+               upqi(k,i)  = qin
+               upqs(k,i)  = qsn
+               upqv(k,i)  = qtn - qcn
+               upLtot(k,i) = Ltot
+             else
+               exit
+             end if
+
+           enddo  ! i=1,mf_nup
+         enddo    ! k=2,nzi
+
+         ! Calculate Rain Rate term from top to bottom
+         ! FIX QS and CHECK IF QS > 0 FIRST TO NOT DIVIDE BY 0
+         if (do_precip) then
+           do i=1,mf_nup
+             do k=nzi-1,1,-1
+               if (upqs(k+1,i) > 0._rtype) then
+                 Sev(k+1,i) = max( kev*(1._rtype - upqv(k+1,i)/upqs(k+1,i))*sqrt(RRun(k+1,i)), 0._rtype ) 
+               else
+                 Sev(k+1,i) = 0._rtype
+               endif
+               ! note that dzt(k) and not dzt(k+1)!
+               ! RRun(top) = 0 (initialized at the beginning of subroutine)
+               RRun(k,i)  = RRun(k+1,i) + (zi(j,k)-zi(j,k+1))*rho_zi(j,k)*( Sac(k+1,i)*(1._rtype-frain_det) + Sev(k+1,i) )
+               ! Limiter in case RRun < 0 due to strong evaporation
+               if (RRun(k,i) < 0._rtype) then
+                RRun(k,i) = 0._rtype
+               endif
+               Smel(k,i)  = RRun(k+1,i)*iexh*(upLtot(k+1,i)-upLtot(k,i))/(dzt(k)*cp*rho_zi(j,k))
+             enddo
+           enddo
+         endif
+
+         ! Calculate the total source terms (eq 20 and 21)
+         if (do_precip) then
+          do i=1,mf_nup
+           do k=1,nzi
+            Sthl(k,i) = - upLtot(k,i)*iexh*( Sac(k,i) + Sev(k,i) )/cp + Smel(k,i)
+            Sqt(k,i)  = Sac(k,i) + Sev(k,i)
+           enddo
+          enddo
+         endif
+ 
+
+         ! writing updraft properties for output
+         ! all variables, except areas (moist_a and dry_a) are now multipled by the area
+         do k=1,nzi
+
+           ! first sum over all i-updrafts
+           do i=1,mf_nup
+             if (upqc(k,i) > 0._rtype) then
+               moist_a(j,k)   = moist_a(j,k)   + upa(k,i)
+               moist_w(j,k)   = moist_w(j,k)   + upa(k,i)*upw(k,i)
+               moist_qt(j,k)  = moist_qt(j,k)  + upa(k,i)*upqt(k,i)
+               moist_thl(j,k) = moist_thl(j,k) + upa(k,i)*upthl(k,i)
+               moist_th(j,k)  = moist_th(j,k)  + upa(k,i)*upth(k,i)
+               moist_u(j,k)   = moist_u(j,k)   + upa(k,i)*upu(k,i)
+               moist_v(j,k)   = moist_v(j,k)   + upa(k,i)*upv(k,i)
+               moist_qc(j,k)  = moist_qc(j,k)  + upa(k,i)*upqc(k,i)
+             else
+               dry_a(j,k)     = dry_a(j,k)     + upa(k,i)
+               dry_w(j,k)     = dry_w(j,k)     + upa(k,i)*upw(k,i)
+               dry_qt(j,k)    = dry_qt(j,k)    + upa(k,i)*upqt(k,i)
+               dry_thl(j,k)   = dry_thl(j,k)   + upa(k,i)*upthl(k,i)
+               dry_th(j,k)    = dry_th(j,k)    + upa(k,i)*upth(k,i)
+               dry_u(j,k)     = dry_u(j,k)     + upa(k,i)*upu(k,i)
+               dry_v(j,k)     = dry_v(j,k)     + upa(k,i)*upv(k,i)
+             endif
+           enddo
+
+           if ( dry_a(j,k) > 0._rtype ) then
+             dry_w(j,k)   = dry_w(j,k)   / dry_a(j,k)
+             dry_qt(j,k)  = dry_qt(j,k)  / dry_a(j,k)
+             dry_thl(j,k) = dry_thl(j,k) / dry_a(j,k)
+             dry_th(j,k)  = dry_th(j,k)  / dry_a(j,k)
+             dry_u(j,k)   = dry_u(j,k)   / dry_a(j,k)
+             dry_v(j,k)   = dry_v(j,k)   / dry_a(j,k)
+           else
+             dry_w(j,k)   = 0._rtype
+             dry_qt(j,k)  = 0._rtype
+             dry_thl(j,k) = 0._rtype
+             dry_th(j,k)  = 0._rtype
+             dry_u(j,k)   = 0._rtype
+             dry_v(j,k)   = 0._rtype
+           endif
+
+           if ( moist_a(j,k) > 0._rtype ) then
+             moist_w(j,k)   = moist_w(j,k)   / moist_a(j,k)
+             moist_qt(j,k)  = moist_qt(j,k)  / moist_a(j,k)
+             moist_thl(j,k) = moist_thl(j,k) / moist_a(j,k)
+             moist_th(j,k)  = moist_th(j,k)  / moist_a(j,k)
+             moist_u(j,k)   = moist_u(j,k)   / moist_a(j,k)
+             moist_v(j,k)   = moist_v(j,k)   / moist_a(j,k)
+             moist_qc(j,k)  = moist_qc(j,k)  / moist_a(j,k)
+           else
+             moist_w(j,k)   = 0._rtype
+             moist_qt(j,k)  = 0._rtype
+             moist_thl(j,k) = 0._rtype
+             moist_th(j,k)  = 0._rtype
+             moist_u(j,k)   = 0._rtype
+             moist_v(j,k)   = 0._rtype
+             moist_qc(j,k)  = 0._rtype
+           endif
+             
+         enddo
+
+         do k=1,nzi
+           do i=1,mf_nup
+             ae  (j,k) = ae  (j,k) - upa(k,i)
+             aw  (j,k) = aw  (j,k) + upa(k,i)*upw(k,i)
+             awu (j,k) = awu (j,k) + upa(k,i)*upw(k,i)*upu(k,i)
+             awv (j,k) = awv (j,k) + upa(k,i)*upw(k,i)*upv(k,i)
+             awthv(j,k)= awthv(j,k)+ upa(k,i)*upw(k,i)*upthv(k,i)
+             awthl(j,k)= awthl(j,k)+ upa(k,i)*upw(k,i)*upthl(k,i) !*cpair/iexh
+             awth(j,k) = awth(j,k) + upa(k,i)*upw(k,i)*upth(k,i) !*cpair/iexh
+             awqt(j,k) = awqt(j,k) + upa(k,i)*upw(k,i)*upqt(k,i)
+             awqc(j,k) = awqc(j,k) + upa(k,i)*upw(k,i)*upqc(k,i)             
+             awqv(j,k) = awqv(j,k) + upa(k,i)*upw(k,i)*upqv(k,i)
+             awql(j,k) = awql(j,k) + upa(k,i)*upw(k,i)*upql(k,i)
+             awqi(j,k) = awqi(j,k) + upa(k,i)*upw(k,i)*upqi(k,i)
+             auSthl(j,k) = auSthl(j,k) + upa(k,i)*Sthl(k,i)
+             auSqt(j,k)  = auSqt(j,k)  + upa(k,i)*Sqt(k,i)
+             auRRun(j,k) = auRRun(j,k)  + upa(k,i)*RRun(k,i)
+           enddo
+         enddo
+
+         ! MJC: Calculate cold pool convective velocity scale
+         ! it's missing a_cp
+         if (do_precip) then
+           !mf_w_cp(j) = ( mf_w_cp_old + auRRun(j,1)*dt*mf_a_wcp ) / (1 + dt/mf_tau_wcp)  ! tau_cp = 4*3600 = 14400._rtype
+          mf_w_cp(j) = mf_w_cp_help(nstep_mff_help);
+          ! (auRRun(j,1)*0.001) converts auRRun from mm/s to meters/s 
+          mf_a_wcp_local =  (1.0_rtype + dt/(mf_tau_wcp*3600.0_rtype))/(dt*2.778e-7_rtype)
+          !mf_w_cp_help(nstep_mff_help+1) = ( mf_w_cp_help(nstep_mff_help) + (auRRun(j,1)*0.001_rtype)*dt*mf_a_wcp_local ) / (1.0_rtype + dt/(mf_tau_wcp*3600.0_rtype))  ! 
+          !mf_w_cp_help(nstep_mff_help+1) = ( mf_w_cp_help(nstep_mff_help) + (auRRun(j,1)*0.001_rtype)*dt/(mf_tau_wcp*3600.0_rtype) ) / (1 + dt/(mf_tau_wcp*3600.0_rtype))  ! tau_cp = 4*3600 = 14400._rtype
+          
+          !mf_w_cp_help(nstep_mff_help+1) = ( mf_w_cp_help(nstep_mff_help) + (auRRun(j,1)*0.001_rtype)*dt*mf_a_wcp ) / (1.0_rtype + dt/(mf_tau_wcp*3600.0_rtype))  ! tau_cp = 4*3600 = 14400._rtype 
+          mf_w_cp_help(nstep_mff_help+1) = ( mf_w_cp_help(nstep_mff_help) + auRRun(j,1)*dt ) / (1.0_rtype + dt/(mf_tau_wcp*3600.0_rtype))  ! tau_cp = 4*3600 = 14400._rtype
+
+         endif 
+
+         ! Find highest vertical level where the plume ensemble is dry (i.e., moist_qc = 0)
+         check  = .true. 
+         plume_dry_height(j) = 0._rtype
+         index_top = 1
+         do k=1,nzi
+            if (check .and. aw(j,k) > 0._rtype .and. moist_qc(j,k) .EQ. 0._rtype) then
+               plume_dry_height(j) = zi(j,k)
+               index_top = k
+            else
+               check = .false.  
+            endif
+         enddo
+         
+         ! Highest vertical level reached by the moist plumes 
+         !(analyzed from the top of the dry CBL given by plume_dry_height)
+         check  = .true. 
+         plume_top_height(j) = 0._rtype
+         do k=index_top+1,nzi
+            if (check .and. aw(j,k) > 0._rtype .and. moist_qc(j,k) > 0._rtype) then
+               plume_top_height(j) = zi(j,k)
+            else
+               check = .false.  
+            endif
+         enddo
+        
+         !print*,'plume_dry_height = ',plume_dry_height(j)
+         !print*,'plume_top_height = ',plume_top_height(j)
+
+         ! Check CLF condition on mass-flux (aw)
+         do k=1,nz
+           cfl_zt = (2._rtype/dt)*rho_zt(j,k)*dz_zt(j,k)
+           if (zi(j,k) < ztop(j)*1.5_rtype) then
+              if (aw(j,k) > (cfl_zt/rho_zi(j,k)) ) then
+                 !print*,'WARNING: aw > CFL'
+                 !print*,'aw(j,k) = ',aw(j,k)
+                 !print*,'CFL = ',cfl_zt/rho_zi(j,k)
+                 !print*,'k index = ',k
+              endif
+                            
+           endif
+           cfl(j,k) = cfl_zt/rho_zi(j,k)   
+         enddo
+         
+       end if  ! ( wthv > 0.0 )
+
+       if (ANY(dry_a  (j,:)>0._rtype)) freq_dry(j)   = 1._rtype
+       if (ANY(moist_a(j,:)>0._rtype)) freq_moist(j) = 1._rtype
+     end do ! j=1,shcol
+
+     ! flip output variables so index 1 = model top (i.e. lowest pressure)
+     do k=1,nzi
+       dry_a_out(:,nzi-k+1) = dry_a(:,k)
+       dry_w_out(:,nzi-k+1) = dry_w(:,k)
+       dry_qt_out(:,nzi-k+1) = dry_qt(:,k)
+       dry_thl_out(:,nzi-k+1) = dry_thl(:,k)
+       dry_u_out(:,nzi-k+1) = dry_u(:,k)
+       dry_v_out(:,nzi-k+1) = dry_v(:,k)
+
+       moist_a_out(:,nzi-k+1) = moist_a(:,k)
+       moist_w_out(:,nzi-k+1) = moist_w(:,k)
+       moist_qt_out(:,nzi-k+1) = moist_qt(:,k)
+       moist_thl_out(:,nzi-k+1) = moist_thl(:,k)
+       moist_u_out(:,nzi-k+1) = moist_u(:,k)
+       moist_v_out(:,nzi-k+1) = moist_v(:,k)
+       moist_qc_out(:,nzi-k+1) = moist_qc(:,k)
+
+       ae_out(:,nzi-k+1) = ae(:,k)
+       aw_out(:,nzi-k+1) = aw(:,k)
+       awthv_out(:,nzi-k+1) = awthv(:,k)
+       awthl_out(:,nzi-k+1) = awthl(:,k)
+       awqt_out(:,nzi-k+1) = awqt(:,k)
+       awql_out(:,nzi-k+1) = awql(:,k)
+       awqi_out(:,nzi-k+1) = awqi(:,k)
+       awu_out(:,nzi-k+1) = awu(:,k)
+       awv_out(:,nzi-k+1) = awv(:,k)
+       auSthl_out(:,nzi-k+1) =  auSthl(:,k) 
+       auSqt_out(:,nzi-k+1) =  auSqt(:,k) 
+       auRRun_out(:,nzi-k+1) =  auRRun(:,k) 
+
+       !thlflx_out(:,nzi-k+1) = thlflx(:,k)
+       !qtflx_out(:,nzi-k+1) = qtflx(:,k)
+     end do
+
+
+  end subroutine integrate_mf
+
+
+
+                       
+  subroutine oneplume( nz, nzi, zi, dzt, ent, p, qt, thl, thv,   &
+                       thv_zi, wmax, wmin, sigmaw, sigmaqt, sigmath, wa, wb, &
+                       do_condensation, plumeheight )
+  !**********************************************************************
+  ! Calculate a single plume with zero entrainment
+  ! to be used for a dynamic mixing length calculation
+  ! By Rachel Storer
+  !**********************************************************************
+
+    integer,  intent(in)                    :: nz, nzi
+
+    real(rtype), intent(in)                 :: wmax, wmin, sigmaw, sigmaqt, sigmath, wa, wb
+
+    real(rtype), dimension(nz),  intent(in) ::  dzt, qt, thl, thv, ent
+    real(rtype), dimension(nzi), intent(in) ::  zi, p, thv_zi
+
+                                                      
+    logical, intent(in)                       :: do_condensation
+
+    real(rtype), intent(inout) :: plumeheight
+     
+    !local variables
+    integer                        :: k
+    real(rtype)                    :: thvn, qtn, thln, qcn, thn, qln, qin, qsn, wn2
+    real(rtype)                    :: Ltot ! this is an output of condensation_mf() but not used in oneplume()
+    real(rtype)                    :: iexh, entexp, entexpu, wp, entw
+    real(rtype), dimension(nzi)    :: upw, upa, upqt, upthv, upthl, upth, &
+                                      upqc, upql, upqi, b, thvflx
+                                      
+        
+
+    thvflx  = 0._rtype
+    b     = 0._rtype
+    upw   = 0._rtype
+    upthl = 0._rtype
+    upthv = 0._rtype
+    upqt  = 0._rtype
+    upa   = 0._rtype
+    upqc  = 0._rtype
+    upth  = 0._rtype
+    upql  = 0._rtype
+    upqi  = 0._rtype
+    Ltot  = 0._rtype
+
+    upw(1) = 0.5_rtype * (wmax+wmin)
+    upa(1) = 0.5_rtype * erf( wmax/(sqrt(2.5_rtype)*sigmaw) ) &
+                      - 0.5_rtype * erf( wmin/(sqrt(2._rtype)*sigmaw) )
+  
+    upqt(1)  = qt(1)  + 0.32_rtype * upw(1) * sigmaqt/sigmaw
+    upthv(1) = thv(1) + 0.58_rtype * upw(1) * sigmath/sigmaw
+           
+    upthl(1) = upthv(1) / (1._rtype+eps*upqt(1))
+    upth(1)  = upthl(1)
+  
+    ! get cloud, lowest momentum level 
+    if (do_condensation) then
+      iexh = (1.e5_rtype / p(1))**(rgas/cp)
+      call condensation_mf(upqt(1), upthl(1), p(1), iexh, &
+                           thvn, qcn, thn, qln, qin, qsn, Ltot)
+      upthv(1) = thvn
+      upqc(1)  = qcn
+      upql(1)  = qln
+      upqi(1)  = qin
+      upth(1)  = thn
+    else
+      ! assume no cldliq
+      upthv(1) = upthl(1)*(1._rtype+eps*upqt(1))
+      upth(1)  = upthl(1)
+
+    end if
+  
+    do k=2,nzi
+   
+      entexp  = exp(-ent(k-1)*dzt(k-1))
+      entexpu = exp(-ent(k-1)*dzt(k-1)/3._rtype)
+              
+      ! integrate updraft
+      qtn  = qt(k-1) *(1._rtype-entexp ) + upqt (k-1)*entexp
+      thln = thl(k-1)*(1._rtype-entexp ) + upthl(k-1)*entexp
+                      
+      ! get cloud, momentum levels
+      if (do_condensation) then
+        iexh = (1.e5_rtype / p(k))**(rgas/cp)
+        call condensation_mf(qtn, thln, p(k), iexh, &
+                             thvn, qcn, thn, qln, qin, qsn, Ltot)
+      else
+        thvn = thln*(1._rtype+eps*qtn)
+        thn = thln                       ! THIS NEEEDS TO BE FIXED!! CALCULATED CORRECTLY
+        qcn = 0._rtype
+        qin = 0._rtype
+        qln = 0._rtype
+      end if
+      ! get buoyancy
+      b(k)=ggr*(0.5_rtype*(thvn+upthv(k-1))/thv(k-1)-1._rtype)
+      wp = wb*ent(k-1)
+      if (wp==0._rtype) then
+         wn2 = upw(k-1)**2._rtype+2._rtype*wa*b(k)*dzt(k-1)
+      else
+         entw = exp(-2._rtype*wp*dzt(k-1))
+         wn2 = entw*upw(k-1)**2._rtype+wa*b(k)/(wb*ent(k-1))*(1._rtype-entw)
+      endif   
+  
+      if (wn2>0._rtype) then
+        upw(k)   = sqrt(wn2)
+        upthv(k) = thvn
+        upthl(k) = thln
+        upqt(k)  = qtn
+        upqc(k)  = qcn
+        upa(k)   = upa(k-1)
+        upql(k)  = qln
+        upqi(k)  = qin
+        upth(k)  = thn
+        plumeheight = zi(k)
+      else
+        exit
+      end if
+      
+    enddo
+     
+
+  end subroutine oneplume
+  
+
+
+  subroutine condensation_mf( qt, thl, p, iex, thv, qc, th, ql, qi, qs, Ltot)
+  !
+  ! zero or one condensation for edmf: calculates thv and qc
+  !
+      ! use wv_saturation,      only : qsat
+
+       real(rtype),intent(in) :: qt,thl,p,iex
+       real(rtype),intent(out):: thv,qc,th,ql,qi,qs,Ltot
+
+       !local variables
+       integer :: niter,i
+       real(rtype) :: diff,t,qcold,es
+       ! ice_wt is the ICE weight returned by get_Ltot_rl:
+       !   ice_wt = 0 at T >= 273.15 K (all liquid)
+       !   ice_wt = 1 at T <= 253.15 K (all ice)
+       !   linear in between. Liquid fraction is (1 - ice_wt).
+       real(rtype) :: ice_wt
+
+       ! max number of iterations
+       niter=50
+       ! minimum difference
+       diff=2.e-5_rtype
+
+       qc=0._rtype
+       t=thl/iex
+
+  !by definition:
+  ! T   = Th*Exner, Exner=(p/p0)^(R/cp)   (1)
+  ! Thl = Th - L/cp*ql/Exner              (2)
+  !so:
+  ! Th  = Thl + L/cp*ql/Exner             (3)
+  ! T   = Th*Exner=(Thl+L/cp*ql/Exner)*Exner    (4)
+  !     = Thl*Exner + L/cp*ql
+       do i=1,niter
+         call get_Ltot_rl(t,Ltot,ice_wt)
+         t = thl/iex+Ltot/cp*qc   !as in (4)
+
+         ! qsat, p is in pascal (check!)
+         call qsat(t,p,es,qs)
+         qcold = qc
+         qc = max(0.5_rtype*qc+0.5_rtype*(qt-qs),0._rtype)
+         if (abs(qc-qcold)<diff) exit
+       enddo
+
+       ! Update T and calculate the other variables
+       call get_Ltot_rl(t,Ltot,ice_wt)
+       t = thl/iex+Ltot/cp*qc
+       thv = (thl+Ltot/cp*iex*qc)*(1.+eps*(qt-qc)-qc)
+       th = t*iex
+       ! ice_wt returned from get_Ltot_rl is the ice fraction (1 at cold T, 0 at warm T).
+       ! Split total condensate qc into liquid and ice accordingly.
+       qi = qc*ice_wt
+       ql = qc*(1._rtype - ice_wt)
+
+       ! Save qs needed for precip evaporation Sev term
+       call qsat(t,p,es,qs)
+
+  end subroutine condensation_mf
+  ! MJ/Kay: The subroutine get_Ltot_rl outputs the total latent heat of vaporization 
+  !i.e. taking into account liquid and ice phases if temperature is below freezing.
+  ! This subroutine was adapted from the one in wv_saturation.F90 called calc_hltalt()    
+  subroutine get_Ltot_rl(t, hltalt, weight)
+    !------------------------------------------------------------------!
+    ! Purpose:                                                         !
+    !   Calculate latent heat of vaporization of water at a given      !
+    !   temperature, taking into account the ice phase if temperature  !
+    !   is below freezing.                                             !
+    !   Optional argument also calculates a term used to calculate     !
+    !   d(es)/dT within the water-ice transition range.                !
+    !------------------------------------------------------------------!
+  
+    ! Inputs
+    real(rtype), intent(in) :: t        ! Temperature
+    ! Outputs
+    real(rtype), intent(out) :: hltalt  ! Appropriately modified hlat
+    real(rtype), intent(out) :: weight  ! Weight for es transition from water to ice
+
+  
+    ! Local variables
+    real(rtype) :: tc      ! Temperature in degrees C
+    real(rtype) :: ttrice = 20.00_rtype  ! transition range from es over H2O to es over ice in C
+    real(rtype) :: tmelting = 273.15_rtype ! freezing T of fresh water          ~ K
+
+    ! Loop iterator
+    integer :: i
+    
+    weight = 0.0_rtype
+    ! At the top of SHOCs module we added: use wv_saturation, only : qsat, no_ip_hltalt
+    ! Subroutine no_ip_hltalt calculates latent heat of vaporization of pure liquid water at a given T
+    !instead of just assuming the latent heat of evaporation at 100C
+    call no_ip_hltalt(t,hltalt)
+
+    if (t < tmelting) then
+       ! Weighting of hlat accounts for transition from water to ice.
+       tc = t - tmelting
+  
+       if (tc >= -ttrice) then
+          weight = -tc/ttrice  
+       else
+          weight = 1.0_rtype
+       end if
+  
+       hltalt = hltalt + weight*lice 
+  
+    end if
+  
+  end subroutine get_Ltot_rl
+
+  subroutine calc_mf_vertflux(shcol,nlev,nlevi,aw,awvar,var,var_zi,varflx)
+
+    implicit none
+
+  ! INPUT VARIABLES
+    ! number of SHOC columns
+    integer, intent(in) :: shcol
+    ! number of midpoint levels
+    integer, intent(in) :: nlev
+    ! number of interface levels
+    integer, intent(in) :: nlevi
+    ! Sum plume (a_i*w_i) [m/s]
+    real(rtype), intent(in) :: aw(shcol,nlevi)
+    ! Sum plume vertical flux of generic variable var (a_i*w_i*var_i) [units vary]
+    real(rtype), intent(in) :: awvar(shcol,nlevi)
+    ! Input variable on thermo/full grid [units vary]
+    real(rtype), intent(in) :: var_zi(shcol,nlevi) ! NOTE: var is interpolated to zi, so has dim nzi
+    real(rtype), intent(in) :: var(shcol,nlev)
+
+  ! OUTPUT VARIABLE
+    real(rtype), intent(out) :: varflx(shcol,nlevi)
+
+  ! INTERNAL VARIABLES
+    integer :: i,k
+
+    ! MKW TODO: SHOC has separate subroutines for lower (k=nlevi) and
+    !   upper (k=1) boundary conditions. Make these later if SCREAM
+    !   folks want that. Should be very quick.
+
+    ! diagnose MF fluxes
+    varflx(:shcol,1) = 0._rtype
+    do k=2,nlev
+      do i=1,shcol
+        varflx(i,k)= awvar(i,k) - aw(i,k)*0.5*(var(i,k-1)+var(i,k)) ! centered differences
+        !varflx(i,k)= awvar(i,k) - aw(i,k)*var(i,k) ! upwind scheme (in reference to the surface)
+        !varflx(i,k)= awvar(i,k) - aw(i,k)*var(i,k-1) ! downwind scheme (in reference to the surface)
+        !varflx(i,k)= awvar(i,k) - aw(i,k)*var_zi(i,k)
+
+      end do
+    end do
+    varflx(:shcol,nlevi) = 0._rtype
+    
+  end subroutine calc_mf_vertflux
+
+  subroutine compute_tmpi3(nlevi, shcol, dtime, rho_zi, tmpi3)
+
+    !intent-ins
+    integer,     intent(in) :: nlevi, shcol
+    !time step [s]
+    real(rtype), intent(in) :: dtime
+    !air density at interfaces [kg/m3]
+    real(rtype), intent(in) :: rho_zi(shcol,nlevi)
+
+    !intent-out
+    real(rtype), intent(out) :: tmpi3(shcol,nlevi)
+
+    !local vars
+    integer :: i, k
+
+    tmpi3(:,1) = 0._rtype
+    ! eqn: tmpi3 = dt*g*rho
+    do k = 2, nlevi
+      do i = 1, shcol
+         tmpi3(i,k) = dtime *  ggr*rho_zi(i,k)
+      enddo
+    enddo
+
+  end subroutine compute_tmpi3
+
 
 !==============================================================
 ! Define grid variables needed for the parameterization
@@ -796,6 +2977,8 @@ subroutine update_prognostics_implicit( &
          zt_grid,zi_grid,tk,tkh,&         ! Input
          uw_sfc,vw_sfc,wthl_sfc,wqw_sfc,& ! Input
          wtracer_sfc,&                    ! Input
+         do_mf,mf_ae,mf_aw,mf_awu,mf_awv,&! EDMF Input
+         mf_awthl,mf_awqt,&               ! EDMF Input         
          thetal,qw,tracer,tke,&           ! Input/Output
          u_wind,v_wind)                   ! Input/Output
 
@@ -841,6 +3024,22 @@ subroutine update_prognostics_implicit( &
   real(rtype), intent(in) :: zt_grid(shcol,nlev)
   ! heights at interfaces [m]
   real(rtype), intent(in) :: zi_grid(shcol,nlevi)
+  
+  ! MJC: EDMF inputs
+  ! If .true., diagnose MF plumes and include in vertical diffusion solver
+  logical, intent(in) ::  do_mf
+  ! Fractional area of of nonconvective environment
+  real(rtype), intent(in) :: mf_ae(shcol,nlevi)
+  ! MF plume sum(a_i*w_i)
+  real(rtype), intent(in) :: mf_aw(shcol,nlevi)
+  ! Total MF plume u turbulent flux
+  real(rtype), intent(in) :: mf_awu(shcol,nlevi)
+  ! Total MF plume v turbulent flux
+  real(rtype), intent(in) :: mf_awv(shcol,nlevi)
+  ! Total MF plume theta_l turbulent flux
+  real(rtype), intent(in) :: mf_awthl(shcol,nlevi)
+  ! Total MF plume q_t turbulent flux
+  real(rtype), intent(in) :: mf_awqt(shcol,nlevi)
 
 ! IN/OUT VARIABLES
   ! liquid water potential temperature [K]
@@ -867,9 +3066,17 @@ subroutine update_prognostics_implicit( &
   real(rtype) :: flux_dummy(shcol)
   real(rtype) :: ksrf(shcol), wtke_sfc(shcol)
 
-  real(rtype) :: du(shcol,nlev) ! Superdiagonal for solver
-  real(rtype) :: dl(shcol,nlev) ! Factorized subdiagonal for solver
-  real(rtype) :: d(shcol,nlev)  ! Factorized diagonal for solver
+!  real(rtype) :: du(shcol,nlev) ! Superdiagonal for solver
+!  real(rtype) :: dl(shcol,nlev) ! Factorized subdiagonal for solver
+!  real(rtype) :: d(shcol,nlev)  ! Factorized diagonal for solver
+
+! MJC: Variables for previous diffusion solver method (SCREAMv0)
+  real(rtype) :: ca(shcol,nlev) ! superdiagonal for solver
+  real(rtype) :: cc(shcol,nlev) ! subdiagonal for solver
+  real(rtype) :: denom(shcol,nlev) ! denominator in solver
+  real(rtype) :: ze(shcol,nlev)
+! MJC: For EDMF in diffusion solver
+  real(rtype) :: tmpi3(shcol,nlevi) 
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
   if (use_cxx) then
@@ -895,6 +3102,10 @@ subroutine update_prognostics_implicit( &
   !  at interfaces. Substitue dp = g*rho*dz in the above equation
   call compute_tmpi(nlevi, shcol, dtime, rho_zi, dz_zi, tmpi)
 
+  ! For MF component
+  tmpi3(:,1) = 0._rtype
+  call compute_tmpi3(nlevi, shcol, dtime, rho_zi, tmpi3)
+  
   ! compute 1/dp term, needed in diffusion solver
   call dp_inverse(nlev, shcol, rho_zt, dz_zt, rdp_zt)
 
@@ -910,36 +3121,72 @@ subroutine update_prognostics_implicit( &
                   wthl_sfc, wqw_sfc, wtke_sfc, wtracer_sfc, &
                   thetal(:,nlev), qw(:,nlev), tke(:,nlev), tracer(:,nlev,:))
 
-  ! Call decomp for momentum variables
+! MJC: Commenting this code that uses the Thomas factorization method.
+!  ! Call decomp for momentum variables
+!  call vd_shoc_decomp(shcol,nlev,nlevi,tk_zi,tmpi,rdp_zt,dtime,&
+!     ksrf,du,dl,d)
+!
+!  ! march u_wind one step forward using implicit solver
+!  call vd_shoc_solve(shcol,nlev,du,dl,d,u_wind)
+!
+!  ! march v_wind one step forward using implicit solver
+!  call vd_shoc_solve(shcol,nlev,du,dl,d,v_wind)
+!
+!  ! Call decomp for thermo variables
+!  flux_dummy(:) = 0._rtype ! fluxes applied explicitly, so zero fluxes out
+!                           ! for implicit solver decomposition
+!  call vd_shoc_decomp(shcol,nlev,nlevi,tkh_zi,tmpi,rdp_zt,dtime,&
+!     flux_dummy,du,dl,d)
+!
+!  ! march temperature one step forward using implicit solver
+!  call vd_shoc_solve(shcol,nlev,du,dl,d,thetal)
+!
+!  ! march total water one step forward using implicit solver
+!  call vd_shoc_solve(shcol,nlev,du,dl,d,qw)
+!
+!  ! march tke one step forward using implicit solver
+!  call vd_shoc_solve(shcol,nlev,du,dl,d,tke)
+!
+!  ! march tracers one step forward using implicit solver
+!  do p=1,num_tracer
+!    call vd_shoc_solve(shcol,nlev,du,dl,d,tracer(:shcol,:nlev,p))
+!  enddo
+
+
+! Call decomp for momentum variables
   call vd_shoc_decomp(shcol,nlev,nlevi,tk_zi,tmpi,rdp_zt,dtime,&
-     ksrf,du,dl,d)
+     ksrf,.false.,mf_ae,mf_aw,tmpi3,ca,cc,denom,ze)
 
   ! march u_wind one step forward using implicit solver
-  call vd_shoc_solve(shcol,nlev,du,dl,d,u_wind)
+  call vd_shoc_solve(shcol,nlev,nlevi,ca,cc,denom,ze,.false.,mf_awu,tmpi3,rdp_zt,u_wind)
 
   ! march v_wind one step forward using implicit solver
-  call vd_shoc_solve(shcol,nlev,du,dl,d,v_wind)
+  call vd_shoc_solve(shcol,nlev,nlevi,ca,cc,denom,ze,.false.,mf_awv,tmpi3,rdp_zt,v_wind)
 
-  ! Call decomp for thermo variables
+! Call decomp for thermo variables
   flux_dummy(:) = 0._rtype ! fluxes applied explicitly, so zero fluxes out
                            ! for implicit solver decomposition
   call vd_shoc_decomp(shcol,nlev,nlevi,tkh_zi,tmpi,rdp_zt,dtime,&
-     flux_dummy,du,dl,d)
-
+     flux_dummy,do_mf,mf_ae,mf_aw,tmpi3,ca,cc,denom,ze)
+     
   ! march temperature one step forward using implicit solver
-  call vd_shoc_solve(shcol,nlev,du,dl,d,thetal)
+  call vd_shoc_solve(shcol,nlev,nlevi,ca,cc,denom,ze,do_mf,mf_awthl,tmpi3,rdp_zt,thetal)
 
   ! march total water one step forward using implicit solver
-  call vd_shoc_solve(shcol,nlev,du,dl,d,qw)
+  call vd_shoc_solve(shcol,nlev,nlevi,ca,cc,denom,ze,do_mf,mf_awqt,tmpi3,rdp_zt,qw)
+
+  ! MKW: Call decomp one more time for TKE and tracers so they don't "see" MF plumes
+  call vd_shoc_decomp(shcol,nlev,nlevi,tkh_zi,tmpi,rdp_zt,dtime,&
+          flux_dummy,.false.,mf_ae,mf_aw,tmpi3,ca,cc,denom,ze)
 
   ! march tke one step forward using implicit solver
-  call vd_shoc_solve(shcol,nlev,du,dl,d,tke)
+  call vd_shoc_solve(shcol,nlev,nlevi,ca,cc,denom,ze,.false.,mf_aw,tmpi3,rdp_zt,tke)
 
   ! march tracers one step forward using implicit solver
   do p=1,num_tracer
-    call vd_shoc_solve(shcol,nlev,du,dl,d,tracer(:shcol,:nlev,p))
+    call vd_shoc_solve(shcol,nlev,nlevi,ca,cc,denom,ze,.false.,mf_aw,tmpi3,rdp_zt,tracer(:shcol,:nlev,p))
   enddo
-
+  
   return
 
 end subroutine update_prognostics_implicit
@@ -1157,13 +3404,17 @@ end subroutine sfc_fluxes
 subroutine diag_second_shoc_moments(&
          shcol,nlev,nlevi, &                    ! Input
          thetal,qw,u_wind,v_wind,tke, &         ! Input
-         isotropy,tkh,tk,&                      ! Input
+         isotropy,tkh,tk, &                     ! Input
          dz_zi,zt_grid,zi_grid,shoc_mix, &      ! Input
          wthl_sfc, wqw_sfc, uw_sfc, vw_sfc, &   ! Input
-         thl_sec,qw_sec,wthl_sec,wqw_sec,&      ! Output
+         do_mf, ae, aw, awthl, awqt, &          ! EDMF Input         
+         thl_sec,qw_sec,wthl_sec,wqw_sec, &     ! Output
          qwthl_sec, uw_sec, vw_sec, wtke_sec, & ! Output
-         w_sec)                                 ! Output
-
+         w_sec, &                               ! Output
+         mf_thlflx, mf_qtflx, &                 ! EDMF Output
+         wthl_sec_ed, wthl_sec_mf, &            ! EDMF Output
+         wqw_sec_ed, wqw_sec_mf)                ! EDMF Output
+         
 #ifdef SCREAM_CONFIG_IS_CMAKE
     use shoc_iso_f, only: diag_second_shoc_moments_f
 #endif
@@ -1214,6 +3465,18 @@ subroutine diag_second_shoc_moments(&
   ! Surface momentum flux (v-direction) [m2/s2]
   real(rtype), intent(in) :: vw_sfc(shcol)
 
+  ! MJC: EDMF inputs
+  ! Logical flag: Include MF in fluxes?
+  logical,     intent(in) :: do_mf
+  ! EDMF environment area [-]
+  real(rtype), intent(in) :: ae(shcol,nlevi)
+  ! EDMF area-weighted plume mean updraft speed [m/s]
+  real(rtype), intent(in) :: aw(shcol,nlevi)
+  ! EDMF area-weighted plume temperature transport [Km/s]
+  real(rtype), intent(in) :: awthl(shcol,nlevi)
+  ! EDMF area_weighted plume moisture transport [kgm/kgs]
+  real(rtype), intent(in) :: awqt(shcol,nlevi)
+  
 ! OUTPUT VARIABLES
   ! second order liquid wat. potential temp. [K^2]
   real(rtype), intent(out) :: thl_sec(shcol,nlevi)
@@ -1233,6 +3496,17 @@ subroutine diag_second_shoc_moments(&
   real(rtype), intent(out) :: wtke_sec(shcol,nlevi)
   ! second order vertical velocity [m2/s2]
   real(rtype), intent(out) :: w_sec(shcol,nlev)
+  
+  ! MJC: EDMF outputs
+  ! MF temperature turbulent flux [Km/s]
+  real(rtype), intent(out) :: mf_thlflx(shcol,nlevi)
+  ! MF moisture turbulent flux [kgm/kgs]
+  real(rtype), intent(out) :: mf_qtflx(shcol,nlevi)
+  
+  real(rtype), intent(out) :: wthl_sec_ed(shcol,nlevi)
+  real(rtype), intent(out) :: wthl_sec_mf(shcol,nlevi)
+  real(rtype), intent(out) :: wqw_sec_ed(shcol,nlevi)
+  real(rtype), intent(out) :: wqw_sec_mf(shcol,nlevi)
 
 ! LOCAL VARIABLES
   real(rtype) :: wstar(shcol)
@@ -1258,13 +3532,14 @@ subroutine diag_second_shoc_moments(&
   ! Diagnose the second order moments flux,
   !  for the lower boundary
   call diag_second_moments_lbycond(&
-     shcol,&                                         ! Input
-     wthl_sfc, wqw_sfc, uw_sfc, vw_sfc,&             ! Input
-     ustar2,wstar,&                                  ! Input
-     wthl_sec(:shcol,nlevi),wqw_sec(:shcol,nlevi),&  ! Output
-     uw_sec(:shcol,nlevi), vw_sec(:shcol,nlevi),&    ! Output
-     wtke_sec(:shcol,nlevi), thl_sec(:shcol,nlevi),& ! Output
-     qw_sec(:shcol,nlevi), qwthl_sec(:shcol,nlevi))  ! Output
+     shcol,&                                             ! Input
+     wthl_sfc, wqw_sfc, uw_sfc, vw_sfc,&                 ! Input
+     ustar2,wstar,&                                      ! Input
+     wthl_sec(:shcol,nlevi),wqw_sec(:shcol,nlevi),&      ! Output
+     uw_sec(:shcol,nlevi), vw_sec(:shcol,nlevi),&        ! Output
+     wtke_sec(:shcol,nlevi), thl_sec(:shcol,nlevi),&     ! Output
+     qw_sec(:shcol,nlevi), qwthl_sec(:shcol,nlevi),&     ! Output
+     wthl_sec_ed(:shcol,nlevi),wqw_sec_ed(:shcol,nlevi)) ! EDMF Output
 
   ! Diagnose the second order moments,
   !  for points away from boundaries.  this is
@@ -1274,18 +3549,23 @@ subroutine diag_second_shoc_moments(&
      thetal, qw, u_wind, v_wind, tke, &     ! Input
      isotropy, tkh, tk,&                    ! Input
      dz_zi, zt_grid, zi_grid, shoc_mix, &   ! Input
+     do_mf, ae, aw, awthl, awqt, &          ! EDMF Input
      thl_sec, qw_sec,wthl_sec,wqw_sec,&     ! Input/Output
      qwthl_sec, uw_sec, vw_sec, wtke_sec, & ! Input/Output
-     w_sec)                                 ! Output
+     w_sec, &                               ! Output
+     mf_thlflx, mf_qtflx, &                 ! EDMF Output
+     wthl_sec_ed, wthl_sec_mf, & 			      ! EDMF Output
+     wqw_sec_ed, wqw_sec_mf) 				        ! EDMF Output
 
   ! Diagnose the second order moments,
   !  calculate the upper boundary conditions
   call diag_second_moments_ubycond(&
-     shcol,                              &  ! Input
-     thl_sec(:shcol,1), qw_sec(:shcol,1),&  ! Output
-     wthl_sec(:shcol,1),wqw_sec(:shcol,1),& ! Output
-     qwthl_sec(:shcol,1), uw_sec(:shcol,1),&! Output
-     vw_sec(:shcol,1), wtke_sec(:shcol,1))  ! Output
+     shcol,                              &        ! Input
+     thl_sec(:shcol,1), qw_sec(:shcol,1),&        ! Output
+     wthl_sec(:shcol,1),wqw_sec(:shcol,1),& 	    ! Output
+     qwthl_sec(:shcol,1), uw_sec(:shcol,1),&	    ! Output
+     vw_sec(:shcol,1), wtke_sec(:shcol,1),&   	  ! Output
+     wthl_sec_ed(:shcol,1), wqw_sec_ed(:shcol,1)) ! EDMF Output
 
   return
 end subroutine diag_second_shoc_moments
@@ -1365,7 +3645,8 @@ subroutine diag_second_moments_lbycond(&
          wthl_sfc, wqw_sfc, uw_sfc, vw_sfc, &         ! Input
          ustar2,wstar, wthl_sec, wqw_sec,&            ! Output
          uw_sec, vw_sec, wtke_sec,&                   ! Output
-         thl_sec, qw_sec, qwthl_sec)                  ! Output
+         thl_sec, qw_sec, qwthl_sec,&                 ! Output
+         wthl_sec_ed, wqw_sec_ed)                     ! Output
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
     use shoc_iso_f, only: diag_second_moments_lbycond_f
@@ -1401,8 +3682,10 @@ subroutine diag_second_moments_lbycond(&
 ! OUTPUT VARIABLES
   ! vertical flux of heat [K m/s]
   real(rtype), intent(out) :: wthl_sec(shcol)
+  real(rtype), intent(out) :: wthl_sec_ed(shcol)
   ! vertical flux of total water [kg/kg m/s]
   real(rtype), intent(out) :: wqw_sec(shcol)
+  real(rtype), intent(out) :: wqw_sec_ed(shcol)  
   ! vertical flux of zonal wind [m2/s2]
   real(rtype), intent(out) :: uw_sec(shcol)
   ! vertical flux of meridional wind [m2/s2]
@@ -1458,6 +3741,9 @@ subroutine diag_second_moments_lbycond(&
     vw_sec(i) = vw_sfc(i)
     wtke_sec(i) = bfb_cube(max(bfb_sqrt(ustar2(i)),0.01_rtype))
 
+	wthl_sec_ed(i) = wthl_sfc(i)
+    wqw_sec_ed(i) = wqw_sfc(i)
+    
   enddo ! end i loop (column loop)
   return
 end subroutine diag_second_moments_lbycond
@@ -1465,12 +3751,17 @@ end subroutine diag_second_moments_lbycond
 subroutine diag_second_moments(&
          shcol,nlev,nlevi, &                    ! Input
          thetal,qw,u_wind,v_wind,tke, &         ! Input
-         isotropy,tkh,tk,&                      ! Input
+         isotropy,tkh,tk, &                     ! Input
          dz_zi,zt_grid,zi_grid,shoc_mix, &      ! Input
-         thl_sec,qw_sec,wthl_sec,wqw_sec,&      ! Input/Output
+         do_mf, ae, aw, awthl, awqt, &          ! Input - EDMF         
+         thl_sec,qw_sec,wthl_sec,wqw_sec, &     ! Input/Output
          qwthl_sec,uw_sec,vw_sec,wtke_sec, &    ! Input/Output
-         w_sec)                                 ! Output
-
+         w_sec, &                               ! Output
+         mf_thlflx, mf_qtflx, &  				        ! Output - EDMF
+         wthl_sec_ed,wthl_sec_mf, &   	        ! Output - EDMF
+         wqw_sec_ed, wqw_sec_mf)                ! Output - EDMF
+         
+         
 #ifdef SCREAM_CONFIG_IS_CMAKE
     use shoc_iso_f, only: diag_second_moments_f
 #endif
@@ -1516,7 +3807,14 @@ subroutine diag_second_moments(&
   real(rtype), intent(in) :: dz_zi(shcol,nlevi)
   ! Mixing length [m]
   real(rtype), intent(in) :: shoc_mix(shcol,nlev)
-
+  
+  ! MJC: EDMF inputs
+  logical    , intent(in) :: do_mf
+  real(rtype), intent(in) :: ae(shcol,nlevi)
+  real(rtype), intent(in) :: aw(shcol,nlevi)
+  real(rtype), intent(in) :: awthl(shcol,nlevi)
+  real(rtype), intent(in) :: awqt(shcol,nlevi)
+  
 ! INPUT/OUTPUT VARIABLES
   ! second order liquid wat. potential temp. [K^2]
   real(rtype), intent(inout) :: thl_sec(shcol,nlevi)
@@ -1539,10 +3837,35 @@ subroutine diag_second_moments(&
   ! second order vertical velocity [m2/s2]
   real(rtype), intent(out) :: w_sec(shcol,nlev)
 
+  ! MJC: EDMF Output
+  real(rtype), intent(out) :: wthl_sec_ed(shcol,nlevi)
+  real(rtype), intent(out) :: wthl_sec_mf(shcol,nlevi)
+  real(rtype), intent(out) :: wqw_sec_ed(shcol,nlevi)
+  real(rtype), intent(out) :: wqw_sec_mf(shcol,nlevi)  
+  ! vertical flux of heat from mass flux plumes [K m/s]
+  real(rtype), intent(out) :: mf_thlflx(shcol,nlevi)
+  ! vertical flux of moisture from mass flux plumes [kg/kg m/s]
+  real(rtype), intent(out) :: mf_qtflx(shcol,nlevi)
+  
   ! LOCAL VARIABLES
   real(rtype) :: isotropy_zi(shcol,nlevi)
   real(rtype) :: tkh_zi(shcol,nlevi)
   real(rtype) :: tk_zi(shcol,nlevi)
+  
+  ! MJC: Extra local variables
+  real(rtype) :: thl_zi(shcol,nlevi)
+  real(rtype) :: qw_zi(shcol,nlevi)
+  real(rtype) :: wtke_sec_ed(shcol,nlevi)
+  real(rtype) :: wtke_sec_mf(shcol,nlevi)
+  real(rtype) :: uw_sec_ed(shcol,nlevi)
+  real(rtype) :: uw_sec_mf(shcol,nlevi)
+  real(rtype) :: vw_sec_ed(shcol,nlevi)
+  real(rtype) :: vw_sec_mf(shcol,nlevi)
+  
+  ! Determines if total fluxes (ED+MF) are computed or not
+  logical :: do_total_fluxes
+  !Dummy variable
+  real(rtype) :: aw_dummy(shcol,nlevi)
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
    if (use_cxx) then
@@ -1558,7 +3881,10 @@ subroutine diag_second_moments(&
   call linear_interp(zt_grid,zi_grid,isotropy,isotropy_zi,nlev,nlevi,shcol,0._rtype)
   call linear_interp(zt_grid,zi_grid,tkh,tkh_zi,nlev,nlevi,shcol,0._rtype)
   call linear_interp(zt_grid,zi_grid,tk,tk_zi,nlev,nlevi,shcol,0._rtype)
-
+  ! MJC: 
+  call linear_interp(zt_grid,zi_grid,thetal,thl_zi,nlev,nlevi,shcol,0._rtype)
+  call linear_interp(zt_grid,zi_grid,qw,qw_zi,nlev,nlevi,shcol,0._rtype)
+  
   ! Vertical velocity variance is assumed to be propotional
   !  to the TKE
   w_sec = w2tune*(2._rtype/3._rtype)*tke
@@ -1582,30 +3908,54 @@ subroutine diag_second_moments(&
          qwthl_sec)                               ! Input/Output
 
   ! Calculate vertical flux for heat
+  ! MJC: Flag for MF fluxes
+  do_total_fluxes = do_mf
   call calc_shoc_vertflux(&
          shcol,nlev,nlevi,tkh_zi,dz_zi,thetal,&   ! Input
-         wthl_sec)                                ! Input/Output
+         zt_grid,zi_grid,ae,aw,awthl,&            ! Input
+         do_total_fluxes,&                        ! Input - Logical variable         
+         wthl_sec,wthl_sec_ed,wthl_sec_mf)        ! Input/Output
+
+  ! MJC: MF flux component
+  call calc_mf_vertflux(shcol,nlev,nlevi,aw,awthl,thetal,thl_zi,mf_thlflx)
 
   ! Calculate vertical flux for moisture
   call calc_shoc_vertflux(&
          shcol,nlev,nlevi,tkh_zi,dz_zi,qw,&       ! Input
-         wqw_sec)                                 ! Input/Output
-
+         zt_grid,zi_grid,ae,aw,awqt,&             ! Input
+         do_total_fluxes,&                        ! Input - Logical variable         
+         wqw_sec,wqw_sec_ed,wqw_sec_mf)           ! Input/Output
+  
+  ! MJC: MF flux component       
+  call calc_mf_vertflux(shcol,nlev,nlevi,aw,awqt,qw,qw_zi,mf_qtflx)
+      
   ! Calculate vertical flux for TKE
+  do_total_fluxes = .false.
+  aw_dummy = 0._rtype  
   call calc_shoc_vertflux(&
-         shcol,nlev,nlevi,tkh_zi,dz_zi,tke,&      ! Input
-         wtke_sec)                                ! Input/Output
+         shcol,nlev,nlevi,tkh_zi,dz_zi,tke,&     ! Input
+        zt_grid,zi_grid,ae,aw,aw_dummy,&         ! Input
+         do_total_fluxes,&                       ! Input - Logical variable
+         wtke_sec,wtke_sec_ed,wtke_sec_mf)       ! Input/Output
 
   ! Calculate vertical flux for momentum (zonal wind)
+  do_total_fluxes = .false.
+  aw_dummy = 0._rtype  
   call calc_shoc_vertflux(&
          shcol,nlev,nlevi,tk_zi,dz_zi,u_wind,&    ! Input
-         uw_sec)                                  ! Input/Output
-
+         zt_grid,zi_grid,ae,aw,aw_dummy,&         ! Input
+         do_total_fluxes,&                        ! Input - Logical variable
+         uw_sec,uw_sec_ed,uw_sec_mf)              ! Input/Output
+         
   ! Calculate vertical flux for momentum (meridional wind)
+  do_total_fluxes = .false.
+  aw_dummy = 0._rtype  
   call calc_shoc_vertflux(&
          shcol,nlev,nlevi,tk_zi,dz_zi,v_wind,&    ! Input
-         vw_sec)                                  ! Input/Output
-
+         zt_grid,zi_grid,ae,aw,aw_dummy,&         ! Input
+         do_total_fluxes,&                        ! Input - Logical variable
+         vw_sec,vw_sec_ed,vw_sec_mf)              ! Input/Output
+         
   return
 end subroutine diag_second_moments
 
@@ -1679,8 +4029,10 @@ subroutine calc_shoc_varorcovar(&
 end subroutine calc_shoc_varorcovar
 
 subroutine calc_shoc_vertflux(&
-         shcol,nlev,nlevi,tkh_zi,dz_zi,invar,&  ! Input
-         vertflux)                              ! Input/Output
+         shcol,nlev,nlevi,tkh_zi,dz_zi,invar,&     ! Input
+         zt_grid,zi_grid,mf_ae,mf_aw,mf_aw_invar,& ! EDMF Input
+         do_total_fluxes,&                         ! EDMF Input - Logical flag         
+         vertflux,vertflux_ed,vertflux_mf)         ! Input/Output
 
   ! Compute either the vertical flux via
   !  downgradient diffusion for a given set of
@@ -1703,12 +4055,26 @@ subroutine calc_shoc_vertflux(&
   real(rtype), intent(in) :: tkh_zi(shcol,nlevi)
   ! delta z centerend on zi grid [m]
   real(rtype), intent(in) :: dz_zi(shcol,nlevi)
+  ! Heights of mid-point grid [m]
+  real(rtype), intent(in) :: zt_grid(shcol,nlev)
+  ! Heights of interface grid [m]
+  real(rtype), intent(in) :: zi_grid(shcol,nlevi)
   ! Input variable [units vary]
   real(rtype), intent(in) :: invar(shcol,nlev)
+  
+  ! MJC: Input from the MF subroutine
+  real(rtype), intent(in) :: mf_ae(shcol,nlevi)       ! EDMF: Environmental area
+  real(rtype), intent(in) :: mf_aw(shcol,nlevi)       ! EDMF: sum(a_i * w_i) [m/s]
+  real(rtype), intent(in) :: mf_aw_invar(shcol,nlevi) ! EDMF: sum(a_i * w_i * var_in) [? m/s]
 
+  ! MJC: EDMF logical variable
+  logical, intent(in) :: do_total_fluxes
+  
 ! INPUT/OUTPUT VARIABLES
   real(rtype), intent(out) :: vertflux(shcol,nlevi)
-
+  real(rtype), intent(out) :: vertflux_ed(shcol,nlevi)
+  real(rtype), intent(out) :: vertflux_mf(shcol,nlevi)
+  
 ! LOCAL VARIABLES
   integer :: i, k, kt
   real(rtype) :: grid_dz
@@ -1716,24 +4082,55 @@ subroutine calc_shoc_vertflux(&
 #ifdef SCREAM_CONFIG_IS_CMAKE
    if (use_cxx) then
       call calc_shoc_vertflux_f(shcol,nlev,nlevi,tkh_zi,dz_zi,invar,&  ! Input
-           vertflux)                              ! Input/Output)
+           vertflux)                                                   ! Input/Output
       return
    endif
 #endif
 
-  do k=2,nlev
+  if (do_total_fluxes) then
+    do k=2,nlev
 
-    kt=k-1 ! define upper grid point indicee
-    do i=1,shcol
+      kt=k-1 ! define upper grid point indice
+      do i=1,shcol
 
-      grid_dz=1._rtype/dz_zi(i,k) ! vertical grid diff squared
-
-      ! Compute the vertical flux via downgradient diffusion
-      vertflux(i,k)=-1._rtype*tkh_zi(i,k)*grid_dz*&
-        (invar(i,kt)-invar(i,k))
-
+        grid_dz = 1._rtype/dz_zi(i,k) ! vertical grid diff squared
+            
+        !! Centered
+        vertflux(i,k)=(-1._rtype*tkh_zi(i,k)*grid_dz*(invar(i,kt)-invar(i,k))) + &
+          mf_aw_invar(i,k) - mf_aw(i,k)*0.5_rtype*(invar(i,kt)+invar(i,k)) 
+          
+        vertflux_ed(i,k)= -1._rtype*tkh_zi(i,k)*grid_dz*(invar(i,kt)-invar(i,k))
+        
+        vertflux_mf(i,k)= mf_aw_invar(i,k) - mf_aw(i,k)*0.5_rtype*(invar(i,kt)+invar(i,k)) 
+        
+        !! MF upwind
+        !vertflux(i,k)=(-1._rtype*mf_ae(i,k)*tkh_zi(i,k)*grid_dz*(invar(i,kt)-invar(i,k))) + &
+        !  mf_aw_invar(i,k) - mf_aw(i,k)*invar(i,k)   
+        !! MF downwind
+        !vertflux(i,k)=(-1._rtype*mf_ae(i,k)*tkh_zi(i,k)*grid_dz*(invar(i,kt)-invar(i,k))) + &
+        !  mf_aw_invar(i,k) - mf_aw(i,k)*invar(i,kt)
+      enddo
     enddo
-  enddo
+  else
+
+    do k=2,nlev
+ 
+      kt=k-1 ! define upper grid point indice
+      do i=1,shcol
+
+        grid_dz=1._rtype/dz_zi(i,k) ! vertical grid diff squared
+
+        ! Compute the vertical flux via downgradient diffusion
+        vertflux(i,k)=-1._rtype*tkh_zi(i,k)*grid_dz*&
+          (invar(i,kt)-invar(i,k))
+
+        vertflux_ed(i,k)= -1._rtype*tkh_zi(i,k)*grid_dz*(invar(i,kt)-invar(i,k))
+        vertflux_mf(i,k)= 0._rtype  
+        
+      enddo
+    enddo
+    
+  endif
 
   return
 end subroutine calc_shoc_vertflux
@@ -1742,7 +4139,8 @@ subroutine diag_second_moments_ubycond(&
          shcol, &                               ! Input
          thl_sec, qw_sec,&                      ! Output
          wthl_sec,wqw_sec,&                     ! Output
-         qwthl_sec, uw_sec, vw_sec, wtke_sec)   ! Output
+         qwthl_sec, uw_sec, vw_sec, wtke_sec,&  ! Output
+         wthl_sec_ed, wqw_sec_ed)               ! Output
 
   ! Purpose of this subroutine is to diagnose the upper
   !  boundary condition for the second order moments
@@ -1767,8 +4165,10 @@ subroutine diag_second_moments_ubycond(&
   real(rtype), intent(out) :: qwthl_sec(shcol)
   ! vertical flux of heat [K m/s]
   real(rtype), intent(out) :: wthl_sec(shcol)
+  real(rtype), intent(out) :: wthl_sec_ed(shcol)  
   ! vertical flux of total water [kg/kg m/s]
   real(rtype), intent(out) :: wqw_sec(shcol)
+  real(rtype), intent(out) :: wqw_sec_ed(shcol)  
   ! vertical flux of zonal wind [m2/s2]
   real(rtype), intent(out) :: uw_sec(shcol)
   ! vertical flux of meridional wind [m2/s2]
@@ -1801,6 +4201,9 @@ subroutine diag_second_moments_ubycond(&
     thl_sec(i) = 0._rtype
     qw_sec(i) = 0._rtype
     qwthl_sec(i) = 0._rtype
+    
+    wthl_sec_ed(i) = 0._rtype
+    wqw_sec_ed(i) = 0._rtype    
   enddo ! end i loop (column loop)
   return
 end subroutine diag_second_moments_ubycond
@@ -2045,7 +4448,7 @@ end subroutine fterms_input_for_diag_third_shoc_moment
 subroutine f0_to_f5_diag_third_shoc_moment(&
      thedz, thedz2, bet2, iso, isosqrd, &    ! Input
      wthl_sec, wthl_sec_kc, wthl_sec_kb, &   ! Input
-     thl_sec_kc, thl_sec_kb, &      ! Input
+     thl_sec_kc, thl_sec_kb, &               ! Input
      w_sec, w_sec_kc,w_sec_zi, &             ! Input
      tke, tke_kc, &                          ! Input
      f0, f1, f2, f3, f4, f5)                 ! Output
@@ -2248,9 +4651,11 @@ subroutine shoc_assumed_pdf(&
          thetal,qw,w_field,thl_sec,qw_sec,& ! Input
          wthl_sec,w_sec, &                  ! Input
          wqw_sec,qwthl_sec,w3,pres, &       ! Input
+         mf_qlflx_zt, &
          zt_grid,zi_grid,&                  ! Input
          shoc_cldfrac,shoc_ql,&             ! Output
-         wqls,wthv_sec,shoc_ql2)            ! Output
+         wqls,wthv_sec,shoc_ql2,&           ! Output
+         a1_out,C1_out,C2_out,ql1_out, ql2_out)              ! Output
 
   ! Purpose of this subroutine is calculate the
   !  double Gaussian PDF of SHOC, which is the centerpiece
@@ -2301,6 +4706,9 @@ subroutine shoc_assumed_pdf(&
   ! heights on interface grid [m]
   real(rtype), intent(in) :: zi_grid(shcol,nlevi)
 
+  real(rtype), intent(in) :: mf_qlflx_zt(shcol,nlev)
+
+
 ! OUTPUT VARIABLES
   ! SGS cloud fraction [-]
   real(rtype), intent(out) :: shoc_cldfrac(shcol,nlev)
@@ -2312,10 +4720,16 @@ subroutine shoc_assumed_pdf(&
   real(rtype), intent(out) :: wqls(shcol,nlev)
   ! SGS liquid water mixing ratio variance [kg/kg]
   real(rtype), intent(out) :: shoc_ql2(shcol,nlev)
+  ! MJC [11/03/24]: Adding variables to the output file for diagnostic purposes
+  real(rtype), intent(out) :: a1_out(shcol,nlev)
+  real(rtype), intent(out) :: C1_out(shcol,nlev)
+  real(rtype), intent(out) :: C2_out(shcol,nlev)
+  real(rtype), intent(out) :: ql1_out(shcol,nlev)
+  real(rtype), intent(out) :: ql2_out(shcol,nlev)
 
 ! LOCAL VARIABLES
   integer i,k
-  real(rtype) skew_w,a
+  real(rtype) Skew_w,a
   real(rtype) w1_1,w1_2,w2_1,w2_2,w3var
   real(rtype) thl1_1,thl1_2,thl2_1,thl2_2
   real(rtype) qw1_1,qw1_2,qw2_1,qw2_2
@@ -2406,7 +4820,7 @@ subroutine shoc_assumed_pdf(&
       call shoc_assumed_pdf_vv_parameters(&
          w_first,w_sec(i,k),w3var,&    ! Input
          Skew_w,w1_1,w1_2,w2_1,w2_2,a) ! Output
-
+        
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       !  FIND PARAMETERS FOR THETAL
 
@@ -2496,11 +4910,17 @@ subroutine shoc_assumed_pdf(&
 
       ! Finally, compute SGS cloud fraction
       shoc_cldfrac(i,k) = min(1._rtype,a*C1+(1._rtype-a)*C2)
+      C1_out(i,k) = C1
+      C2_out(i,k) = C2
+      a1_out(i,k) = a  
 
       ! Compute SGS liquid water mixing ratio
       call shoc_assumed_pdf_compute_sgs_liquid(&
         a,ql1,ql2,&   ! Input
         shoc_ql(i,k)) ! Output
+
+      ql1_out(i,k) = ql1
+      ql2_out(i,k) = ql2
 
       ! Compute cloud liquid variance (CLUBB formulation, adjusted to SHOC parameters based)
       call shoc_assumed_pdf_compute_cloud_liquid_variance(&
@@ -2515,6 +4935,7 @@ subroutine shoc_assumed_pdf(&
       ! Compute the SGS buoyancy flux
       call shoc_assumed_pdf_compute_buoyancy_flux(&
         wthlsec, epsterm, wqwsec, pval, wqls(i,k),& ! Input
+        mf_qlflx_zt(i,k),&
         wthv_sec(i,k))                              ! Output
 
     enddo  ! end i loop here
@@ -2997,9 +5418,10 @@ subroutine shoc_assumed_pdf_compute_liquid_water_flux(&
   wqls =a*((w1_1-w_first)*ql1)+(1._rtype-a)*((w1_2-w_first)*ql2)
 
 end subroutine shoc_assumed_pdf_compute_liquid_water_flux
-
+        
 subroutine shoc_assumed_pdf_compute_buoyancy_flux(&
   wthlsec,epsterm,wqwsec,pval,wqls,& ! Input
+  mf_qlflx_zt,&
   wthv_sec)                          ! Output
   ! Compute the SGS buoyancy flux
   implicit none
@@ -3010,12 +5432,16 @@ subroutine shoc_assumed_pdf_compute_buoyancy_flux(&
   real(rtype), intent(in) :: wqwsec
   real(rtype), intent(in) :: pval
   real(rtype), intent(in) :: wqls
+  real(rtype), intent(in) :: mf_qlflx_zt
 
   ! intent-out
   real(rtype), intent(out) :: wthv_sec
 
   wthv_sec=wthlsec+((1._rtype-epsterm)/epsterm)*basetemp*wqwsec &
   +((lcond/cp)*bfb_pow(basepres/pval,(rgas/cp))-(1._rtype/epsterm)*basetemp)*wqls
+  
+  !wthv_sec=wthlsec+((1._rtype-epsterm)/epsterm)*basetemp*wqwsec &
+  ! +((lcond/cp)*bfb_pow(basepres/pval,(rgas/cp))-(1._rtype/epsterm)*basetemp)*(wqls+mf_qlflx_zt)
 
 end subroutine shoc_assumed_pdf_compute_buoyancy_flux
 
@@ -3023,13 +5449,14 @@ end subroutine shoc_assumed_pdf_compute_buoyancy_flux
 ! Advance turbulent kinetic energy equation
 
 subroutine shoc_tke(&
-         shcol,nlev,nlevi,dtime,&    ! Input
-         wthv_sec,shoc_mix,&         ! Input
-         dz_zi,dz_zt,pres,tabs,&     ! Input
-         u_wind,v_wind,brunt,&       ! Input
-         zt_grid,zi_grid,pblh,&      ! Input
-         tke,tk,tkh, &               ! Input/Output
-         isotropy)                   ! Output
+         shcol,nlev,nlevi,dtime,&       ! Input
+         wthv_sec,shoc_mix,&            ! Input
+         dz_zi,dz_zt,pres,tabs,&        ! Input
+         u_wind,v_wind,brunt,&          ! Input
+         zt_grid,zi_grid,pblh,&         ! Input
+         tke,tk,tkh, &                  ! Input/Output
+         isotropy, &                    ! Output
+         a_diss, a_prod_bu, a_prod_sh)  ! Output
 
   ! Purpose of this subroutine is to advance the SGS
   !  TKE equation due to shear production, buoyant
@@ -3081,11 +5508,14 @@ subroutine shoc_tke(&
 ! OUTPUT VARIABLES
   ! Return to isotropic timescale [s]
   real(rtype), intent(out) :: isotropy(shcol,nlev)
+  real(rtype), intent(out) :: a_prod_bu(shcol,nlev)
+  real(rtype), intent(out) :: a_prod_sh(shcol,nlev)
+  real(rtype), intent(out) :: a_diss(shcol,nlev)
 
 ! LOCAL VARIABLES
   real(rtype) :: sterm(shcol,nlevi), sterm_zt(shcol,nlev)
   ! Dissipation term
-  real(rtype) :: a_diss(shcol,nlev)
+  !real(rtype) :: a_diss(shcol,nlev)
   !column integrated stability
   real(rtype) :: brunt_int(shcol)
 
@@ -3102,7 +5532,7 @@ subroutine shoc_tke(&
 
   !advance sgs TKE
   call adv_sgs_tke(nlev, shcol, dtime, shoc_mix, wthv_sec, &
-       sterm_zt, tk, tke, a_diss)
+       sterm_zt, tk, tke, a_diss, a_prod_bu, a_prod_sh)
 
   !Compute isotropic time scale [s]
   call isotropic_ts(nlev, shcol, brunt_int, tke, a_diss, brunt, isotropy)
@@ -3226,7 +5656,7 @@ end subroutine compute_shr_prod
 ! Advance SGS TKE
 
 subroutine adv_sgs_tke(nlev, shcol, dtime, shoc_mix, wthv_sec, &
-     sterm_zt, tk, tke, a_diss)
+     sterm_zt, tk, tke, a_diss, a_prod_bu, a_prod_sh)
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
   use shoc_iso_f, only: adv_sgs_tke_f
@@ -3255,10 +5685,12 @@ subroutine adv_sgs_tke(nlev, shcol, dtime, shoc_mix, wthv_sec, &
   !intent-out
   ! Dissipation term
   real(rtype), intent(out) :: a_diss(shcol,nlev)
+  real(rtype), intent(out) :: a_prod_bu(shcol,nlev)
+  real(rtype), intent(out) :: a_prod_sh(shcol,nlev)
 
   !local variables
   integer :: i, k
-  real(rtype) :: a_prod_bu, a_prod_sh
+  !real(rtype) :: a_prod_bu, a_prod_sh
 
   real(rtype) :: Ck, Cs, Ce, Ce1, Ce2, Cee
 
@@ -3272,30 +5704,33 @@ subroutine adv_sgs_tke(nlev, shcol, dtime, shoc_mix, wthv_sec, &
 
   Cs=0.15_rtype
   Ck=0.1_rtype
-  Ce=bfb_cube(Ck)/bfb_quad(Cs)
+  Ce=bfb_cube(Ck)/bfb_quad(Cs)  ! MJC: 1.975
 
-  Ce1=Ce/0.7_rtype*0.19_rtype
-  Ce2=Ce/0.7_rtype*0.51_rtype
-  Cee=Ce1+Ce2
+  Ce1=Ce/0.7_rtype*0.19_rtype   ! MJC: 0.536
+  Ce2=Ce/0.7_rtype*0.51_rtype   ! MJC: 1.439
+  Cee=Ce1+Ce2                   ! MJC: 1.975
+  !print*,'Cee = ', Cee
 
   do k = 1, nlev
      do i = 1, shcol
 
         ! Compute buoyant production term
-        a_prod_bu=(ggr/basetemp)*wthv_sec(i,k)
+        a_prod_bu(i,k)=(ggr/basetemp)*wthv_sec(i,k)
 
         tke(i,k)=max(0._rtype,tke(i,k))
 
         ! Shear production term, use diffusivity from
         !  previous timestep
-        a_prod_sh=tk(i,k)*sterm_zt(i,k)
+        a_prod_sh(i,k)=tk(i,k)*sterm_zt(i,k)
 
         ! Dissipation term
-        a_diss(i,k)=Cee/shoc_mix(i,k)*bfb_pow(tke(i,k),1.5_rtype)
-
+        !a_diss(i,k)=Cee/shoc_mix(i,k)*bfb_pow(tke(i,k),1.5_rtype)
+        ! MJC: Cee as tunable constant
+        a_diss(i,k)=Cee_const/shoc_mix(i,k)*bfb_pow(tke(i,k),1.5_rtype)
+        
         ! March equation forward one timestep
         tke(i,k)=max(mintke,tke(i,k)+dtime* &
-             (max(0._rtype,a_prod_sh+a_prod_bu)-a_diss(i,k)))
+             (max(0._rtype,a_prod_sh(i,k)+a_prod_bu(i,k))-a_diss(i,k)))
 
         tke(i,k)=min(tke(i,k),maxtke)
      enddo
@@ -3499,7 +5934,7 @@ subroutine shoc_length(&
          host_dx,host_dy,&             ! Input
          zt_grid,zi_grid,dz_zt,&       ! Input
          tke,thv,&                     ! Input
-         brunt,shoc_mix)               ! Output
+         brunt,l_inf,shoc_mix)         ! Output
 
   ! Purpose of this subroutine is to compute the SHOC
   !  mixing length scale, which is used to compute the
@@ -3539,10 +5974,11 @@ subroutine shoc_length(&
   real(rtype), intent(out) :: brunt(shcol,nlev)
   ! SHOC mixing length [m]
   real(rtype), intent(out) :: shoc_mix(shcol,nlev)
+  real(rtype), intent(out) :: l_inf(shcol)
 
   ! LOCAL VARIABLES
   real(rtype) :: thv_zi(shcol,nlevi)
-  real(rtype) :: l_inf(shcol)
+  !real(rtype) :: l_inf(shcol)
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
    if (use_cxx) then
@@ -3579,11 +6015,90 @@ end subroutine shoc_length
 ! subdiagonal and diagonal coeffs for solving the
 ! tridiagonal diffusion matrix.
 
+!subroutine vd_shoc_decomp( &
+!         shcol,nlev,nlevi,&          ! Input
+!         kv_term,tmpi,rdp_zt,dtime,& ! Input
+!         flux, &                     ! Input
+!         du,dl,d)                    ! Output
+!
+!  implicit none
+!
+!! INPUT VARIABLES
+!  ! number of columns
+!  integer, intent(in) :: shcol
+!  ! number of mid-point levels
+!  integer, intent(in) :: nlev
+!  ! number of levels on the interface
+!  integer, intent(in) :: nlevi
+!
+!  ! SHOC timestep [s]
+!  real(rtype), intent(in) :: dtime
+!  ! diffusion coefficent [m2/s]
+!  real(rtype), intent(in) :: kv_term(shcol,nlevi)
+!  ! dt*(g*rho)**2/dp at interfaces
+!  real(rtype), intent(in) :: tmpi(shcol,nlevi)
+!  ! 1/dp
+!  real(rtype), intent(in) :: rdp_zt(shcol,nlev)
+!  ! surface flux [varies]
+!  real(rtype), intent(in) :: flux(shcol)
+!
+!! OUTPUT VARIABLES
+!  ! superdiagonal
+!  real(rtype), intent(out) :: du(shcol,nlev)
+!  ! Factorized version of subdiagonal
+!  real(rtype), intent(out) :: dl(shcol,nlev)
+!  ! Factorized version of diagonal
+!  real(rtype), intent(out) :: d(shcol,nlev)
+!
+!! LOCAL VARIABLES
+!  integer :: i, k
+!
+!  ! Determine superdiagonal (du) and subdiagonal (dl) coeffs of the
+!  ! tridiagonal diffusion matrix.
+!  do k=1,nlev-1
+!    do i=1,shcol
+!      du(i,k)   = -1._rtype * kv_term(i,k+1) * tmpi(i,k+1) * rdp_zt(i,k)
+!      dl(i,k+1) = -1._rtype * kv_term(i,k+1) * tmpi(i,k+1) * rdp_zt(i,k+1)
+!    enddo
+!  enddo
+!
+!  ! The bottom element of the superdiagonal (du) and the top element of
+!  ! the subdiagonal (dl) is set to zero (not included in linear system).
+!  du(:,nlev) = 0._rtype
+!  dl(:,1)    = 0._rtype
+!
+!  ! Compute the diagonal and perform Thomas factorization. The diagonal
+!  ! elements are a combination of du and dl (d=1-du-dl). Surface fluxes
+!  ! are applied explicitly in the diagonal at the top level.
+!  do i=1,shcol
+!    d(i,1) = 1._rtype - du(i,1)
+!  enddo
+!  do k=2,nlev-1
+!    do i=1,shcol
+!      d(i,k) = 1._rtype - du(i,k) - dl(i,k)
+!
+!      dl(i,k) = dl(i,k)/d(i,k-1)
+!      d (i,k) = d (i,k) - dl(i,k)*du(i,k-1)
+!    enddo
+!  enddo
+!  do i=1,shcol
+!    d(i,nlev) = 1._rtype - dl(i,nlev) + flux(i)*dtime*ggr*rdp_zt(i,nlev)
+!
+!    dl(i,nlev) = dl(i,nlev)/d(i,nlev-1)
+!    d (i,nlev) = d (i,nlev) - dl(i,nlev)*du(i,nlev-1)
+!  enddo
+!
+!  return
+!
+!end subroutine vd_shoc_decomp
+
+! MJC: Previous version (SCREAMv0)
 subroutine vd_shoc_decomp( &
          shcol,nlev,nlevi,&          ! Input
          kv_term,tmpi,rdp_zt,dtime,& ! Input
          flux, &                     ! Input
-         du,dl,d)                    ! Output
+         do_mf,mf_ae,mf_aw,tmpi3,&   ! EDMF input
+         ca,cc,denom,ze)             ! Output
 
   implicit none
 
@@ -3606,55 +6121,102 @@ subroutine vd_shoc_decomp( &
   ! surface flux [varies]
   real(rtype), intent(in) :: flux(shcol)
 
+  ! MJC: EDMF inputs
+  ! Include mass flux contribution?
+  logical,  intent(in)  :: do_mf
+  ! Sum of environment area, i.e. 1-sum(a_i) [-]
+  real(rtype), intent(in)  :: mf_ae(shcol,nlevi)
+  ! Sum (a_i*w_i) [m/s]
+  real(rtype), intent(in)  :: mf_aw(shcol,nlevi)
+  ! dt*g*rho on interfaces
+  real(rtype), intent(in)  :: tmpi3(shcol,nlevi)
 ! OUTPUT VARIABLES
   ! superdiagonal
-  real(rtype), intent(out) :: du(shcol,nlev)
-  ! Factorized version of subdiagonal
-  real(rtype), intent(out) :: dl(shcol,nlev)
-  ! Factorized version of diagonal
-  real(rtype), intent(out) :: d(shcol,nlev)
+  real(rtype), intent(out) :: ca(shcol,nlev)
+  ! subdiagonal
+  real(rtype), intent(out) :: cc(shcol,nlev)
+  ! 1./(1.+ca(k)+cc(k)-cc(k)*ze(k-1))
+  real(rtype), intent(out) :: denom(shcol,nlev)
+  ! Term in tri-diag. matrix system
+  real(rtype), intent(out) :: ze(shcol,nlev)
 
 ! LOCAL VARIABLES
   integer :: i, k
 
-  ! Determine superdiagonal (du) and subdiagonal (dl) coeffs of the
-  ! tridiagonal diffusion matrix.
-  do k=1,nlev-1
+  ! Determine superdiagonal (ca(k)) and subdiagonal (cc(k)) coeffs of the
+  ! tridiagonal diffusion matrix. The diagonal elements  (cb=1+ca+cc) are
+  ! a combination of ca and cc; they are not required by the solver.
+
+  do k=nlev-1,1,-1
     do i=1,shcol
-      du(i,k)   = -1._rtype * kv_term(i,k+1) * tmpi(i,k+1) * rdp_zt(i,k)
-      dl(i,k+1) = -1._rtype * kv_term(i,k+1) * tmpi(i,k+1) * rdp_zt(i,k+1)
+      if ( do_mf ) then
+        ca(i,k  ) = (mf_ae(i,k+1)*kv_term(i,k+1)*tmpi(i,k+1) &
+             - 0.5_rtype*tmpi3(i,k+1)*mf_aw(i,k+1))*rdp_zt(i,k  )
+        cc(i,k+1) = (mf_ae(i,k+1)*kv_term(i,k+1)*tmpi(i,k+1) &
+             + 0.5_rtype*tmpi3(i,k+1)*mf_aw(i,k+1))*rdp_zt(i,k+1)
+      else
+        ca(i,k) = kv_term(i,k+1) * tmpi(i,k+1) * rdp_zt(i,k)
+        cc(i,k+1) = kv_term(i,k+1) * tmpi(i,k+1) * rdp_zt(i,k+1)
+      endif
     enddo
   enddo
 
-  ! The bottom element of the superdiagonal (du) and the top element of
-  ! the subdiagonal (dl) is set to zero (not included in linear system).
-  du(:,nlev) = 0._rtype
-  dl(:,1)    = 0._rtype
+  ! The bottom element of the upper diagonal (ca) is zero (not used).
+  ! The subdiagonal (cc) is not needed in the solver.
 
-  ! Compute the diagonal and perform Thomas factorization. The diagonal
-  ! elements are a combination of du and dl (d=1-du-dl). Surface fluxes
-  ! are applied explicitly in the diagonal at the top level.
+  ca(:,nlev) = 0._rtype
+
+  ! Calculate e(k). This term is required in the solution of the
+  ! tridiagonal matrix as defined by the implicit diffusion equation.
+
   do i=1,shcol
-    d(i,1) = 1._rtype - du(i,1)
+    if ( do_mf ) then
+      denom(i,nlev) = 1._rtype/ &
+        (1._rtype + cc(i,nlev) - &
+        tmpi3(i,nlev)*mf_aw(i,nlev)*rdp_zt(i,nlev) + &
+        flux(i)*dtime*ggr*rdp_zt(i,nlev))
+    else
+      denom(i,nlev) = 1._rtype/ &
+        (1._rtype + cc(i,nlev) + flux(i)*dtime*ggr*rdp_zt(i,nlev))
+    endif
+    ze(i,nlev) = cc(i,nlev) * denom(i,nlev)
   enddo
-  do k=2,nlev-1
-    do i=1,shcol
-      d(i,k) = 1._rtype - du(i,k) - dl(i,k)
 
-      dl(i,k) = dl(i,k)/d(i,k-1)
-      d (i,k) = d (i,k) - dl(i,k)*du(i,k-1)
+  do k=nlev-1,2,-1
+    do i=1,shcol
+      if ( do_mf ) then
+        denom(i,k) = 1._rtype/ &
+          (1._rtype + ca(i,k) + cc(i,k) - &
+          ca(i,k)*ze(i,k+1) - &
+          (tmpi3(i,k)*mf_aw(i,k) - tmpi3(i,k+1)*mf_aw(i,k+1))*rdp_zt(i,k))
+      else
+        denom(i,k) = 1._rtype/ &
+          (1._rtype + ca(i,k) + cc(i,k) - &
+          ca(i,k) * ze(i,k+1))
+      endif
+      ze(i,k) = cc(i,k) * denom(i,k)
     enddo
   enddo
-  do i=1,shcol
-    d(i,nlev) = 1._rtype - dl(i,nlev) + flux(i)*dtime*ggr*rdp_zt(i,nlev)
 
-    dl(i,nlev) = dl(i,nlev)/d(i,nlev-1)
-    d (i,nlev) = d (i,nlev) - dl(i,nlev)*du(i,nlev-1)
+  do i=1,shcol
+    if ( do_mf ) then
+      ! MJC: bug fix
+      !denom(i,1) = 1._rtype/ &
+      !  (1._rtype + ca(i,1) - ca(i,1)*ze(i,2) - &
+      !  (tmpi3(i,1)*mf_aw(i,1) - tmpi3(i,2)*mf_aw(i,2))*rdp_zt(i,1))
+      denom(i,1) = 1._rtype/ &
+        (1._rtype + ca(i,1) - ca(i,1)*ze(i,2) + &
+        tmpi3(i,2)*mf_aw(i,2)*rdp_zt(i,1))
+    else
+      denom(i,1) = 1._rtype/ &
+        (1._rtype + ca(i,1) - ca(i,1) * ze(i,2))
+    endif
   enddo
 
   return
 
 end subroutine vd_shoc_decomp
+
 
 !==============================================================
 ! Subroutine to solve the implicit vertical diffsion equation
@@ -3670,11 +6232,58 @@ end subroutine vd_shoc_decomp
 ! Note that the same routine is used for temperature, momentum and
 ! tracers.
 ! ---------------------------------------------------------------
+!
+!subroutine vd_shoc_solve(&
+!         shcol,nlev,& ! Input
+!         du,dl,d,&    ! Input
+!         var)         ! Input/Output
+!
+!  implicit none
+!
+!! INPUT VARIABLES
+!  ! number of columns
+!  integer, intent(in) :: shcol
+!  ! number of mid-point levels
+!  integer, intent(in) :: nlev
+!  ! superdiagonal
+!  real(rtype), intent(in) :: du(shcol,nlev)
+!  ! Factorized version of subdiagonal
+!  real(rtype), intent(in) :: dl(shcol,nlev)
+!  ! Factorized version of diagonal
+!  real(rtype), intent(in) :: d(shcol,nlev)
+!
+!! IN/OUT VARIABLES
+!  real(rtype), intent(inout) :: var(shcol,nlev)
+!
+!! LOCAL VARIABLES
+!  integer :: i, k
+!
+!  ! Solve using Thomas algorithm
+!  do k=2,nlev
+!    do i=1,shcol
+!      var(i,k) = var(i,k) - dl(i,k)*var(i,k-1)
+!    enddo
+!  enddo
+!  do i=1,shcol
+!    var(i,nlev) = var(i,nlev)/d(i,nlev)
+!  enddo
+!  do k=nlev,2,-1
+!    do i=1,shcol
+!      var(i,k-1) = (var(i,k-1) - du(i,k-1)*var(i,k))/d(i,k-1)
+!    enddo
+!  enddo
+!
+!  return
+!
+!end subroutine vd_shoc_solve
 
+! MJC: Previous version (SCREAMv0)
 subroutine vd_shoc_solve(&
-         shcol,nlev,& ! Input
-         du,dl,d,&    ! Input
-         var)         ! Input/Output
+         shcol,nlev,nlevi,&   ! Input
+         ca,cc,denom,ze,&     ! Input
+         do_mf,mf_awvar,&     ! EDMF Input
+         tmpi3,rdp_zt,&       ! EDMF Input
+         var)                 ! Input/Output
 
   implicit none
 
@@ -3683,31 +6292,70 @@ subroutine vd_shoc_solve(&
   integer, intent(in) :: shcol
   ! number of mid-point levels
   integer, intent(in) :: nlev
+  ! number of levels on the interface
+  integer, intent(in) :: nlevi
   ! superdiagonal
-  real(rtype), intent(in) :: du(shcol,nlev)
-  ! Factorized version of subdiagonal
-  real(rtype), intent(in) :: dl(shcol,nlev)
-  ! Factorized version of diagonal
-  real(rtype), intent(in) :: d(shcol,nlev)
+  real(rtype), intent(in) :: ca(shcol,nlev)
+  ! subdiagonal
+  real(rtype), intent(in) :: cc(shcol,nlev)
+  ! 1./(1.+ca(k)+cc(k)-cc(k)*ze(k-1))
+  real(rtype), intent(in) :: denom(shcol,nlev)
+  ! Term in tri-diag. matrix system
+  real(rtype), intent(in) :: ze(shcol,nlev)
+
+  ! MJC: EDMF inputs
+  ! Include mass flux contribution?
+  logical,  intent(in)    :: do_mf
+  ! Sum of plume (a_i*w_i*var_i)
+  real(rtype), intent(in)    :: mf_awvar(shcol,nlevi)
+  ! dt*g*rho on interfaces
+  real(rtype), intent(in)    :: tmpi3(shcol,nlevi)
+  ! 1/dp
+  real(rtype), intent(in)    :: rdp_zt(shcol,nlev)
 
 ! IN/OUT VARIABLES
   real(rtype), intent(inout) :: var(shcol,nlev)
 
 ! LOCAL VARIABLES
   integer :: i, k
+  ! Term in tri-diag solution
+  real(rtype) :: zf(shcol,nlev)
 
-  ! Solve using Thomas algorithm
-  do k=2,nlev
+
+  ! Calculate zf(k). Terms zf(k) and ze(k) are required in solution of
+  ! tridiagonal matrix defined by implicit diffusion equation.
+  ! Note that only levels ntop through nbot need be solved for.
+
+  do i=1,shcol
+    if (do_mf) then
+      zf(i,nlev) = (var(i,nlev) - &
+        tmpi3(i,nlev)*mf_awvar(i,nlev)*rdp_zt(i,nlev))*denom(i,nlev)
+    else
+      zf(i,nlev) = var(i,nlev) * denom(i,nlev)
+    endif 
+  enddo
+
+  do k=nlev-1,1,-1
     do i=1,shcol
-      var(i,k) = var(i,k) - dl(i,k)*var(i,k-1)
+      if (do_mf) then
+        zf(i,k) = (var(i,k) + &
+          (tmpi3(i,k+1)*mf_awvar(i,k+1) - tmpi3(i,k)*mf_awvar(i,k))*rdp_zt(i,k) + &
+          ca(i,k)*zf(i,k+1))*denom(i,k)
+      else
+        zf(i,k) = (var(i,k) + ca(i,k) * zf(i,k+1)) * denom(i,k)
+      endif 
     enddo
   enddo
+
+  ! Perform back substitution
+
   do i=1,shcol
-    var(i,nlev) = var(i,nlev)/d(i,nlev)
+    var(i,1) = zf(i,1)
   enddo
-  do k=nlev,2,-1
+
+  do k=2,nlev
     do i=1,shcol
-      var(i,k-1) = (var(i,k-1) - du(i,k-1)*var(i,k))/d(i,k-1)
+      var(i,k) = zf(i,k) + ze(i,k)*var(i,k-1)
     enddo
   enddo
 
@@ -4707,7 +7355,7 @@ subroutine linear_interp(x1,x2,y1,y2,km1,km2,ncol,minthresh)
           y2(i,k2) = y1(i,km1-1) + (y1(i,km1)-y1(i,km1-1))*(x2(i,k2)-x1(i,km1-1))/(x1(i,km1)-x1(i,km1-1))
        end do
     else
-       print *,km1,km2
+       !print *,km1,km2
     end if
     do k2 = 1,km2
        do i = 1,ncol
@@ -4805,17 +7453,36 @@ subroutine compute_l_inf_shoc_length(nlev,shcol,zt_grid,dz_zt,tke,l_inf)
 
   numer(:) = 0._rtype
   denom(:) = 0._rtype
-
+  
+  ! MJC [10/31/24]: Add do_edmf to use original code when running just SHOC.
   do k=1,nlev
     do i=1,shcol
+      if (do_edmf) then
+        if ( tke(i,k) .ge. 0.0005_rtype ) then
+           tkes=bfb_sqrt(tke(i,k))
+        else
+           tkes = 0._rtype    
+        endif
+        numer(i)=numer(i)+tkes*zt_grid(i,k)*dz_zt(i,k)
+        denom(i)=denom(i)+tkes*dz_zt(i,k)
+      else
         tkes=bfb_sqrt(tke(i,k))
         numer(i)=numer(i)+tkes*zt_grid(i,k)*dz_zt(i,k)
         denom(i)=denom(i)+tkes*dz_zt(i,k)
+      endif  
     enddo
   enddo
-
+  
   do i=1,shcol
-    l_inf(i)=0.1_rtype*(numer(i)/denom(i))
+    if (do_edmf) then
+      if (denom(i) .eq. 0._rtype) then
+        l_inf(i)=l_inf_const     
+      else
+        l_inf(i)=0.1_rtype*(numer(i)/denom(i))
+      endif
+    else
+      l_inf(i)=0.1_rtype*(numer(i)/denom(i))
+    endif
   enddo
 
 end subroutine compute_l_inf_shoc_length
@@ -4864,9 +7531,17 @@ subroutine compute_shoc_mix_shoc_length(nlev,shcol,tke,brunt,zt_grid,l_inf,shoc_
       tkes = sqrt(tke(i,k))
 
       if(brunt(i,k) .ge. 0) brunt2(i,k) = brunt(i,k)
-
-      shoc_mix(i,k)=min(maxlen,(2.8284_rtype*sqrt(1._rtype/((1._rtype/(tscale*tkes*vk*zt_grid(i,k)))&
+ 
+      ! MJC [10/31/24]: Add do_edmf to use original code when running just SHOC.
+      if (do_edmf) then
+        ! MJC: Original + l_inf_const  
+        shoc_mix(i,k)=min(maxlen,(2.8284_rtype*sqrt(1._rtype/((1._rtype/(tscale*tkes*vk*zt_grid(i,k)))&
+        +(1._rtype/(tscale*tkes*l_inf_const))+0.01_rtype*(brunt2(i,k)/tke(i,k)))))/length_fac)
+      else
+        shoc_mix(i,k)=min(maxlen,(2.8284_rtype*sqrt(1._rtype/((1._rtype/(tscale*tkes*vk*zt_grid(i,k)))&
         +(1._rtype/(tscale*tkes*l_inf(i)))+0.01_rtype*(brunt2(i,k)/tke(i,k)))))/length_fac)
+      endif
+          
     enddo ! end i loop (column loop)
   enddo ! end k loop (vertical loop)
 
@@ -4903,6 +7578,162 @@ subroutine check_length_scale_shoc_length(nlev,shcol,host_dx,host_dy,shoc_mix)
   enddo
 
 end subroutine check_length_scale_shoc_length
+
+!=========================================================
+!=========================================================
+! MJC: Poisson code for MF entrainment
+!call Poisson( nz, mf_nup, entf, enti, 69._rtype)
+
+  subroutine poisson(nz,nup,lambda,poi,state)
+  !**********************************************************************
+  ! Set a unique (but reproduceble) seed for the kiss RNG
+  ! Call Poisson deviate
+  ! By Adam Herrington
+  !**********************************************************************
+#ifdef SCREAM_CONFIG_IS_CMAKE
+   use shoc_eam_host_stubs, only: ShrKissRandGen
+#else
+   use shr_RandNum_mod, only: ShrKissRandGen
+#endif
+
+       integer,                     intent(in)  :: nz,nup
+       real(rtype), dimension(1,4),      intent(in)  :: state
+       real(rtype), dimension(nz,nup), intent(in)  :: lambda
+       integer,  dimension(nz,nup), intent(out) :: poi
+       integer,  dimension(1,4)                 :: tmpseed
+       integer                                  :: i,j
+       type(ShrKissRandGen)                     :: kiss_gen
+
+       ! Compute seed
+       tmpseed(1,1) = int((state(1,1) - int(state(1,1))) * 1000000000._rtype)
+       tmpseed(1,2) = int((state(1,2) - int(state(1,2))) * 1000000000._rtype)
+       tmpseed(1,3) = int((state(1,3) - int(state(1,3))) * 1000000000._rtype)
+       tmpseed(1,4) = int((state(1,4) - int(state(1,4))) * 1000000000._rtype)
+
+       ! Set seed
+       kiss_gen = ShrKissRandGen(tmpseed)
+
+       do i=1,nz
+         do j=1,nup
+           call hybridRNG(kiss_gen,lambda(i,j),poi(i,j))
+         enddo
+       enddo
+
+  end subroutine poisson
+
+  subroutine hybridRNG(kiss_gen,lambda,kout)
+  !**********************************************************************
+  ! Interface for the two poisson rng subroutines
+  ! chooses the appropriate subroutine based on the value of lambda
+  !**********************************************************************
+#ifdef SCREAM_CONFIG_IS_CMAKE
+   use shoc_eam_host_stubs, only: ShrKissRandGen
+#else
+   use shr_RandNum_mod, only: ShrKissRandGen
+#endif
+
+       type(ShrKissRandGen), intent(inout) :: kiss_gen
+       real(rtype),             intent(in)    :: lambda
+       integer,              intent(out)   :: kout
+
+       if (lambda < 10._rtype) then
+          call knuth(kiss_gen,lambda,kout)
+       else
+          call hormann(kiss_gen,lambda,kout)
+       end if
+
+  end subroutine hybridRNG
+
+  subroutine knuth(kiss_gen,lambda,kout)
+  !**********************************************************************
+  ! Discrete random poisson from Knuth 
+  ! The Art of Computer Programming, v2, 137-138
+  ! By Adam Herrington
+  !**********************************************************************
+#ifdef SCREAM_CONFIG_IS_CMAKE
+   use shoc_eam_host_stubs, only: ShrKissRandGen
+#else
+   use shr_RandNum_mod, only: ShrKissRandGen
+#endif
+
+       type(ShrKissRandGen), intent(inout) :: kiss_gen
+       real(rtype),             intent(in)    :: lambda
+       integer,              intent(out)   :: kout
+
+       ! Local variables
+       real(rtype), dimension(1,1) :: tmpuni
+       real(rtype)                 :: puni, explam
+       integer                  :: k
+
+       k = 0
+       explam = exp(-1._rtype*lambda)
+       puni = 1._rtype
+       do while (puni > explam)
+         k = k + 1
+         call kiss_gen%random(tmpuni)
+         puni = puni*tmpuni(1,1)
+       end do
+       kout = k - 1
+
+  end subroutine knuth
+
+  subroutine hormann(kiss_gen,lambda,kout)
+  !**********************************************************************
+  ! Discrete random poisson
+  ! Implements Poisson Transformed Rejection with Squeeze (PTRS) 
+  ! from W. Hormann Insurance: Mathematics and Economics 12, 39-45 (1993) 
+  ! By Jake Reschke
+  !**********************************************************************
+#ifdef SCREAM_CONFIG_IS_CMAKE
+  use shoc_eam_host_stubs, only: ShrKissRandGen
+#else
+  use shr_RandNum_mod, only: ShrKissRandGen
+#endif
+
+      type(ShrKissRandGen), intent(inout) :: kiss_gen
+      real(rtype),             intent(in)    :: lambda
+      integer,              intent(out)   :: kout
+
+      ! Local variables
+      real(rtype), dimension(1,1) :: U,V
+      real(rtype)                 :: a,b,vr,alphinv,us,loggam
+      integer                  :: k,i
+
+      b = 0.931_rtype + 2.53_rtype*sqrt(lambda)
+      a = -0.059_rtype + 0.02483_rtype*b
+      vr = 0.9277_rtype - 3.6224_rtype/(b - 2._rtype)
+      alphinv = 1.1239_rtype + 1.1328_rtype/(b - 3.4_rtype)
+
+      do
+         call kiss_gen%random(U)
+         call kiss_gen%random(V)
+         U(1,1) = U(1,1) - 0.5_rtype
+         us = 0.5_rtype - abs(U(1,1))
+         k = floor( (2._rtype*a/us + b)*U(1,1) + lambda + 0.43_rtype )
+         if (us >= 0.07_rtype .and.  V(1,1) <= vr) then
+            kout = k
+            exit
+         end if
+         if (k <= 0 .or. (us < 0.013_rtype .and. V(1,1) > us)) then
+            cycle
+         end if
+         ! compute log(k!). If k >=10 use stirling's approximation
+         if (k < 10) then
+            loggam = 0._rtype
+            do i = 1, k
+               loggam = loggam + log(1._rtype*i)
+            end do
+         else
+            loggam = log(sqrt(2._rtype*pi)) + (k + 0.5_rtype)*log(1._rtype*k) - k + (1._rtype/12._rtype - 1._rtype/(360._rtype*k*k))/k
+         end if
+         if (log( V(1,1)*alphinv/(a/(us*us) + b) ) <= -1._rtype*lambda + k*log(lambda) - loggam) then
+            kout = k
+            exit
+         end if
+      end do
+
+  end subroutine hormann
+
 
 end module
 
