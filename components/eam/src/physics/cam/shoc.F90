@@ -82,7 +82,7 @@ real(rtype) :: Ckm_s = 0.1_rtype ! Stable PBL diffusivity for momentum
 ! MJC: extra tunable parameters
 real(rtype) :: l_inf_const = 150.0_rtype  ! [m] Asymptotic value of length scale L
 real(rtype) :: tscale_const = 400.0_rtype ! [s] Eddy turnover timescale 
-real(rtype) :: Cee_const = 1.0_rtype      ! Turbulent constant of TKE dissipation
+real(rtype) :: Cee_const = 1.0_rtype      ! Multiplier on the TKE dissipation constant Cee (1 = standard SHOC)
 
 ! For EDMF:
 real(rtype) :: mf_L0   = 50._rtype   ! Default in namelist_defaults_eam.xml: 50 m
@@ -5704,11 +5704,11 @@ subroutine adv_sgs_tke(nlev, shcol, dtime, shoc_mix, wthv_sec, &
 
   Cs=0.15_rtype
   Ck=0.1_rtype
-  Ce=bfb_cube(Ck)/bfb_quad(Cs)  ! MJC: 1.975
+  Ce=bfb_cube(Ck)/bfb_quad(Cs)  ! = Ck^3/Cs^4 = 0.1^3/0.15^4 = 1.975 (bfb_quad is the 4th power)
 
-  Ce1=Ce/0.7_rtype*0.19_rtype   ! MJC: 0.536
-  Ce2=Ce/0.7_rtype*0.51_rtype   ! MJC: 1.439
-  Cee=Ce1+Ce2                   ! MJC: 1.975
+  Ce1=Ce/0.7_rtype*0.19_rtype   ! 0.536
+  Ce2=Ce/0.7_rtype*0.51_rtype   ! 1.439
+  Cee=Ce1+Ce2                   ! 1.975 = standard SHOC dissipation constant
   !print*,'Cee = ', Cee
 
   do k = 1, nlev
@@ -5725,8 +5725,12 @@ subroutine adv_sgs_tke(nlev, shcol, dtime, shoc_mix, wthv_sec, &
 
         ! Dissipation term
         !a_diss(i,k)=Cee/shoc_mix(i,k)*bfb_pow(tke(i,k),1.5_rtype)
-        ! MJC: Cee as tunable constant
-        a_diss(i,k)=Cee_const/shoc_mix(i,k)*bfb_pow(tke(i,k),1.5_rtype)
+        ! Cee_const is a MULTIPLIER on SHOC's Cee (default 1.0 = standard SHOC,
+        ! bit-for-bit with maint-3.0). The E3SM_SCREAM_pm_oct_2023 SHOC+MF tree
+        ! used Cee_const (default 1.0) as the ABSOLUTE constant in place of
+        ! Cee = 1.975, i.e. 0.506x the standard dissipation for every run, MF or
+        ! not; that behaviour is recovered here with Cee_const = 0.50625 (= Cs^4/Ck^3).
+        a_diss(i,k)=(Cee_const*Cee)/shoc_mix(i,k)*bfb_pow(tke(i,k),1.5_rtype)
         
         ! March equation forward one timestep
         tke(i,k)=max(mintke,tke(i,k)+dtime* &

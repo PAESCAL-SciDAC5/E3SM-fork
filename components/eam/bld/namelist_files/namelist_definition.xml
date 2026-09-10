@@ -3449,7 +3449,9 @@ Default: set by build-namelist
 
 <entry id="shoc_Cee_const" type="real" category="pblrad"
        group="shocpbl_diff_nl" valid_values="" >
-Turbulent constant of TKE dissipation.
+Multiplier on SHOC's TKE dissipation constant Cee = Ce1+Ce2 = Ck^3/Cs^4 = 1.975 (adv_sgs_tke).
+1.0 reproduces standard SHOC. (In the E3SM_SCREAM_pm_oct_2023 SHOC+MF tree this
+value was used as the absolute constant instead, i.e. 1.0 there = 0.50625 here.)
 Default: set by build-namelist
 </entry>
 
