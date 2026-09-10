@@ -5692,7 +5692,8 @@ subroutine adv_sgs_tke(nlev, shcol, dtime, shoc_mix, wthv_sec, &
   integer :: i, k
   !real(rtype) :: a_prod_bu, a_prod_sh
 
-  real(rtype) :: Ck, Cs, Ce, Ce1, Ce2, Cee
+  real(rtype) :: Ck, Cs, Ce, Ce1, Ce2, Cee, Cee_eff
+  real(rtype) :: a_prod_bu_s, a_prod_sh_s
 
 #ifdef SCREAM_CONFIG_IS_CMAKE
   if (use_cxx) then
@@ -5709,34 +5710,41 @@ subroutine adv_sgs_tke(nlev, shcol, dtime, shoc_mix, wthv_sec, &
   Ce1=Ce/0.7_rtype*0.19_rtype   ! 0.536
   Ce2=Ce/0.7_rtype*0.51_rtype   ! 1.439
   Cee=Ce1+Ce2                   ! 1.975 = standard SHOC dissipation constant
+  Cee_eff=Cee_const*Cee         ! Cee_const = 1 -> Cee exactly
   !print*,'Cee = ', Cee
 
   do k = 1, nlev
      do i = 1, shcol
 
         ! Compute buoyant production term
-        a_prod_bu(i,k)=(ggr/basetemp)*wthv_sec(i,k)
+        a_prod_bu_s=(ggr/basetemp)*wthv_sec(i,k)
 
         tke(i,k)=max(0._rtype,tke(i,k))
 
         ! Shear production term, use diffusivity from
         !  previous timestep
-        a_prod_sh(i,k)=tk(i,k)*sterm_zt(i,k)
+        a_prod_sh_s=tk(i,k)*sterm_zt(i,k)
 
-        ! Dissipation term
-        !a_diss(i,k)=Cee/shoc_mix(i,k)*bfb_pow(tke(i,k),1.5_rtype)
-        ! Cee_const is a MULTIPLIER on SHOC's Cee (default 1.0 = standard SHOC,
-        ! bit-for-bit with maint-3.0). The E3SM_SCREAM_pm_oct_2023 SHOC+MF tree
-        ! used Cee_const (default 1.0) as the ABSOLUTE constant in place of
-        ! Cee = 1.975, i.e. 0.506x the standard dissipation for every run, MF or
-        ! not; that behaviour is recovered here with Cee_const = 0.50625 (= Cs^4/Ck^3).
-        a_diss(i,k)=(Cee_const*Cee)/shoc_mix(i,k)*bfb_pow(tke(i,k),1.5_rtype)
-        
-        ! March equation forward one timestep
+        ! Dissipation term. Cee_eff = Cee_const*Cee, with Cee_const a MULTIPLIER
+        ! on SHOC's Cee (default 1.0 = standard SHOC, bit-for-bit with maint-3.0).
+        ! The E3SM_SCREAM_pm_oct_2023 SHOC+MF tree used Cee_const (default 1.0) as
+        ! the ABSOLUTE constant in place of Cee = 1.975, i.e. 0.506x the standard
+        ! dissipation for every run, MF or not; that behaviour is recovered here
+        ! with Cee_const = 0.50625 (= Cs^4/Ck^3).
+        a_diss(i,k)=Cee_eff/shoc_mix(i,k)*bfb_pow(tke(i,k),1.5_rtype)
+
+        ! March equation forward one timestep. The scalar temporaries and the
+        ! expression shapes are kept exactly as in standard SHOC so that the
+        ! compiler generates the same floating-point code (with -O3 and FMA
+        ! contraction, array temporaries changed the last bit of tke).
         tke(i,k)=max(mintke,tke(i,k)+dtime* &
-             (max(0._rtype,a_prod_sh(i,k)+a_prod_bu(i,k))-a_diss(i,k)))
+             (max(0._rtype,a_prod_sh_s+a_prod_bu_s)-a_diss(i,k)))
 
         tke(i,k)=min(tke(i,k),maxtke)
+
+        ! SHOC+MF diagnostics (history output)
+        a_prod_bu(i,k)=a_prod_bu_s
+        a_prod_sh(i,k)=a_prod_sh_s
      enddo
   enddo
 
@@ -6147,6 +6155,45 @@ subroutine vd_shoc_decomp( &
 ! LOCAL VARIABLES
   integer :: i, k
 
+  if (.not. do_mf) then
+    ! Standard SHOC (no mass flux): operation-for-operation the maint-3.0
+    ! vd_shoc_decomp (Thomas factorization), so that do_edmf=.false. -- and the
+    ! momentum/TKE/tracer solves, which never carry MF -- stay bit-for-bit with
+    ! standard SHOC. The MF formulation below is mathematically equivalent but
+    ! evaluates in a different order (round-off differences that BOMEX amplifies
+    ! to O(1) within ~8 h). Factors are returned packed as
+    !   ca = du (superdiagonal), cc = dl (factorized subdiagonal),
+    !   denom = d (factorized diagonal), ze = 0 (unused);
+    ! vd_shoc_solve's do_mf=.false. branch consumes them accordingly.
+    do k=1,nlev-1
+      do i=1,shcol
+        ca(i,k)   = -1._rtype * kv_term(i,k+1) * tmpi(i,k+1) * rdp_zt(i,k)
+        cc(i,k+1) = -1._rtype * kv_term(i,k+1) * tmpi(i,k+1) * rdp_zt(i,k+1)
+      enddo
+    enddo
+    ca(:,nlev) = 0._rtype
+    cc(:,1)    = 0._rtype
+    do i=1,shcol
+      denom(i,1) = 1._rtype - ca(i,1)
+    enddo
+    do k=2,nlev-1
+      do i=1,shcol
+        denom(i,k) = 1._rtype - ca(i,k) - cc(i,k)
+
+        cc(i,k) = cc(i,k)/denom(i,k-1)
+        denom(i,k) = denom(i,k) - cc(i,k)*ca(i,k-1)
+      enddo
+    enddo
+    do i=1,shcol
+      denom(i,nlev) = 1._rtype - cc(i,nlev) + flux(i)*dtime*ggr*rdp_zt(i,nlev)
+
+      cc(i,nlev) = cc(i,nlev)/denom(i,nlev-1)
+      denom(i,nlev) = denom(i,nlev) - cc(i,nlev)*ca(i,nlev-1)
+    enddo
+    ze(:,:) = 0._rtype
+    return
+  endif
+
   ! Determine superdiagonal (ca(k)) and subdiagonal (cc(k)) coeffs of the
   ! tridiagonal diffusion matrix. The diagonal elements  (cb=1+ca+cc) are
   ! a combination of ca and cc; they are not required by the solver.
@@ -6325,6 +6372,25 @@ subroutine vd_shoc_solve(&
   ! Term in tri-diag solution
   real(rtype) :: zf(shcol,nlev)
 
+  if (.not. do_mf) then
+    ! Standard SHOC: the maint-3.0 Thomas back-substitution on the packed
+    ! factors (ca = du, cc = dl, denom = d) from vd_shoc_decomp's do_mf=.false.
+    ! branch; bit-for-bit with standard SHOC.
+    do k=2,nlev
+      do i=1,shcol
+        var(i,k) = var(i,k) - cc(i,k)*var(i,k-1)
+      enddo
+    enddo
+    do i=1,shcol
+      var(i,nlev) = var(i,nlev)/denom(i,nlev)
+    enddo
+    do k=nlev,2,-1
+      do i=1,shcol
+        var(i,k-1) = (var(i,k-1) - ca(i,k-1)*var(i,k))/denom(i,k-1)
+      enddo
+    enddo
+    return
+  endif
 
   ! Calculate zf(k). Terms zf(k) and ze(k) are required in solution of
   ! tridiagonal matrix defined by implicit diffusion equation.

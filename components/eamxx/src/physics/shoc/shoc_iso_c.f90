@@ -1539,7 +1539,7 @@ contains
   end subroutine pblintd_height_c
 
   subroutine vd_shoc_decomp_c(shcol, nlev, nlevi, kv_term, tmpi, rdp_zt, dtime, flux, du, dl, d) bind(C)
-    use scream_abortutils, only: endscreamrun
+    use shoc, only : vd_shoc_decomp
 
     integer(kind=c_int) , value, intent(in) :: shcol, nlev, nlevi
     real(kind=c_real) , intent(in), dimension(shcol, nlevi) :: kv_term, tmpi
@@ -1547,22 +1547,28 @@ contains
     real(kind=c_real) , value, intent(in) :: dtime
     real(kind=c_real) , intent(in), dimension(shcol) :: flux
     real(kind=c_real) , intent(out), dimension(shcol, nlev) :: du, dl, d
+    ! SHOC+MF: with do_mf=.false. vd_shoc_decomp runs the standard maint-3.0
+    ! factorization and returns du, dl, d packed in (ca, cc, denom); ze unused.
+    real(kind=c_real), dimension(shcol, nlevi) :: mf_ae, mf_aw, tmpi3
+    real(kind=c_real), dimension(shcol, nlev) :: ze
+    mf_ae = 1; mf_aw = 0; tmpi3 = 0
 
-    ! SHOC+MF: vd_shoc_decomp now returns (ca, cc, denom, ze) for its own solver
-    ! form; the (du, dl, d) test interface of standard SHOC cannot be mapped to it.
-    du = 0; dl = 0; d = 0
-    call endscreamrun('vd_shoc_decomp_c: unit-test bridge not available with the SHOC+MF shoc.F90')
+    call vd_shoc_decomp(shcol, nlev, nlevi, kv_term, tmpi, rdp_zt, dtime, flux, .false., mf_ae, mf_aw, tmpi3, du, dl, d, ze)
   end subroutine vd_shoc_decomp_c
 
   subroutine vd_shoc_solve_c(shcol, nlev, du, dl, d, var) bind(C)
-    use scream_abortutils, only: endscreamrun
+    use shoc, only : vd_shoc_solve
 
     integer(kind=c_int) , value, intent(in) :: shcol, nlev
     real(kind=c_real) , intent(in), dimension(shcol, nlev) :: du, dl, d
     real(kind=c_real) , intent(inout), dimension(shcol, nlev) :: var
+    ! SHOC+MF: do_mf=.false. runs the standard maint-3.0 Thomas solve on the
+    ! packed factors (ca=du, cc=dl, denom=d); the MF-only arguments are dummies.
+    real(kind=c_real), dimension(shcol, nlev+1) :: mf_awvar, tmpi3
+    real(kind=c_real), dimension(shcol, nlev) :: ze, rdp_zt
+    mf_awvar = 0; tmpi3 = 0; ze = 0; rdp_zt = 0
 
-    ! SHOC+MF: see vd_shoc_decomp_c
-    call endscreamrun('vd_shoc_solve_c: unit-test bridge not available with the SHOC+MF shoc.F90')
+    call vd_shoc_solve(shcol, nlev, nlev+1, du, dl, d, ze, .false., mf_awvar, tmpi3, rdp_zt, var)
   end subroutine vd_shoc_solve_c
 
   subroutine pblintd_surf_temp_c(shcol, nlev, nlevi, z, ustar, obklen, kbfs, thv, tlv, pblh, check, rino) bind(C)
