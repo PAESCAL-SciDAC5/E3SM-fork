@@ -2959,27 +2959,30 @@ Int shoc_main_f(Int shcol, Int nlev, Int nlevi, Real dtime, Int nadv, Int npbl, 
   std::vector<view_1d> out_views_1d = {pblh_d};
   ScreamDeepCopy::copy_to_host({pblh}, shcol, out_views_1d);
 
-  // 2d
+  // 2d. tkh is a pure output of the C++ shoc_main (SHOCOutput) and must be
+  // copied back too: without it the host tkh array keeps whatever it held on
+  // entry (the shoc_in_and_out driver's tables showed tkh = 0 for the C++
+  // engine while tk was filled).
   std::vector<int> dim1_2d_out = {shcol, shcol, shcol, shcol, shcol,
-                                  shcol, shcol, shcol, shcol,
+                                  shcol, shcol, shcol, shcol, shcol,
                                   shcol, shcol, shcol, shcol, shcol,
                                   shcol, shcol, shcol, shcol, shcol,
                                   shcol, shcol, shcol, shcol, shcol,
                                   shcol};
   std::vector<int> dim2_2d_out = {nlev,  nlev,  nlev,  nlev,  nlev,
-                                  nlev,  nlev,  nlev,  nlev,
+                                  nlev,  nlev,  nlev,  nlev,  nlev,
                                   nlev,  nlev,  nlev,  nlev,  nlevi,
                                   nlevi, nlevi, nlevi, nlevi, nlevi,
                                   nlevi, nlevi, nlevi, nlev,  nlev,
                                   nlev};
   std::vector<Real*> ptr_array_2d_out = {host_dse, tke,       thetal,   qw,       u_wind,
-                                         v_wind,   wthv_sec,  tk,       shoc_cldfrac,
+                                         v_wind,   wthv_sec,  tk,       tkh,      shoc_cldfrac,
                                          shoc_ql,  shoc_ql2,  shoc_mix, w_sec,    thl_sec,
                                          qw_sec,   qwthl_sec, wthl_sec, wqw_sec,  wtke_sec,
                                          uw_sec,   vw_sec,    w3,       wqls_sec, brunt,
                                          isotropy};
   std::vector<view_2d> out_views_2d = {host_dse_d, tke_d,       thetal_d,   qw_d,       u_wind_d,
-                                       v_wind_d,   wthv_sec_d,  tk_d,       shoc_cldfrac_d,
+                                       v_wind_d,   wthv_sec_d,  tk_d,       tkh_d,      shoc_cldfrac_d,
                                        shoc_ql_d,  shoc_ql2_d,  shoc_mix_d, w_sec_d,    thl_sec_d,
                                        qw_sec_d,   qwthl_sec_d, wthl_sec_d, wqw_sec_d,  wtke_sec_d,
                                        uw_sec_d,   vw_sec_d,    w3_d,       wqls_sec_d, brunt_d,
