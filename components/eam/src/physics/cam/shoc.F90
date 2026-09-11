@@ -34,7 +34,7 @@ module shoc
 implicit none
 save ! for module variables
 
-public  :: shoc_init, shoc_main, shoc_main_std
+public  :: shoc_init, shoc_main, shoc_main_std, shoc_main_std_mf_diag
 
 logical :: use_cxx = .true.
 
@@ -144,6 +144,20 @@ real(rtype), allocatable, save, private :: mfp_mf_moist_freq(:)
 real(rtype), allocatable, save, private :: mfp_plumeheight(:)
 real(rtype), allocatable, save, private :: mfp_plume_dry_height(:)
 real(rtype), allocatable, save, private :: mfp_mf_w_cp(:)
+
+! Per-call MF diagnostics of shoc_main that shoc_main_std would otherwise
+! discard (they are intent(out) locals there). Copied after every call when
+! do_edmf is on, zero otherwise; read back by shoc_main_std_mf_diag for the
+! shoc_in_and_out driver's MF tables. Diagnostic only: nothing reads them
+! inside SHOC, so the no-MF path is unchanged.
+real(rtype), allocatable, save, private :: mfd_shoc_cldfrac_orig(:,:)   ! PDF-only cloud fraction (zt)
+real(rtype), allocatable, save, private :: mfd_shoc_ql_orig(:,:)        ! PDF-only condensate (zt)
+real(rtype), allocatable, save, private :: mfd_mf_ql(:,:)               ! updraft condensate a_u*qc_u (zt)
+real(rtype), allocatable, save, private :: mfd_mf_moist_a_zt(:,:)       ! moist updraft area (zt)
+real(rtype), allocatable, save, private :: mfd_ent_ensemble_mean(:,:)   ! ensemble-mean entrainment rate (zt) [1/m]
+real(rtype), allocatable, save, private :: mfd_ztop(:)                  ! ztop used by the dynamic L0 [m]
+real(rtype), allocatable, save, private :: mfd_dynamic_L0(:)            ! L0 = mf_a*ztop**mf_b [m]
+real(rtype), allocatable, save, private :: mfd_wstar(:)                 ! surface-layer w* of the plume closure [m/s]
 
 !=========================================================
 ! Private module parameters
@@ -1272,7 +1286,69 @@ subroutine shoc_main_std ( &
 #endif
      )
 
+  ! Keep the per-call MF diagnostics for shoc_main_std_mf_diag. With MF off
+  ! ztop/dynamic_L0/wstar are never assigned by shoc_main (integrate_mf is not
+  ! called), so only copy them on the MF path and leave zeros otherwise.
+  if (do_edmf) then
+    mfd_shoc_cldfrac_orig = shoc_cldfrac_orig
+    mfd_shoc_ql_orig      = shoc_ql_orig
+    mfd_mf_ql             = mf_ql
+    mfd_mf_moist_a_zt     = mf_moist_a_zt
+    mfd_ent_ensemble_mean = ent_ensemble_mean
+    mfd_ztop              = ztop
+    mfd_dynamic_L0        = dynamic_L0
+    mfd_wstar             = wstar
+  end if
+
 end subroutine shoc_main_std
+
+!==============================================================
+! shoc_main_std_mf_diag: read back the SHOC+MF plume diagnostics of the last
+! shoc_main_std call (for the shoc_in_and_out driver's MF tables). All arrays
+! are top-first (k=1 = model top) like shoc_main's own outputs. Interface
+! (nlevi) quantities are the persistent MF state (mfp_*), midpoint (nlev) and
+! column (shcol) ones the copies saved at the end of shoc_main_std. Zeros
+! before the first call or with do_edmf off.
+subroutine shoc_main_std_mf_diag(shcol, nlev, nlevi, &
+     shoc_cldfrac_orig, shoc_ql_orig, mf_ql, mf_moist_a_zt, ent_ensemble_mean, & ! Output (zt)
+     mf_thlflx, mf_qtflx, mf_thvflx, mf_moist_a, mf_moist_w, mf_moist_qc, mf_aw, & ! Output (zi)
+     plumeheight, plume_dry_height, ztop, dynamic_L0, wstar)                       ! Output (column)
+
+  implicit none
+
+  integer, intent(in) :: shcol, nlev, nlevi
+  real(rtype), intent(out) :: shoc_cldfrac_orig(shcol,nlev), shoc_ql_orig(shcol,nlev)
+  real(rtype), intent(out) :: mf_ql(shcol,nlev), mf_moist_a_zt(shcol,nlev)
+  real(rtype), intent(out) :: ent_ensemble_mean(shcol,nlev)
+  real(rtype), intent(out) :: mf_thlflx(shcol,nlevi), mf_qtflx(shcol,nlevi), mf_thvflx(shcol,nlevi)
+  real(rtype), intent(out) :: mf_moist_a(shcol,nlevi), mf_moist_w(shcol,nlevi)
+  real(rtype), intent(out) :: mf_moist_qc(shcol,nlevi), mf_aw(shcol,nlevi)
+  real(rtype), intent(out) :: plumeheight(shcol), plume_dry_height(shcol)
+  real(rtype), intent(out) :: ztop(shcol), dynamic_L0(shcol), wstar(shcol)
+
+  if (.not. allocated(mfd_shoc_cldfrac_orig)) then
+    call shoc_main_std_alloc(shcol, nlev, nlevi)
+  end if
+
+  shoc_cldfrac_orig = mfd_shoc_cldfrac_orig
+  shoc_ql_orig      = mfd_shoc_ql_orig
+  mf_ql             = mfd_mf_ql
+  mf_moist_a_zt     = mfd_mf_moist_a_zt
+  ent_ensemble_mean = mfd_ent_ensemble_mean
+  mf_thlflx         = mfp_mf_thlflx
+  mf_qtflx          = mfp_mf_qtflx
+  mf_thvflx         = mfp_mf_thvflx
+  mf_moist_a        = mfp_mf_moist_a
+  mf_moist_w        = mfp_mf_moist_w
+  mf_moist_qc       = mfp_mf_moist_qc
+  mf_aw             = mfp_mf_aw
+  plumeheight       = mfp_plumeheight
+  plume_dry_height  = mfp_plume_dry_height
+  ztop              = mfd_ztop
+  dynamic_L0        = mfd_dynamic_L0
+  wstar             = mfd_wstar
+
+end subroutine shoc_main_std_mf_diag
 
 subroutine shoc_main_std_alloc(shcol, nlev, nlevi)
   ! Allocate and zero the persistent MF state used by shoc_main_std
@@ -1352,6 +1428,23 @@ subroutine shoc_main_std_alloc(shcol, nlev, nlevi)
     allocate(mfp_plume_dry_height(shcol)); mfp_plume_dry_height = 0._rtype
     if (allocated(mfp_mf_w_cp)) deallocate(mfp_mf_w_cp)
     allocate(mfp_mf_w_cp(shcol)); mfp_mf_w_cp = 0._rtype
+    ! Diagnostic copies read by shoc_main_std_mf_diag
+    if (allocated(mfd_shoc_cldfrac_orig)) deallocate(mfd_shoc_cldfrac_orig)
+    allocate(mfd_shoc_cldfrac_orig(shcol,nlev)); mfd_shoc_cldfrac_orig = 0._rtype
+    if (allocated(mfd_shoc_ql_orig)) deallocate(mfd_shoc_ql_orig)
+    allocate(mfd_shoc_ql_orig(shcol,nlev)); mfd_shoc_ql_orig = 0._rtype
+    if (allocated(mfd_mf_ql)) deallocate(mfd_mf_ql)
+    allocate(mfd_mf_ql(shcol,nlev)); mfd_mf_ql = 0._rtype
+    if (allocated(mfd_mf_moist_a_zt)) deallocate(mfd_mf_moist_a_zt)
+    allocate(mfd_mf_moist_a_zt(shcol,nlev)); mfd_mf_moist_a_zt = 0._rtype
+    if (allocated(mfd_ent_ensemble_mean)) deallocate(mfd_ent_ensemble_mean)
+    allocate(mfd_ent_ensemble_mean(shcol,nlev)); mfd_ent_ensemble_mean = 0._rtype
+    if (allocated(mfd_ztop)) deallocate(mfd_ztop)
+    allocate(mfd_ztop(shcol)); mfd_ztop = 0._rtype
+    if (allocated(mfd_dynamic_L0)) deallocate(mfd_dynamic_L0)
+    allocate(mfd_dynamic_L0(shcol)); mfd_dynamic_L0 = 0._rtype
+    if (allocated(mfd_wstar)) deallocate(mfd_wstar)
+    allocate(mfd_wstar(shcol)); mfd_wstar = 0._rtype
 end subroutine shoc_main_std_alloc
 
 

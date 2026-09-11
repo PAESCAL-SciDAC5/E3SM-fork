@@ -130,6 +130,29 @@ contains
     nstep_calls = nstep_calls + 1
   end subroutine shoc_main_c
 
+  ! SHOC+MF plume diagnostics of the last shoc_main_c call, for the
+  ! shoc_in_and_out driver's MF tables (see shoc.F90::shoc_main_std_mf_diag).
+  ! Top-first like every other shoc_main array; zeros with do_edmf off.
+  subroutine shoc_main_mf_diag_c(shcol, nlev, nlevi, &
+     shoc_cldfrac_orig, shoc_ql_orig, mf_ql, mf_moist_a_zt, ent_ensemble_mean, &
+     mf_thlflx, mf_qtflx, mf_thvflx, mf_moist_a, mf_moist_w, mf_moist_qc, mf_aw, &
+     plumeheight, plume_dry_height, ztop, dynamic_L0, wstar) bind(C)
+    use shoc, only : shoc_main_std_mf_diag
+
+    integer(kind=c_int), value, intent(in) :: shcol, nlev, nlevi
+    real(kind=c_real), intent(out), dimension(shcol, nlev) :: shoc_cldfrac_orig, shoc_ql_orig, &
+       mf_ql, mf_moist_a_zt, ent_ensemble_mean
+    real(kind=c_real), intent(out), dimension(shcol, nlevi) :: mf_thlflx, mf_qtflx, mf_thvflx, &
+       mf_moist_a, mf_moist_w, mf_moist_qc, mf_aw
+    real(kind=c_real), intent(out), dimension(shcol) :: plumeheight, plume_dry_height, &
+       ztop, dynamic_L0, wstar
+
+    call shoc_main_std_mf_diag(shcol, nlev, nlevi, &
+       shoc_cldfrac_orig, shoc_ql_orig, mf_ql, mf_moist_a_zt, ent_ensemble_mean, &
+       mf_thlflx, mf_qtflx, mf_thvflx, mf_moist_a, mf_moist_w, mf_moist_qc, mf_aw, &
+       plumeheight, plume_dry_height, ztop, dynamic_L0, wstar)
+  end subroutine shoc_main_mf_diag_c
+
   ! Copy a NUL-terminated C string into a Fortran character variable
   subroutine c_to_f_string(cstr, fstr)
     character(kind=c_char), intent(in) :: cstr(*)

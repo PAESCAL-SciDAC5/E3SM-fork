@@ -37,6 +37,31 @@ Output format is byte-compatible with the Fortran writer
 time, k (0 = top), u, v, tke, qv, qc, T, P, lscale×3 (zeros here — the
 Larson length scale is an EAM-side diagnostic).
 
+## SHOC+MF plume tables (Fortran engine, `do_edmf 1`)
+
+With `-f` and a `-p` file that turns the mass-flux scheme on, three extra
+tables are written next to the two standard ones (which keep their columns
+and stay byte-identical, MF on or off). Everything is top-first (k = 0 =
+model top), full double precision, raw kinematic units:
+
+- `<prefix>_f90_<mode>_mfzt.txt` (midpoints): `cldfrac_pdf qc_pdf` are the
+  PDF-only cloud fraction / condensate (`shoc_cldfrac_orig`, `shoc_ql_orig`),
+  `mf_ql` = a_u·qc_u and `mf_a_zt` the moist-updraft condensate and area on
+  the zt grid, so `cldfrac = min(1, cldfrac_pdf + mf_a_zt)` and
+  `qc = qc_pdf + mf_ql`; `ent_mean` is the ensemble-mean entrainment rate [1/m].
+- `<prefix>_f90_<mode>_mfzi.txt` (interfaces): the MF fluxes `mf_thlflx`
+  [K m/s], `mf_qtflx` [kg/kg m/s], `mf_thvflx` [K m/s]; the moist-plume
+  ensemble area, velocity and condensate `mf_moist_a mf_moist_w mf_moist_qc`;
+  and the total mass flux `mf_aw` = Σ a_i w_i [m/s].
+- `<prefix>_f90_<mode>_mfts.txt` (one row per step): `plumeheight` (top of
+  the fixed-entrainment test plume), `plume_dry_height` (top of the dry part
+  of the ensemble), `ztop` and `dynamic_L0` used by the entrainment closure,
+  the surface-layer `wstar`, and `pblh`.
+
+The values come from `shoc.F90::shoc_main_std_mf_diag` through
+`shoc_iso_c.f90::shoc_main_mf_diag_c`: copies of `shoc_main`'s MF outputs
+taken after each call, nothing is recomputed.
+
 ## What a C++-based host must do for an apples-to-apples run with SHOC's Fortran version
 
 1. **Call `shoc_main` directly.** Do not go through the EAMxx atmosphere

@@ -13,6 +13,8 @@
 // Output: two text tables per run (SHOC uses a staggered vertical grid) —
 //   <prefix>_<engine>_<mode>_zt.txt : midpoint (nlev) states/variances vs pres
 //   <prefix>_<engine>_<mode>_zi.txt : interface (nlev+1) fluxes/covariances vs presi
+// and, for the Fortran engine with the mass-flux scheme on (do_edmf=1), three
+// SHOC+MF plume tables (_mfzt.txt, _mfzi.txt, _mfts.txt; see MfDiag below).
 // All fluxes are written RAW in native SHOC (kinematic) units; the W/m2
 // conversion (x rho x cp / x rho x Lv, matching EAM's shoc_intr history fields)
 // is done downstream in the plot script. Values are full double precision.
@@ -327,6 +329,60 @@ void expect_another_arg (int i, int argc) {
 extern "C" {
   int shoc_set_param_c(const char* name, Real value);   // 0 ok, 1 unknown name
   int shoc_get_param_c(const char* name, Real* value);  // 0 ok, 1 unknown name
+  // SHOC+MF plume diagnostics of the last shoc_main call (Fortran engine only;
+  // shoc_iso_c.f90::shoc_main_mf_diag_c). Arrays are top-first like FortranData.
+  void shoc_main_mf_diag_c(Int shcol, Int nlev, Int nlevi,
+    Real* shoc_cldfrac_orig, Real* shoc_ql_orig, Real* mf_ql, Real* mf_moist_a_zt, Real* ent_ensemble_mean,
+    Real* mf_thlflx, Real* mf_qtflx, Real* mf_thvflx, Real* mf_moist_a, Real* mf_moist_w, Real* mf_moist_qc, Real* mf_aw,
+    Real* plumeheight, Real* plume_dry_height, Real* ztop, Real* dynamic_L0, Real* wstar);
+}
+
+// ---------------------------------------------------------------------------
+// SHOC+MF plume diagnostics (Fortran engine with do_edmf=1 only). They go to
+// three SEPARATE tables, <base>_mfzt.txt / _mfzi.txt / _mfts.txt, so the two
+// standard tables keep their columns and stay byte-identical to a build
+// without this code (MF on or off). Split of the totals in the zt table:
+//   cldfrac = cldfrac_pdf + mf_a_zt (clipped at 1), qc = qc_pdf + mf_ql.
+// Fluxes are raw kinematic units (K m/s, kg/kg m/s), like the zi table.
+struct MfDiag {
+  Int nlev, nlevi;
+  std::vector<Real> cldfrac_pdf, ql_pdf, mf_ql, mf_a_zt, ent_mean;        // zt
+  std::vector<Real> thlflx, qtflx, thvflx, moist_a, moist_w, moist_qc, aw; // zi
+  Real plumeheight = 0, plume_dry_height = 0, ztop = 0, dynamic_L0 = 0, wstar = 0;
+  MfDiag (Int nlev_, Int nlevi_)
+    : nlev(nlev_), nlevi(nlevi_),
+      cldfrac_pdf(nlev_), ql_pdf(nlev_), mf_ql(nlev_), mf_a_zt(nlev_), ent_mean(nlev_),
+      thlflx(nlevi_), qtflx(nlevi_), thvflx(nlevi_), moist_a(nlevi_), moist_w(nlevi_),
+      moist_qc(nlevi_), aw(nlevi_) {}
+  void fetch () {
+    shoc_main_mf_diag_c(1, nlev, nlevi,
+      cldfrac_pdf.data(), ql_pdf.data(), mf_ql.data(), mf_a_zt.data(), ent_mean.data(),
+      thlflx.data(), qtflx.data(), thvflx.data(), moist_a.data(), moist_w.data(), moist_qc.data(), aw.data(),
+      &plumeheight, &plume_dry_height, &ztop, &dynamic_L0, &wstar);
+  }
+};
+
+// Whether the Fortran engine runs with the mass-flux scheme on (module do_edmf).
+bool fortran_mf_on (bool use_fortran) {
+  if (!use_fortran) return false;
+  Real v = 0;
+  EKAT_REQUIRE_MSG(shoc_get_param_c("do_edmf", &v) == 0, "shoc_in_and_out: shoc_get_param_c failed for do_edmf");
+  return v != 0;
+}
+
+void write_mf_zt (std::FILE* fp, int time_s, const FortranData& d, const MfDiag& m) {
+  for (Int k = 0; k < d.nlev; ++k)
+    std::fprintf(fp, "%6d %4d %.17e %.17e %.17e %.17e %.17e %.17e\n", time_s, (int)k,
+      d.zt_grid(0,k), m.cldfrac_pdf[k], m.ql_pdf[k], m.mf_ql[k], m.mf_a_zt[k], m.ent_mean[k]);
+}
+void write_mf_zi (std::FILE* fp, int time_s, const FortranData& d, const MfDiag& m) {
+  for (Int k = 0; k < d.nlevi; ++k)
+    std::fprintf(fp, "%6d %4d %.17e %.17e %.17e %.17e %.17e %.17e %.17e %.17e\n", time_s, (int)k,
+      d.zi_grid(0,k), m.thlflx[k], m.qtflx[k], m.thvflx[k], m.moist_a[k], m.moist_w[k], m.moist_qc[k], m.aw[k]);
+}
+void write_mf_ts (std::FILE* fp, int time_s, const FortranData& d, const MfDiag& m) {
+  std::fprintf(fp, "%6d %.17e %.17e %.17e %.17e %.17e %.17e\n", time_s,
+    m.plumeheight, m.plume_dry_height, m.ztop, m.dynamic_L0, m.wstar, d.pblh(0));
 }
 static const std::vector<std::string>& f90_param_names () {
   static const std::vector<std::string> t = {
@@ -441,7 +497,9 @@ int main (int argc, char** argv) {
       "                do_dynamic_L do_entr_tke do_explicit do_integral\n"
       "                do_implicit (logicals as 0/1). Unlisted names keep the\n"
       "                EAM defaults (do_edmf=0: standard SHOC). The effective\n"
-      "                values are always written to <prefix>_<engine>_<mode>.params.\n";
+      "                values are always written to <prefix>_<engine>_<mode>.params.\n"
+      "                With -f and do_edmf=1 the SHOC+MF plume diagnostics are\n"
+      "                also written: <prefix>_f90_<mode>_{mfzt,mfzi,mfts}.txt.\n";
     return 1;
   }
 
@@ -526,6 +584,29 @@ int main (int argc, char** argv) {
     // Provenance: the tuning parameters this run actually used (defaults or -p).
     write_params_sidecar(base + ".params", pfile, use_fortran);
 
+    // SHOC+MF plume diagnostics: three extra tables, only when the Fortran
+    // engine runs with do_edmf=1 (nothing is written otherwise, so MF-off runs
+    // produce exactly the same files as before).
+    const bool mf_on = fortran_mf_on(use_fortran);
+    std::FILE *fmzt = nullptr, *fmzi = nullptr, *fmts = nullptr;
+    MfDiag mfd(d->nlev, d->nlevi);
+    if (mf_on) {
+      fmzt = std::fopen((base + "_mfzt.txt").c_str(), "w");
+      fmzi = std::fopen((base + "_mfzi.txt").c_str(), "w");
+      fmts = std::fopen((base + "_mfts.txt").c_str(), "w");
+      EKAT_REQUIRE_MSG(fmzt && fmzi && fmts, "shoc_in_and_out: cannot write the MF tables " + base + "_mf*.txt");
+      std::fprintf(fmzt, "time k zt cldfrac_pdf qc_pdf mf_ql mf_a_zt ent_mean\n");
+      std::fprintf(fmzi, "time k zi mf_thlflx mf_qtflx mf_thvflx mf_moist_a mf_moist_w mf_moist_qc mf_aw\n");
+      std::fprintf(fmts, "time plumeheight plume_dry_height ztop dynamic_L0 wstar pblh\n");
+    }
+    auto write_mf = [&] (int time_s) {
+      if (!mf_on) return;
+      mfd.fetch();
+      write_mf_zt(fmzt, time_s, *d, mfd);
+      write_mf_zi(fmzi, time_s, *d, mfd);
+      write_mf_ts(fmts, time_s, *d, mfd);
+    };
+
     std::printf("shoc_in_and_out: engine=%s mode=%s nz=%d dt=%d steps=%d"
                 " dx=%g ic=%s\n", engine.c_str(), mode.c_str(), ic.nz, dt,
                 nsteps, dx, icdir.c_str());
@@ -540,6 +621,7 @@ int main (int argc, char** argv) {
         shoc_main(*d, use_fortran);
         write_state_zt(fzt, istep*dt, *d);
         write_state_zi(fzi, istep*dt, *d);
+        write_mf(istep*dt);
       }
     } else { // exp1
       // A single shoc_main call that advances nadv=nsteps substeps internally;
@@ -548,10 +630,12 @@ int main (int argc, char** argv) {
       shoc_main(*d, use_fortran);
       write_state_zt(fzt, nsteps*dt, *d);
       write_state_zi(fzi, nsteps*dt, *d);
+      write_mf(nsteps*dt);
     }
 
     std::fclose(fzt);
     std::fclose(fzi);
+    if (mf_on) { std::fclose(fmzt); std::fclose(fmzi); std::fclose(fmts); }
     std::printf("shoc_in_and_out: wrote %s and %s (pblh = %.4f m)\n",
                 zt_name.c_str(), zi_name.c_str(), d->pblh(0));
 
