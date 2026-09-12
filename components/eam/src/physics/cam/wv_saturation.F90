@@ -59,6 +59,9 @@ public svp_to_qsat
 public qsat           ! Mixed phase
 public qsat_water     ! SVP over water only
 public qsat_ice       ! SVP over ice only
+! SHOC+MF calls no_ip_hltalt directly (latent heat at temperature t) in its
+! plume condensation; the donor SHOC+MF tree makes it public for the same reason.
+public no_ip_hltalt
 
 ! Wet bulb temperature solver
 public findsp_vc, findsp
