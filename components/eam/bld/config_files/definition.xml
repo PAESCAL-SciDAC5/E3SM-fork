@@ -47,6 +47,11 @@ Physics package: cam3, cam4, cam5, ideal (Held-Suarez forcings), adiabatic, defa
 <entry id="microphys" valid_values="rk,mg1,mg1.5,mg2,p3,none" value="">
 Microphysics package: rk (Rasch and Kristjansson), mg1 (Morrison and Gettelman two moment scheme CAM5.1), mg1.5 (Morrison and Gettelman second version development), mg2 ((Morrison and Gettelman second version), p3 (Morrison and Milbrandt (2015) two moment scheme).
 A value of "none" indicates no microphysics parameterization is used.
+configure also accepts eam_p3, stored as microphys=p3 with p3_version=eam.
+</entry>
+<entry id="p3_version" valid_values="auto,eam" value="auto">
+P3 implementation selection. auto preserves the SGS-dependent selection for
+-microphys p3; eam records -microphys eam_p3, normalized to microphys=p3.
 </entry>
 <entry id="macrophys" valid_values="rk,park,clubb_sgs,shoc_sgs,none" value="">
 Macrophysics package: RK, Park, CLUBB_SGS, SHOC_SGS.

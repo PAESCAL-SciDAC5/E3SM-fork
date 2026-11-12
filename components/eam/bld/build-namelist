@@ -3899,7 +3899,9 @@ if ($clubb_sgs  =~ /$TRUE/io) {
 
 # P3
 if ($cfg->get('microphys') =~ /^p3/) {
-   if ($shoc_sgs  =~ /$TRUE/io) {
+   # Older configuration caches have no p3_version and retain automatic selection.
+   my $eam_p3 = $cfg->is_valid_name('p3_version') && $cfg->get('p3_version') eq 'eam';
+   if ($shoc_sgs  =~ /$TRUE/io and !$eam_p3) {
       add_default($nl, 'micro_p3_lookup_dir');
       add_default($nl, 'micro_p3_tableversion');
       add_default($nl, 'micro_aerosolactivation');
@@ -3909,7 +3911,7 @@ if ($cfg->get('microphys') =~ /^p3/) {
       add_default($nl, 'p3_qc_accret_Expon');
       add_default($nl, 'do_prescribed_CCN'); 
    }
-   if ($clubb_sgs  =~ /$TRUE/io) {
+   if ($clubb_sgs  =~ /$TRUE/io or $eam_p3) {
       add_default($nl, 'micro_p3_lookup_dir');
       add_default($nl, 'micro_p3_tableversion');
       add_default($nl, 'micro_aerosolactivation');
@@ -4987,6 +4989,14 @@ sub get_default_value {
 
     my $var_name    = lc(shift);   # name of namelist variable (case insensitive interface)
     my $usr_att_ref = shift;       # reference to hash containing user supplied attributes
+
+    # Legacy caches do not define p3_version. Unknown XML attributes are otherwise
+    # ignored by NamelistDefaults, which could let explicit EAM defaults match SHOC.
+    unless ($cfg->is_valid_name('p3_version')) {
+        my %attributes = defined($usr_att_ref) ? %$usr_att_ref : ();
+        $attributes{'p3_version'} = 'auto';
+        $usr_att_ref = \%attributes;
+    }
 
     # Check first in the use case defaults
     if (defined $uc_defaults) {

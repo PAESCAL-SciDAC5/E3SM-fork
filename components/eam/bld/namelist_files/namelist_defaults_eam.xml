@@ -947,20 +947,34 @@
 <micro_subgrid_cloud                microphys="p3"> .true.  </micro_subgrid_cloud>
 <do_prescribed_CCN                  microphys="p3"> .false. </do_prescribed_CCN>
   
-<!-- P3 specific namelist variables (for v3 version of P3) -->
+<!-- EAM P3 defaults: CLUBB with p3/eam_p3, or SHOC with explicit eam_p3.
+     Keep the paired entries and the tuned overrides below in sync. -->
 <micro_p3_lookup_dir    clubb_sgs="1" microphys="p3"> atm/cam/physprops </micro_p3_lookup_dir>
+<micro_p3_lookup_dir    shoc_sgs="1" p3_version="eam" microphys="p3"> atm/cam/physprops </micro_p3_lookup_dir>
 <micro_p3_tableversion  clubb_sgs="1" microphys="p3">  4.1.2  </micro_p3_tableversion>
+<micro_p3_tableversion  shoc_sgs="1" p3_version="eam" microphys="p3">  4.1.2  </micro_p3_tableversion>
 <micro_tend_output      clubb_sgs="1" microphys="p3"> .false.  </micro_tend_output>
+<micro_tend_output      shoc_sgs="1" p3_version="eam" microphys="p3"> .false.  </micro_tend_output>
 <p3_autocon_coeff       clubb_sgs="1" microphys="p3">  30500.0D0   </p3_autocon_coeff>
+<p3_autocon_coeff       shoc_sgs="1" p3_version="eam" microphys="p3">  30500.0D0   </p3_autocon_coeff>
 <p3_qc_autocon_expon    clubb_sgs="1" microphys="p3">  3.19D0   </p3_qc_autocon_expon>
+<p3_qc_autocon_expon    shoc_sgs="1" p3_version="eam" microphys="p3">  3.19D0   </p3_qc_autocon_expon>
 <p3_nc_autocon_expon    clubb_sgs="1" microphys="p3">  -1.40D0   </p3_nc_autocon_expon>
+<p3_nc_autocon_expon    shoc_sgs="1" p3_version="eam" microphys="p3">  -1.40D0   </p3_nc_autocon_expon>
 <p3_accret_coeff        clubb_sgs="1" microphys="p3">  117.25D0   </p3_accret_coeff>
+<p3_accret_coeff        shoc_sgs="1" p3_version="eam" microphys="p3">  117.25D0   </p3_accret_coeff>
 <p3_qc_accret_expon     clubb_sgs="1" microphys="p3">  1.15D0   </p3_qc_accret_expon>
+<p3_qc_accret_expon     shoc_sgs="1" p3_version="eam" microphys="p3">  1.15D0   </p3_qc_accret_expon>
 <p3_wbf_coeff           clubb_sgs="1" microphys="p3"> 0.7D0     </p3_wbf_coeff>
+<p3_wbf_coeff           shoc_sgs="1" p3_version="eam" microphys="p3"> 0.7D0     </p3_wbf_coeff>
 <p3_max_mean_rain_size  clubb_sgs="1" microphys="p3"> 0.005D0     </p3_max_mean_rain_size>
+<p3_max_mean_rain_size  shoc_sgs="1" p3_version="eam" microphys="p3"> 0.005D0     </p3_max_mean_rain_size>
 <p3_embryonic_rain_size clubb_sgs="1" microphys="p3"> 0.000025D0  </p3_embryonic_rain_size>
+<p3_embryonic_rain_size shoc_sgs="1" p3_version="eam" microphys="p3"> 0.000025D0  </p3_embryonic_rain_size>
 <p3_embryonic_rain_size clubb_sgs="1" microphys="p3" hgrid="ne120np4"> 0.000020D0  </p3_embryonic_rain_size>
+<p3_embryonic_rain_size shoc_sgs="1" p3_version="eam" microphys="p3" hgrid="ne120np4"> 0.000020D0  </p3_embryonic_rain_size>
 <do_Cooper_inP3         clubb_sgs="1" microphys="p3"> .false. </do_Cooper_inP3>
+<do_Cooper_inP3         shoc_sgs="1" p3_version="eam" microphys="p3"> .false. </do_Cooper_inP3>
 
 <!-- P3 specific namelist variables (for SCREAM version of P3) -->
 <micro_p3_lookup_dir   shoc_sgs="1" microphys="p3"> atm/scream/tables </micro_p3_lookup_dir>
@@ -1979,7 +1993,9 @@ with se_tstep, dt_remap_factor, dt_tracer_factor set to -1
 <sscav_tuning phys="default" microphys="p3">.false.</sscav_tuning>
 <p3_mincdnc phys="default" microphys="p3"> 20.D6      </p3_mincdnc>
 <p3_wbf_coeff phys="default" clubb_sgs="1" microphys="p3"> 1.0      </p3_wbf_coeff>
+<p3_wbf_coeff phys="default" shoc_sgs="1" p3_version="eam" microphys="p3"> 1.0      </p3_wbf_coeff>
 <p3_nc_autocon_expon  phys="default" clubb_sgs="1" microphys="p3">  -1.10D0   </p3_nc_autocon_expon>
+<p3_nc_autocon_expon  phys="default" shoc_sgs="1" p3_version="eam" microphys="p3">  -1.10D0   </p3_nc_autocon_expon>
 <n_so4_monolayers_pcage  phys="default" clubb_sgs="1" microphys="p3">  3.0D0   </n_so4_monolayers_pcage>
 <dp_cut_accum_rename  phys="default">  4.0D-7   </dp_cut_accum_rename>
 <dp_xferall_thresh_accum_rename phys="default">  4.0D-7  </dp_xferall_thresh_accum_rename>

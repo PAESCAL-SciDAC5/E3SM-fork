@@ -144,7 +144,9 @@ OPTIONS
      -max_n_rad_cnst <n> Maximum number of constituents that are either radiatively
                         active, or in any single diagnostic list for the radiation.
      -vbs               Activate vbs soa processes in the modal aerosol model.
-     -microphys <name>  Specify the microphysics option [mg1 | mg1.5 | mg2 | rk | p3].
+     -microphys <name>  Specify the microphysics option [mg1 | mg1.5 | mg2 | rk | p3 | eam_p3].
+                        p3 selects SCREAM Fortran P3 with SHOC, otherwise EAM P3.
+                        eam_p3 explicitly selects EAM P3 with either CLUBB or SHOC.
      -nadv <n>          Set total number of advected species to <n>.
      -nadv_tt <n>       Set number of advected test tracers <n>.
      -nlev <n>          Set number of levels to <n>.
@@ -977,6 +979,14 @@ if (defined $opts{'microphys'}) {
     }
 }
 
+# Keep the canonical P3 scheme name so existing tracer, CPP and namelist
+# selections still apply. Record the explicit implementation choice separately.
+my $p3_version = 'auto';
+if ($microphys_pkg eq 'eam_p3') {
+    $microphys_pkg = 'p3';
+    $p3_version = 'eam';
+}
+$cfg_ref->set('p3_version', $p3_version);
 $cfg_ref->set('microphys', $microphys_pkg);
 
 if ($print>=2) { print "Microphysics package: $microphys_pkg$eol"; }
@@ -1031,6 +1041,11 @@ if ($shoc_sgs and $microphys_pkg !~ m/^mg/ and $microphys_pkg !~ m/^p3/) {
 **    ERROR: microphysics package set to: $microphys_pkg
 **    SHOC_SGS only works with MG or P3 microphysics.
 EOF
+}
+
+# The explicit EAM P3 pairing is supported with CLUBB or SHOC, outside MMF.
+if ($p3_version eq 'eam' and ((!$clubb_sgs and !$shoc_sgs) or defined $opts{'use_MMF'})) {
+    die "configure ERROR: -microphys eam_p3 requires CLUBB or SHOC and does not support MMF.\n";
 }
 
 #-----------------------------------------------------------------------------------------------
@@ -1766,12 +1781,12 @@ if (defined $opts{'cppdefs'}) {
 }
 $cfg_ref->set('cppdefs', $usr_cppdefs);
 
-# Define is_eamxx_config flag to select which P3 version codes to use
-# If the config uses both p3 and shoc, it is recognized as a scream case.
+# Select the Fortran P3 implementation. Preserve the automatic selection for
+# -microphys p3; -microphys eam_p3 explicitly uses EAM P3 even with SHOC.
  
 my $is_eamxx_config = 0;
 if ($microphys_pkg =~ /^p3/) {
-   if ($shoc_sgs) {
+   if ($shoc_sgs and $p3_version ne 'eam') {
       $is_eamxx_config = 1;
       print "The case uses SCREAM config and SCREAM's version of P3 codes in Fortran 90.\n";
    } else {
