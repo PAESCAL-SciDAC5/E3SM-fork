@@ -240,11 +240,13 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
    real(R8),parameter :: tstar_tiny = 1.0e-5_R8
    real(R8),parameter :: qstar_tiny = 1.0e-8_R8
    real(R8),parameter :: u10n_tiny  = 1.0e-3_R8
+   real(R8),parameter :: wind_adj_tiny = 1.0e-3_R8
    !--- local variables --------------------------------
    integer(IN) :: n      ! vector loop index
    integer(IN) :: iter
    logical     :: use_stability_limiter ! apply the stability limiter during iteration
    real(R8)    :: vmag   ! surface wind magnitude   (m/s)
+   real(R8)    :: vmag_init ! initially calculated surface wind magnitude (m/s)
    real(R8)    :: ssq    ! sea surface humidity     (kg/kg)
    real(R8)    :: delt   ! potential T difference   (K)
    real(R8)    :: delq   ! humidity difference      (kg/kg)
@@ -278,6 +280,9 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
    real(R8)    :: zo,zot,zoq      ! roughness lengths
    real(R8)    :: hsb,hlb         ! sens & lat heat flxs at zbot
    real(R8) :: trf,qrf,urf,vrf ! reference-height quantities
+
+   ! For use in dealing with optional arguments.
+   real(R8), allocatable :: wsresp_copy, tau_est_copy
 
 
     !--- local functions --------------------------------
@@ -336,6 +341,15 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
    psixh = spval
    hol=spval
 
+   if (present(wsresp) .and. present(tau_est)) then
+      allocate(wsresp_copy, tau_est_copy)
+   end if
+
+   if (use_coldair_outbreak_mod .and. present(wsresp) .and. present(tau_est)) then
+      call shr_sys_abort('Cold air outbreak not implemented for use with ' // &
+           'implicit flux method' // errMsg(sourcefile, __LINE__))
+   end if
+
   !--- for cold air outbreak calc --------------------------------
    tdiff= tbot - ts
 
@@ -374,6 +388,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
         delq   = qbot(n) - ssq                     ! spec hum dif (kg/kg)
         alz    = log(zbot(n)/zref)
         cp     = loc_cpdair*(1.0_R8 + loc_cpvir*ssq)
+        vmag_init = vmag
 
         if (.not. use_ocn_atm_flux_reg) then
             use_stability_limiter = .true.
@@ -398,7 +413,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
             ! system has a solution, but this solution likely does not have any physical meaning as it is induced by
             ! the limiter.
             !
-            ! Note: if implicit stress modification is used, may need to preserve original value of vmag for use in this step.
+            ! Reset vmag for next try in case it was modified (e.g. by implicit flux code).
+            vmag = vmag_init
             ! check if computed scaling parameters are close to 0
             if (abs(ustar) < ustar_tiny .or. abs(tstar) < tstar_tiny .or. &
                 abs(qstar) < qstar_tiny .or. abs(u10n) < u10n_tiny) then
@@ -498,7 +514,16 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
 
 
     DO n=1,nMax
-     if (mask(n) /= 0) then
+       if (mask(n) /= 0) then
+
+        if (present(wsresp) .and. present(tau_est)) then
+           ! If these actually have values, they need to be set. Otherwise, they
+           ! are unallocated, which means they can be passed as optional
+           ! arguments to cor30a and are considered "not present" in that
+           ! context.
+           wsresp_copy = wsresp(n)
+           tau_est_copy = tau_est(n)
+        end if
 
         !--- compute some needed quantities ---
         wind0 = max(sqrt((ubot(n) - us(n))**2 + (vbot(n) - vs(n))**2), 0.01_r8)
@@ -523,7 +548,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
                  & ,zo,zot,zoq,hol,ustar,tstar,qstar        &  ! out: ss scales
                  & ,rd,rh,re                                &  ! out: exch. coeffs
                  & ,trf,qrf,urf,vrf                         &  ! out: reference-height params
-                 & ,wsresp(n),tau_est(n)                    &  ! in: optional stress params for the sake of maintaining same defs
+                 & ,wsresp_copy,tau_est_copy                &  ! in: optional stress params for the sake of maintaining same defs
                  & ,charnockSeaState(n))                       ! in: optional charnock sea state
         else 
            call cor30a(ubot(n),vbot(n),tbot(n),qbot(n),rbot(n) &  ! in atm params
@@ -533,7 +558,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
                  & ,zo,zot,zoq,hol,ustar,tstar,qstar        &  ! out: ss scales
                  & ,rd,rh,re                                &  ! out: exch. coeffs
                  & ,trf,qrf,urf,vrf                         &  ! out: reference-height params
-                 & ,wsresp(n),tau_est(n)   )                   ! in: optional stress params for the sake of maintaining same defs
+                 & ,wsresp_copy,tau_est_copy   )               ! in: optional stress params for the sake of maintaining same defs
         endif
         hol=zbot(n)/hol
         rd=sqrt(rd)
@@ -737,7 +762,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
          ! Update stress and magnitude of mean wind.
          tau = rbot(n) * ustar * rdn * wind_adj
          call shr_flux_update_stress(wind0, wsresp(n), tau_est(n), &
-               tau, prev_tau, tau_diff, prev_tau_diff, wind_adj)
+               tau, prev_tau, tau_diff, prev_tau_diff, wind_adj, &
+               apply_tau_diff_fac=.false.)
          vmag = wind_adj
          if (present(ugust)) then
             vmag = sqrt(vmag**2 + ugust(n)**2)
@@ -766,7 +792,7 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
                               ((tstar_next - tstar_prev)/(abs(tstar_prev) + tstar_tiny))**2 + &
                               ((qstar_next - qstar_prev)/(abs(qstar_prev) + qstar_tiny))**2 + &
                               ((u10n_next - u10n_prev)/(abs(u10n_prev) + u10n_tiny))**2 + &
-                              ((wind_adj_next - wind_adj_prev)/(abs(wind_adj_prev) + u10n_tiny))**2) &
+                              ((wind_adj_next - wind_adj_prev)/(abs(wind_adj_prev) + wind_adj_tiny))**2) &
                               > flux_con_tol)) exit
             else
                if (.not. (sqrt(((ustar_next - ustar_prev)/(abs(ustar_prev) + ustar_tiny))**2 + &
@@ -895,7 +921,8 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,   &
                ! When regularization is active, wind_adj needs to be updated with damping to be
                ! consistent with the other unknowns.
                call shr_flux_update_stress(wind0, wsresp(n), tau_est(n), &
-                     tau, prev_tau, tau_diff, prev_tau_diff, wind_adj_next)
+                     tau, prev_tau, tau_diff, prev_tau_diff, wind_adj_next, &
+                     apply_tau_diff_fac=.false.)
                wind_adj = ocn_atm_flux_damping * wind_adj_next + &
                           (1.0_R8 - ocn_atm_flux_damping) * wind_adj_prev
             else
@@ -1096,6 +1123,11 @@ SUBROUTINE shr_flux_atmOcn_UA(   &
 
    ! Evaluate loc_epsilon.
    loc_epsilon = 1.0_R8 / (1.0_R8 + loc_zvir)
+
+   if (use_coldair_outbreak_mod .and. present(wsresp) .and. present(tau_est)) then
+      call shr_sys_abort('Cold air outbreak not implemented for use with ' // &
+           'implicit flux method' // errMsg(sourcefile, __LINE__))
+   end if
 
   !--- for cold air outbreak calc --------------------------------
    tdiff = tbot - ts
@@ -1780,6 +1812,9 @@ SUBROUTINE shr_flux_atmOcn_diurnal &
    real(R8)    :: hsb,hlb         ! sens & lat heat flxs at zbot
    real(R8)    :: trf,qrf,urf,vrf ! reference-height quantities
 
+   ! For use in dealing with optional arguments.
+   real(R8), allocatable :: wsresp_copy, tau_est_copy
+
    !--- local functions --------------------------------
    real(R8)    :: qsat   ! function: the saturation humididty of air (kg/m^3)
    real(R8)    :: cdn    ! function: neutral drag coeff at 10m
@@ -1837,8 +1872,18 @@ SUBROUTINE shr_flux_atmOcn_diurnal &
    dtiter = spval
    dsiter = spval
    al2 = log(zref/ztref)
+
+   if (present(wsresp) .and. present(tau_est)) then
+      allocate(wsresp_copy, tau_est_copy)
+   end if
+
   !--- for cold air outbreak calc --------------------------------
    tdiff= tbot - ts
+
+   if (use_coldair_outbreak_mod .and. present(wsresp) .and. present(tau_est)) then
+      call shr_sys_abort('Cold air outbreak not implemented for use with ' // &
+           'implicit flux method' // errMsg(sourcefile, __LINE__))
+   end if
 
    ! equations 18 and 19
    AMP = 1.0_R8/F0-1.0_R8
@@ -1982,6 +2027,15 @@ SUBROUTINE shr_flux_atmOcn_diurnal &
 
          else if (ocn_surface_flux_scheme .eq. 1) then! use COARE algorithm
 
+              if (present(wsresp) .and. present(tau_est)) then
+                 ! If these actually have values, they need to be set. Otherwise, they
+                 ! are unallocated, which means they can be passed as optional
+                 ! arguments to cor30a and are considered "not present" in that
+                 ! context.
+                 wsresp_copy = wsresp(n)
+                 tau_est_copy = tau_est(n)
+              end if
+
               call cor30a(ubot(n),vbot(n),tbot(n),qbot(n),rbot(n) &  ! in atm params
                        & ,us(n),vs(n),tBulk(n),ssq                &  ! in surf params (NB ts -> tBulk)
                        & ,zpbl,zbot(n),zbot(n),zref,ztref,ztref   &  ! in heights
@@ -1989,7 +2043,7 @@ SUBROUTINE shr_flux_atmOcn_diurnal &
                        & ,zo,zot,zoq,hol,ustar,tstar,qstar        &  ! out: ss scales
                        & ,rd,rh,re                                &  ! out: exch. coeffs
                        & ,trf,qrf,urf,vrf                         &  ! out: reference-height params
-                       & ,wsresp(n),tau_est(n))                      ! in: optional stress params
+                       & ,wsresp_copy,tau_est_copy)                  ! in: optional stress params
              ! for the sake of maintaining same defs
               hol=zbot(n)/hol
               rd=sqrt(rd)
@@ -2159,6 +2213,15 @@ SUBROUTINE shr_flux_atmOcn_diurnal &
 
          else if (ocn_surface_flux_scheme .eq. 1) then! use COARE algorithm
 
+            if (present(wsresp) .and. present(tau_est)) then
+               ! If these actually have values, they need to be set. Otherwise, they
+               ! are unallocated, which means they can be passed as optional
+               ! arguments to cor30a and are considered "not present" in that
+               ! context.
+               wsresp_copy = wsresp(n)
+               tau_est_copy = tau_est(n)
+            end if
+
             call cor30a(ubot(n),vbot(n),tbot(n),qbot(n),rbot(n) &  ! in atm params
                      & ,us(n),vs(n),tBulk(n),ssq                &  ! in surf params (NB ts -> tBulk)
                      & ,zpbl,zbot(n),zbot(n),zref,ztref,ztref   &  ! in heights
@@ -2166,7 +2229,7 @@ SUBROUTINE shr_flux_atmOcn_diurnal &
                      & ,zo,zot,zoq,hol,ustar,tstar,qstar        &  ! out: ss scales
                      & ,rd,rh,re                                &  ! out: exch. coeffs
                      & ,trf,qrf,urf,vrf                         &  ! out: reference-height params
-                     & ,wsresp(n),tau_est(n))                      ! in: optional stress params
+                     & ,wsresp_copy,tau_est_copy)                  ! in: optional stress params
             ! for the sake of maintaining same defs
             hol=zbot(n)/hol
             rd=sqrt(rd)
@@ -2753,7 +2816,7 @@ end subroutine shr_flux_MOstability
 ! We use the sign convention where all arguments are assumed to be positive,
 ! except for tau_diff and prev_tau_diff, which can be of either sign.
 subroutine shr_flux_update_stress(wind0, wsresp, tau_est, tau, prev_tau, &
-     tau_diff, prev_tau_diff, wind_adj)
+     tau_diff, prev_tau_diff, wind_adj, apply_tau_diff_fac)
   ! Wind speed from atmosphere (not updated by iteration) [m/s]
   real(r8), intent(in) :: wind0
   ! Response of boundary layer wind to stress changes in a time step [m/s/Pa]
@@ -2771,40 +2834,82 @@ subroutine shr_flux_update_stress(wind0, wsresp, tau_est, tau, prev_tau, &
   real(r8), intent(out) :: prev_tau_diff
   ! Wind updated by iteration [m/s]
   real(r8), intent(out) :: wind_adj
+  ! Whether or not to apply tau_diff_fac damping. Default is true for reasons of
+  ! improved stability, but it is preferable to disable this if a damping is
+  ! already being applied outside of this function.
+  logical, intent(in), optional :: apply_tau_diff_fac
 
+  ! Regularization parameter for limiter preventing reversal of wind direction.
+  ! In the limit rieps -> 0, the code will clip changes in wind so that friction
+  ! can at most stop the wind, not reverse it. Small positive values will still
+  ! effectively clip the value, but smooth out the transition between clipped
+  ! and unclipped values so that the derivative of the limited tau with respect
+  ! to the original tau is continuous.
+  !
+  ! This value is unitless, and should not be modified unless there is clear
+  ! evidence of slow convergence of the iterative solver. If the tau is large
+  ! enough that it would remove all the wind this time step (wind_frac = 1),
+  ! then the limiter will adjust this value so that the fraction removed is
+  ! approximately: wind_frac = 1 - sqrt(rieps)
+  real(r8), parameter :: rieps = 1.e-6
+
+  ! Applied amount of wsresp [m/s/Pa]
   real(r8) :: wsresp_applied
-
+  logical :: apply_tau_diff_fac_loc
   ! maximum ratio between abs(tau_diff) and abs(prev_tau_diff)
   real(r8) :: tau_diff_fac
+  ! Estimated fraction of wind that will be removed by friction [unitless]
+  real(r8) :: wind_frac
+  ! Scratch variable used in wind adjustment calculation [unitless]
+  real(r8) :: sqrt_term
+
+  if (present(apply_tau_diff_fac)) then
+     apply_tau_diff_fac_loc = apply_tau_diff_fac
+  else
+     apply_tau_diff_fac_loc = .true.
+  end if
 
   ! Using wsresp_applied = 0.5 * wsresp improves accuracy somewhat, similar to
   ! using the trapezoidal method rather than backward Euler.
   wsresp_applied = 0.5 * wsresp
 
-  ! Forbid removing more than 99% of wind speed.
-  ! This is applied before anything else to ensure that the applied stress is
-  ! not so strong that it reverses the direction of the winds.
-  if ( (tau - tau_est) * wsresp_applied > 0.99_r8 * wind0 ) then
-     tau = tau_est + 0.99_r8 * wind0 / wsresp_applied
-  end if
-
   prev_tau_diff = tau_diff
   tau_diff = tau - prev_tau
 
   ! damp large changes each iteration for convergence
-  if (tau_diff * prev_tau_diff < 0._r8) then
-     ! if oscillating about the solution, use stronger damping
-     ! this should not be set below 0.5
-     tau_diff_fac = 0.6_r8
-  else
-     tau_diff_fac = 0.95_r8
+  if (apply_tau_diff_fac_loc) then
+     if (tau_diff * prev_tau_diff < 0._r8) then
+        ! if oscillating about the solution, use stronger damping
+        ! this should not be set below 0.5
+        tau_diff_fac = 0.6_r8
+     else
+        tau_diff_fac = 0.95_r8
+     end if
+
+     if (abs(tau_diff) > abs(tau_diff_fac*prev_tau_diff)) then
+        tau_diff = sign(tau_diff_fac*prev_tau_diff, tau_diff)
+        tau = prev_tau + tau_diff
+     end if
   end if
 
-  if (abs(tau_diff) > abs(tau_diff_fac*prev_tau_diff)) then
-     tau_diff = sign(tau_diff_fac*prev_tau_diff, tau_diff)
-     tau = prev_tau + tau_diff
-  end if
   prev_tau = tau
+
+  ! Forbid reversing wind direction.
+  ! This is applied before anything else to ensure that the applied stress is
+  ! not so strong that it reverses the direction of the winds.
+  ! The formula is derived from fitting a hyperbola in such a way that for small
+  ! tau, the size of the wind adjustment is roughly linear with tau, whereas for
+  ! large tau, the wind speed removed by friction asymptotically approaches 100%
+  ! of total wind.
+  if (tau > tau_est .and. wsresp_applied > 0._r8) then
+     ! Fraction of wind removed.
+     wind_frac = (tau - tau_est) * wsresp_applied / wind0
+     sqrt_term = np.sqrt((wind_frac - 1._r8)**2 + 4 * wind_frac * rieps / (1._r8 + rieps))
+     ! Limited value of wind_frac.
+     wind_frac = (wind_frac + 1._r8 - sqrt_term) * (1._r8 + rieps) / 2._r8
+     ! Invert formula to retrieve limited value of tau.
+     tau = (wind_frac * wind0 / wsresp_applied) + tau_est
+  end if
 
   wind_adj = wind0 - (tau - tau_est) * wsresp_applied
 
